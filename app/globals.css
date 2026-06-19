@@ -1,0 +1,187 @@
+@import "tailwindcss";
+
+:root {
+  /* ===== الألوان الأساسية הפخمة (Purple & Gold Harmony) ===== */
+  /* بنفسجي ساطع وهادئ (Indigo/Violet) */
+  --primary: #7C3AED;
+  --primary-dark: #5B21B6;
+  --primary-light: #EDE9FE;
+
+  /* ذهبي / أصفر مشرق (Yellow/Amber) للمسات الجذابة */
+  --accent-amber: #FBBF24;
+  --accent-amber-light: #FEF3C7;
+
+  /* ألوان إضافية (أخضر للنجاح، أحمر للتنبيهات، أزرق للتميز) */
+  --accent-teal: #10B981;
+  --accent-teal-light: #ECFDF5;
+  --accent-red: #EF4444;
+  --accent-red-light: #FEF2F2;
+  --accent-blue: #3B82F6;
+  --accent-blue-light: #DBEAFE;
+
+  --sidebar: #1E1B4B;
+
+  /* ألوان الخلفية والنصوص (Clean & Soft) */
+  --bg: #F8FAFC;
+  --card: #FFFFFF;
+  --text: #1E293B;
+  --text-muted: #64748B;
+  --border: #E2E8F0;
+
+  --sidebar-w: 230px;
+  --header-h: 58px;
+}
+
+[data-theme="dark"] {
+  --bg: #0B0F19; /* كحلي داكن جداً وفخم */
+  --card: #111827;
+  --text: #F8FAFC;
+  --text-muted: #94A3B8;
+  --border: #1E293B;
+  
+  --primary: #3B82F6;
+  --primary-dark: #2563EB;
+  --primary-light: #172554;
+
+  --accent-amber: #FBBF24;
+  --accent-amber-light: #451A03;
+  --accent-teal-light: #064E3B;
+  --accent-red-light: #450A0A;
+  --accent-blue-light: #1E3A8A;
+}
+
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-light: var(--primary-light);
+
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-amber-light: var(--accent-amber-light);
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-teal-light: var(--accent-teal-light);
+  --color-accent-red: var(--accent-red);
+  --color-accent-red-light: var(--accent-red-light);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-blue-light: var(--accent-blue-light);
+
+  --color-sidebar: var(--sidebar);
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-border: var(--border);
+
+  --font-sans: "Cairo", sans-serif;
+}
+
+/* فئات مساعدة إضافية للتصميم الراقي */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+[data-theme="dark"] .glass-effect {
+  background: rgba(17, 24, 39, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.mesh-gradient-bg {
+  background-color: var(--bg);
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(253,16%,7%,0) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, hsla(225,39%,30%,0.1) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, hsla(339,49%,30%,0.05) 0, transparent 50%);
+}
+
+[data-theme="dark"] .mesh-gradient-bg {
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
+    radial-gradient(at 50% 0%, hsla(225,39%,30%,0.5) 0, transparent 50%), 
+    radial-gradient(at 100% 0%, hsla(339,49%,30%,0.2) 0, transparent 50%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Cairo", sans-serif;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* ===== سكرول بار مخصص ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ===== أنيميشن مشترك ===== */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.5s ease both;
+}
+.delay-1 {
+  animation-delay: 0.05s;
+}
+.delay-2 {
+  animation-delay: 0.1s;
+}
+.delay-3 {
+  animation-delay: 0.15s;
+}
+.delay-4 {
+  animation-delay: 0.2s;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.pulse {
+  animation: pulse 1s infinite;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.pop {
+  animation: pop 0.25s ease;
+}
+
+/* احترام تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
