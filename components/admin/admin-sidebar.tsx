@@ -6,6 +6,7 @@ import {
   IconRocket, IconLayoutDashboard, IconUsers, IconUpload,
   IconClipboardText, IconCurrencyDollar, IconArrowRight,
   IconLogout2, IconBrain, IconBook, IconFolder, IconBrandWhatsapp,
+  IconSchool,
 } from "@tabler/icons-react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
@@ -15,6 +16,7 @@ const NAV_GROUPS = [
     label: "الإدارة",
     items: [
       { href: "/admin",          label: "الرئيسية",           icon: <IconLayoutDashboard size={19} /> },
+      { href: "/admin/courses",   label: "الدورات التعليمية",  icon: <IconSchool size={19} /> },
       { href: "/admin/tracks",   label: "المسارات والأقسام",  icon: <IconBrain size={19} /> },
       { href: "/admin/exams",    label: "إنشاء الاختبارات",   icon: <IconClipboardText size={19} /> },
       { href: "/admin/lessons",  label: "رفع الدروس",          icon: <IconBook size={19} /> },

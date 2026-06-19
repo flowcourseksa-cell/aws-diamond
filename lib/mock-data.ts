@@ -145,11 +145,47 @@ export const FLOW_TRACKS: FlowTrack[] = [
     gradient: "from-indigo-500 to-violet-600",
     icon: "📐",
     sections: [
-      { id: "algebra", name: "جبر", skills: [] },
-      { id: "geometry", name: "هندسة", skills: [] },
-      { id: "statistics", name: "احصاء", skills: [] },
-      { id: "word-problems", name: "مسائل لفظية", skills: [] },
-      { id: "comparisons", name: "مقارنات", skills: [] },
+      {
+        id: "algebra", name: "جبر",
+        skills: [
+          { id: "sk-alg-1", name: "المعادلات الخطية",       masteryScore: 72, status: "average" },
+          { id: "sk-alg-2", name: "المتباينات",              masteryScore: 55, status: "average" },
+          { id: "sk-alg-3", name: "الدوال والعلاقات",        masteryScore: 40, status: "weak"    },
+          { id: "sk-alg-4", name: "الأنماط والمتتاليات",     masteryScore: 80, status: "strong"  },
+        ],
+      },
+      {
+        id: "geometry", name: "هندسة",
+        skills: [
+          { id: "sk-geo-1", name: "المساحات والمحيطات",      masteryScore: 85, status: "strong"  },
+          { id: "sk-geo-2", name: "الزوايا والمثلثات",        masteryScore: 60, status: "average" },
+          { id: "sk-geo-3", name: "الدائرة وخواصها",          masteryScore: 45, status: "weak"    },
+          { id: "sk-geo-4", name: "الأشكال الفضائية",         masteryScore: 30, status: "weak"    },
+        ],
+      },
+      {
+        id: "statistics", name: "إحصاء واحتمالات",
+        skills: [
+          { id: "sk-stat-1", name: "الوسط الحسابي والوسيط",  masteryScore: 78, status: "average" },
+          { id: "sk-stat-2", name: "الاحتمالات الأساسية",     masteryScore: 35, status: "weak"    },
+          { id: "sk-stat-3", name: "قراءة الجداول والرسوم",   masteryScore: 90, status: "strong"  },
+        ],
+      },
+      {
+        id: "word-problems", name: "مسائل لفظية",
+        skills: [
+          { id: "sk-wp-1", name: "مسائل السرعة والمسافة",    masteryScore: 50, status: "average" },
+          { id: "sk-wp-2", name: "مسائل الخلائط والنسب",     masteryScore: 30, status: "weak"    },
+          { id: "sk-wp-3", name: "مسائل الربح والخسارة",      masteryScore: 65, status: "average" },
+        ],
+      },
+      {
+        id: "comparisons", name: "مقارنات كمية",
+        skills: [
+          { id: "sk-cmp-1", name: "مقارنة الكميتين",          masteryScore: 82, status: "strong"  },
+          { id: "sk-cmp-2", name: "مقارنة العبارات الجبرية",  masteryScore: 55, status: "average" },
+        ],
+      },
     ],
   },
   {
@@ -159,11 +195,43 @@ export const FLOW_TRACKS: FlowTrack[] = [
     gradient: "from-purple-500 to-fuchsia-600",
     icon: "📖",
     sections: [
-      { id: "odd-word", name: "مفردة شاذة", skills: [] },
-      { id: "reading", name: "استيعاب المقروء", skills: [] },
-      { id: "completion", name: "اكمال الجمل", skills: [] },
-      { id: "context-error", name: "الخطأ السياقي", skills: [] },
-      { id: "analogy", name: "التناظر اللفظي", skills: [] },
+      {
+        id: "odd-word", name: "المفردة الشاذة",
+        skills: [
+          { id: "sk-ow-1", name: "تصنيف الكلمات بالمعنى",    masteryScore: 70, status: "average" },
+          { id: "sk-ow-2", name: "العلاقة المفهومية",          masteryScore: 55, status: "average" },
+        ],
+      },
+      {
+        id: "reading", name: "استيعاب المقروء",
+        skills: [
+          { id: "sk-rd-1", name: "الفكرة الرئيسية",            masteryScore: 80, status: "strong"  },
+          { id: "sk-rd-2", name: "الاستنتاج والتحليل",          masteryScore: 38, status: "weak"    },
+          { id: "sk-rd-3", name: "معنى الكلمة من السياق",      masteryScore: 60, status: "average" },
+        ],
+      },
+      {
+        id: "completion", name: "إكمال الجمل",
+        skills: [
+          { id: "sk-cmp-lf-1", name: "الترابط المنطقي للجملة", masteryScore: 65, status: "average" },
+          { id: "sk-cmp-lf-2", name: "الثغرات المفردية",        masteryScore: 75, status: "average" },
+        ],
+      },
+      {
+        id: "context-error", name: "الخطأ السياقي",
+        skills: [
+          { id: "sk-ce-1", name: "اكتشاف التناقض",             masteryScore: 42, status: "weak"    },
+          { id: "sk-ce-2", name: "الكلمة غير المناسبة",         masteryScore: 58, status: "average" },
+        ],
+      },
+      {
+        id: "analogy", name: "التناظر اللفظي",
+        skills: [
+          { id: "sk-an-1", name: "علاقة الجزء بالكل",           masteryScore: 50, status: "average" },
+          { id: "sk-an-2", name: "علاقة السبب بالنتيجة",        masteryScore: 33, status: "weak"    },
+          { id: "sk-an-3", name: "علاقة الضد والمرادف",         masteryScore: 85, status: "strong"  },
+        ],
+      },
     ],
   },
   {
@@ -173,9 +241,28 @@ export const FLOW_TRACKS: FlowTrack[] = [
     gradient: "from-red-500 to-rose-600",
     icon: "🏆",
     sections: [
-      { id: "nafis-math", name: "رياضيات", skills: [] },
-      { id: "nafis-science", name: "علوم", skills: [] },
-      { id: "nafis-arabic", name: "لغة عربية", skills: [] },
+      {
+        id: "nafis-math", name: "رياضيات نافس",
+        skills: [
+          { id: "sk-nm-1", name: "الأعداد والعمليات",          masteryScore: 75, status: "average" },
+          { id: "sk-nm-2", name: "الكسور والنسب المئوية",       masteryScore: 60, status: "average" },
+          { id: "sk-nm-3", name: "الجبر الأساسي",               masteryScore: 45, status: "weak"    },
+        ],
+      },
+      {
+        id: "nafis-science", name: "علوم نافس",
+        skills: [
+          { id: "sk-ns-1", name: "الفيزياء الأساسية",           masteryScore: 50, status: "average" },
+          { id: "sk-ns-2", name: "الكيمياء الأساسية",            masteryScore: 40, status: "weak"    },
+        ],
+      },
+      {
+        id: "nafis-arabic", name: "لغة عربية نافس",
+        skills: [
+          { id: "sk-na-1", name: "القواعد النحوية",              masteryScore: 70, status: "average" },
+          { id: "sk-na-2", name: "الفهم والاستيعاب",             masteryScore: 65, status: "average" },
+        ],
+      },
     ],
   },
   {
@@ -185,11 +272,25 @@ export const FLOW_TRACKS: FlowTrack[] = [
     gradient: "from-amber-500 to-orange-500",
     icon: "🔢",
     sections: [
-      { id: "tasis-komi", name: "كمي", skills: [] },
-      { id: "tasis-lafzi", name: "لفظي", skills: [] },
+      {
+        id: "tasis-komi", name: "تأسيس كمي",
+        skills: [
+          { id: "sk-tk-1", name: "العمليات الأساسية",            masteryScore: 90, status: "strong"  },
+          { id: "sk-tk-2", name: "الكسور والأعداد العشرية",      masteryScore: 75, status: "average" },
+          { id: "sk-tk-3", name: "النسب والتناسب",               masteryScore: 55, status: "average" },
+        ],
+      },
+      {
+        id: "tasis-lafzi", name: "تأسيس لفظي",
+        skills: [
+          { id: "sk-tl-1", name: "المفردات الأساسية",            masteryScore: 80, status: "strong"  },
+          { id: "sk-tl-2", name: "الفهم القرائي البسيط",          masteryScore: 68, status: "average" },
+        ],
+      },
     ],
   },
 ];
+
 
 export const TRACK_EXAMS: Array<{
   id: string; trackId: string; sectionId: string;

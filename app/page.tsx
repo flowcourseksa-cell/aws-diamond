@@ -1,6 +1,7 @@
 "use client";
 
 import HeroSection from "@/components/landing/hero-section";
+import CoursesSection from "@/components/landing/courses-section";
 import MainBannersSection from "@/components/landing/main-banners-section";
 import CommunitySection from "@/components/landing/community-section";
 import AboutSection from "@/components/landing/about-section";
@@ -15,6 +16,7 @@ export default function Home() {
     <div className="min-h-screen flex flex-col font-sans bg-bg text-text">
       <main className="flex-grow">
         <HeroSection />
+        <CoursesSection />
         <MainBannersSection />
         <CommunitySection />
         <AboutSection />

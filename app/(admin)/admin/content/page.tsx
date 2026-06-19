@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { IconUpload, IconVideo, IconFileTypePdf, IconCheck } from "@tabler/icons-react";
 import { SUBJECTS } from "@/lib/mock-data";
 import { useToast } from "@/components/ui/toast";

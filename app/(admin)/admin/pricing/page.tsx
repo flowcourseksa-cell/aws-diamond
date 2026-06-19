@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   IconCurrencyDollar, IconDiscount2, IconCheck, IconX,
   IconPlus, IconTrash, IconEdit, IconLock,

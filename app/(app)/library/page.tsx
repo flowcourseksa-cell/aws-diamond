@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   IconSearch, IconFileTypePdf, IconVideo, IconPhoto,
   IconNotes, IconDownload, IconEye, IconLock, IconFolder,
 } from "@tabler/icons-react";
-import { CURRENT_SUBSCRIPTION } from "@/lib/mock-data";
-import type { LibraryFileType } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { IconAlertTriangle } from "@tabler/icons-react";
 import { useToast } from "@/components/ui/toast";
+import type { LibraryFileType } from "@/lib/types";
 import { usePlatformStore, type LibraryFile as AdminFile } from "@/lib/store";
-import { useEffect } from "react";
 
 // ── ملفات المكتبة مرتبطة بالمسارات ──────────────────────────
 type LibraryFile = {
@@ -34,19 +34,39 @@ const TYPE_INFO: Record<LibraryFileType, { icon: React.ReactNode; color: string 
 
 export default function LibraryPage() {
   const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => setIsMounted(true), []);
+  const router = useRouter();
+  const { files: storeFiles, tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
 
-  const storeFiles = usePlatformStore(s => s.files);
-  const storeTracks = usePlatformStore(s => s.tracks);
+  useEffect(() => setIsMounted(true), []);
 
   const [typeFilter,  setTypeFilter]  = useState<"all" | LibraryFileType>("all");
   const [trackFilter, setTrackFilter] = useState("all");
   const [search,      setSearch]      = useState("");
   const { showToast }                 = useToast();
-  const hasSub                        = CURRENT_SUBSCRIPTION.status === "active";
+  const hasSub = true; // In the real system, they have a sub if they are enrolled
 
-  const mappedFiles: LibraryFile[] = storeFiles.map(f => {
-    const track = storeTracks.find(t => t.id === f.trackId);
+  if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
+
+  const currentCourse = courses.find(c => c.id === enrolledCourseId);
+
+  if (!enrolledCourseId || !currentCourse) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
+        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
+        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
+        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى ملفات المكتبة.</p>
+        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
+          تصفح الدورات المتاحة
+        </button>
+      </div>
+    );
+  }
+
+  const activeTracks = storeTracks.filter(t => currentCourse.trackIds.includes(t.id));
+  const activeFiles = storeFiles.filter(f => currentCourse.trackIds.includes(f.trackId));
+
+  const mappedFiles: LibraryFile[] = activeFiles.map(f => {
+    const track = activeTracks.find(t => t.id === f.trackId);
     return {
       id: f.id,
       trackId: f.trackId,
@@ -71,10 +91,9 @@ export default function LibraryPage() {
 
   const trackFilters = [
     { value: "all", label: "كل المسارات" },
-    ...storeTracks.map(t => ({ value: t.id, label: t.name }))
+    ...activeTracks.map(t => ({ value: t.id, label: t.name }))
   ];
 
-  if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
   return (
     <>

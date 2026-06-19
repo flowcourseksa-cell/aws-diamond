@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconX,
   IconFolder, IconFileText, IconVideo, IconPhoto, IconNotes,

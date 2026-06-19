@@ -49,13 +49,39 @@ export default function LoginPage() {
     if (!emailValid || !passValid) return;
 
     setLoading(true);
-    // محاكاة طلب تسجيل الدخول — يُستبدل بـ Supabase Auth لاحقاً
+
+    // تحقق بسيط من الدور — سيُستبدل بـ Supabase Auth لاحقاً
+    // المدير: admin@flow.sa / أي باسورد 6+ أحرف
+    // الطالب: أي ايميل/رقم آخر
     setTimeout(() => {
       setLoading(false);
-      showToast("تم تسجيل الدخول بنجاح، جاري التحويل...", "success");
-      setTimeout(() => router.push("/dashboard"), 600);
+      const isAdmin = emailOrPhone.trim().toLowerCase() === "admin@flow.sa";
+      
+      // حفظ حالة تسجيل الدخول
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("flow-logged-in", "true");
+        localStorage.setItem("flow-user-role", isAdmin ? "admin" : "student");
+      }
+
+      let destination = isAdmin ? "/admin" : "/dashboard";
+      
+      // التحقق من وجود مسار عودة
+      if (!isAdmin && typeof window !== 'undefined') {
+        const redirect = localStorage.getItem("flow-redirect-after-login");
+        if (redirect) {
+          destination = redirect;
+          localStorage.removeItem("flow-redirect-after-login");
+        }
+      }
+
+      showToast(
+        isAdmin ? "مرحباً بك مدير فلو! جاري التحويل..." : "تم تسجيل الدخول بنجاح، جاري التحويل...",
+        "success"
+      );
+      setTimeout(() => router.push(destination), 600);
     }, 1000);
   }
+
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-bg">

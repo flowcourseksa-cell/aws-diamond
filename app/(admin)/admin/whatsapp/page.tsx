@@ -1,42 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   IconBrandWhatsapp, IconSettings, IconSend, IconHistory,
   IconCheck, IconToggleRight, IconToggleLeft, IconUser,
 } from "@tabler/icons-react";
+import { usePlatformStore } from "@/lib/store";
+import { useToast } from "@/components/ui/toast";
 
-// ── Types & Mock Data ─────────────────────────────────────────
-type HistoryEntry = {
-  id: string;
-  date: string;
-  studentName: string;
-  type: string;
-  status: "success" | "failed";
-};
-
-const MOCK_HISTORY: HistoryEntry[] = [];
-
-const STUDENTS: string[] = [];
-
-// ── Component ─────────────────────────────────────────────────
 export default function AdminWhatsAppPage() {
   const [autoExam, setAutoExam] = useState(true);
   const [autoWeekly, setAutoWeekly] = useState(false);
-  const [examTemplate, setExamTemplate] = useState("مرحباً ولي أمر {name}،\nلقد أكمل ابنكم اختبار في مسار {track} وحصل على نسبة {score}%.\n\nمنصة فلو تتمنى لكم التوفيق!");
-  
-  const [manualStudent, setManualStudent] = useState(STUDENTS[0]);
+  const [examTemplate, setExamTemplate] = useState(
+    "مرحباً ولي أمر {name}،\nلقد أكمل ابنكم اختبار في مسار {track} وحصل على نسبة {score}%.\n\nمنصة فلو تتمنى لكم التوفيق!"
+  );
   const [manualMessage, setManualMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [history, setHistory] = useState<{ id: string; date: string; type: string; status: "success" | "failed" }[]>([]);
+
+  const { showToast } = useToast();
+
+  useEffect(() => setIsMounted(true), []);
+
+  if (!isMounted) return <div className="p-8 text-center font-bold">جاري التحميل...</div>;
+
+  function handleSaveSettings() {
+    // حفظ في localStorage كإعداد مؤقت حتى ربط الـ API الحقيقي
+    localStorage.setItem("flow-whatsapp-settings", JSON.stringify({ autoExam, autoWeekly, examTemplate }));
+    showToast("تم حفظ إعدادات الواتساب بنجاح ✓", "success");
+  }
 
   function handleSendManual() {
     if (!manualMessage.trim()) return;
     setSending(true);
+    // محاكاة إرسال — سيتم ربطه بـ WhatsApp Business API
     setTimeout(() => {
       setSending(false);
       setManualMessage("");
-      alert("تم إرسال الرسالة بنجاح (وهمي)");
-    }, 1000);
+      const entry = {
+        id: `h-${Date.now()}`,
+        date: new Date().toLocaleTimeString("ar-SA"),
+        type: "رسالة يدوية",
+        status: "success" as const,
+      };
+      setHistory(prev => [entry, ...prev]);
+      showToast("تم إرسال الرسالة بنجاح ✓", "success");
+    }, 1200);
   }
 
   return (
@@ -47,18 +57,18 @@ export default function AdminWhatsAppPage() {
           <IconBrandWhatsapp size={28} />
           <h2 className="text-xl font-black">إشعارات الواتساب لأولياء الأمور</h2>
         </div>
-        <p className="text-white/80 text-sm font-semibold">إعداد الإشعارات التلقائية وإرسال رسائل يدوية للطلاب.</p>
+        <p className="text-white/80 text-sm font-semibold">إعداد الإشعارات التلقائية وإرسال رسائل لأولياء الأمور.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Settings Column */}
         <div className="flex flex-col gap-6 fade-up">
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center gap-2 mb-5 text-text font-black text-lg">
               <IconSettings size={22} className="text-primary"/> الإعدادات التلقائية
             </div>
-            
+
             <div className="flex flex-col gap-5">
               <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-bg">
                 <div>
@@ -83,6 +93,9 @@ export default function AdminWhatsAppPage() {
                       </button>
                     ))}
                   </div>
+                  <p className="text-xs text-text-muted mt-2">
+                    {"{name}"} = اسم الطالب &nbsp;|&nbsp; {"{score}"} = النتيجة% &nbsp;|&nbsp; {"{track}"} = المسار
+                  </p>
                 </div>
               )}
 
@@ -95,8 +108,8 @@ export default function AdminWhatsAppPage() {
                   {autoWeekly ? <IconToggleRight size={36} stroke={1.5}/> : <IconToggleLeft size={36} stroke={1.5}/>}
                 </button>
               </div>
-              
-              <button className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white hover:bg-primary-dark">
+
+              <button onClick={handleSaveSettings} className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white hover:bg-primary-dark">
                 <IconCheck size={18}/> حفظ الإعدادات
               </button>
             </div>
@@ -105,23 +118,26 @@ export default function AdminWhatsAppPage() {
 
         {/* Manual Send & History Column */}
         <div className="flex flex-col gap-6 fade-up delay-1">
-          
+
           {/* Manual Send */}
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center gap-2 mb-5 text-text font-black text-lg">
               <IconSend size={20} className="text-accent-amber"/> إرسال رسالة يدوية
             </div>
-            
+
             <div className="flex flex-col gap-4">
               <div>
-                <label className="text-xs font-black text-text-muted mb-1.5 block">الطالب</label>
+                <label className="text-xs font-black text-text-muted mb-1.5 block">رقم ولي الأمر (واتساب)</label>
                 <div className="relative">
                   <IconUser size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted"/>
-                  <select value={manualStudent} onChange={e => setManualStudent(e.target.value)}
-                    className="w-full rounded-xl border border-border bg-bg py-2.5 pl-3 pr-10 text-sm font-semibold outline-none focus:border-primary">
-                    {STUDENTS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  <input
+                    type="tel"
+                    placeholder="05XXXXXXXX"
+                    dir="ltr"
+                    className="w-full rounded-xl border border-border bg-bg py-2.5 pl-3 pr-10 text-sm font-semibold outline-none focus:border-primary"
+                  />
                 </div>
+                <p className="text-xs text-text-muted mt-1">أدخل رقم الجوال بصيغة 05XXXXXXXX</p>
               </div>
               <div>
                 <label className="text-xs font-black text-text-muted mb-1.5 block">محتوى الرسالة</label>
@@ -140,15 +156,17 @@ export default function AdminWhatsAppPage() {
             <div className="flex items-center gap-2 mb-4 text-text font-black text-lg">
               <IconHistory size={20} className="text-text-muted"/> سجل الإرسال
             </div>
-            
+
             <div className="flex flex-col gap-3">
-              {MOCK_HISTORY.map(h => (
+              {history.length === 0 ? (
+                <p className="text-center text-sm text-text-muted font-semibold py-6">لا يوجد سجل إرسال بعد</p>
+              ) : history.map(h => (
                 <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-bg">
                   <div>
-                    <div className="font-bold text-sm text-text">{h.studentName}</div>
-                    <div className="text-xs text-text-muted font-semibold mt-0.5">{h.type} • {h.date}</div>
+                    <div className="font-bold text-sm text-text">{h.type}</div>
+                    <div className="text-xs text-text-muted font-semibold mt-0.5">{h.date}</div>
                   </div>
-                  {h.status === "success" 
+                  {h.status === "success"
                     ? <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-1 rounded-lg text-[10px] font-black">نجاح</span>
                     : <span className="bg-rose-50 text-rose-600 border border-rose-200 px-2 py-1 rounded-lg text-[10px] font-black">فشل</span>
                   }

@@ -9,6 +9,8 @@ import { CURRENT_SUBSCRIPTION } from "@/lib/mock-data";
 import { useToast } from "@/components/ui/toast";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { usePlatformStore, type AdminLesson } from "@/lib/store";
+import { useRouter } from "next/navigation";
+import { IconAlertTriangle } from "@tabler/icons-react";
 
 // ── بيانات الدروس مرتبطة بالمسارات الصحيحة ────────────────
 
@@ -103,8 +105,8 @@ function VideoPlayer({ lesson, onBack, onComplete }: {
 
 export default function LessonsPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const lessons = usePlatformStore(s => s.lessons);
-  const tracks = usePlatformStore(s => s.tracks);
+  const router = useRouter();
+  const { lessons, tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
   
   useEffect(() => setIsMounted(true), []);
 
@@ -113,10 +115,30 @@ export default function LessonsPage() {
   const [selected, setSelected]   = useState<TrackLesson | null>(null);
   const [done, setDone]           = useState<Set<string>>(new Set());
   const { showToast }             = useToast();
-  const hasSub                    = CURRENT_SUBSCRIPTION.status === "active";
+  const hasSub = true; // In the real system, they have a sub if they are enrolled
 
-  const mappedLessons: TrackLesson[] = lessons.map(l => {
-    const track = tracks.find(t => t.id === l.trackId);
+  if (!isMounted) return <div className="p-8 text-center font-bold">جاري التحميل...</div>;
+
+  const currentCourse = courses.find(c => c.id === enrolledCourseId);
+
+  if (!enrolledCourseId || !currentCourse) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
+        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
+        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
+        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى الدروس والشروحات.</p>
+        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
+          تصفح الدورات المتاحة
+        </button>
+      </div>
+    );
+  }
+
+  const activeTracks = storeTracks.filter(t => currentCourse.trackIds.includes(t.id));
+  const activeLessons = lessons.filter(l => currentCourse.trackIds.includes(l.trackId));
+
+  const mappedLessons: TrackLesson[] = activeLessons.map(l => {
+    const track = activeTracks.find(t => t.id === l.trackId);
     const section = track?.sections.find(s => s.id === l.sectionId);
     return {
       id: l.id,
@@ -142,7 +164,7 @@ export default function LessonsPage() {
 
   const trackFilters = [
     { value: "all", label: "كل المسارات" },
-    ...tracks.map(t => ({ value: t.id, label: t.name }))
+    ...activeTracks.map(t => ({ value: t.id, label: t.name }))
   ];
 
   function open(l: TrackLesson) {
@@ -179,11 +201,20 @@ export default function LessonsPage() {
 
       {/* Filters + Search */}
       <section className="fade-up flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          {trackFilters.map(f => (
-            <button key={f.value} onClick={() => setFilter(f.value)}
-              className={`whitespace-nowrap rounded-[10px] border px-4 py-2.25 text-[13px] font-bold transition-colors ${filter === f.value ? "border-primary bg-primary text-white" : "border-border bg-card text-text-muted hover:border-primary hover:text-primary"}`}>
-              {f.label}
+        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <button
+            onClick={() => setFilter("all")}
+            className={`flex-shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all whitespace-nowrap ${filter === "all" ? "bg-text text-bg shadow-lg scale-[1.02]" : "border border-border text-text-muted hover:border-text-muted"}`}
+          >
+            كل الدروس
+          </button>
+          {activeTracks.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setFilter(t.id)}
+              className={`flex-shrink-0 rounded-xl px-5 py-2.5 text-sm font-bold transition-all whitespace-nowrap ${filter === t.id ? "bg-text text-bg shadow-lg scale-[1.02]" : "border border-border text-text-muted hover:border-text-muted"}`}
+            >
+              {t.name}
             </button>
           ))}
         </div>

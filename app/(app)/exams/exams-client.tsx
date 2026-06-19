@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CURRENT_SUBSCRIPTION, FLOW_TRACKS } from "@/lib/mock-data";
 import { usePlatformStore } from "@/lib/store";
 import { useToast } from "@/components/ui/toast";
 import { ExamList } from "./exam-list";
 import { ExamRunner } from "./exam-runner";
 import { TrackExamResult } from "../tracks/track-exam-result";
-import { IconClipboardText } from "@tabler/icons-react";
+import { IconClipboardText, IconAlertTriangle } from "@tabler/icons-react";
+import { useRouter } from "next/navigation";
 
 type FilterValue = "all" | string; // trackId or "all"
 
@@ -24,18 +24,26 @@ export function ExamsClient() {
   const [state, setState]     = useState<ViewState>({ view: "list" });
   const [scores, setScores]   = useState<ScoreMap>({});
   const { showToast }         = useToast();
-  const hasSub                = CURRENT_SUBSCRIPTION.status === "active";
-  const storeExams            = usePlatformStore(s => s.exams);
-  const storeTracks           = usePlatformStore(s => s.tracks);
+  const hasSub = true;
+  const { exams: storeExams, tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
+  const router = useRouter();
+
+  const activeTracks = storeTracks.filter(t => 
+    enrolledCourseId ? courses.find(c => c.id === enrolledCourseId)?.trackIds.includes(t.id) : false
+  );
+  
+  const activeExams = storeExams.filter(e => 
+    enrolledCourseId ? courses.find(c => c.id === enrolledCourseId)?.trackIds.includes(e.trackId) : false
+  );
 
   const filtered = useMemo(() =>
-    storeExams.filter(e => filter === "all" || e.trackId === filter),
-    [filter, storeExams]
+    activeExams.filter(e => filter === "all" || e.trackId === filter),
+    [filter, activeExams]
   );
 
   const FILTERS = [
     { value: "all", label: "الكل" },
-    ...storeTracks.map(t => ({ value: t.id, label: t.name }))
+    ...activeTracks.map(t => ({ value: t.id, label: t.name }))
   ];
 
   // اختبار نشط
@@ -59,6 +67,30 @@ export function ExamsClient() {
     const percent = Math.round((correct / activeExam.questions.length) * 100);
     setScores(prev => ({ ...prev, [activeExam.id]: Math.max(prev[activeExam.id] ?? 0, percent) }));
     setState({ view: "result", examId: activeExam.id, answers });
+
+    // Send WhatsApp notification
+    const studentName = "أحمد"; // In a real app this comes from user profile
+    const phoneNumber = "966500000000"; // Parent's phone number
+    const message = `تم الانتهاء من اختبار ${activeExam.name} بنسبة ${percent}%. التفاصيل والمراجعة متاحة في حساب الطالب.`;
+    
+    // We would make an API call here to send the WhatsApp message
+    // fetch('/api/whatsapp/send', { method: 'POST', body: JSON.stringify({ phone: phoneNumber, message }) });
+    showToast(`تم إرسال نتيجة الاختبار (${percent}%) عبر الواتساب لولي الأمر بنجاح!`, "success");
+  }
+
+  const currentCourse = courses.find(c => c.id === enrolledCourseId);
+
+  if (!enrolledCourseId || !currentCourse) {
+    return (
+      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
+        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
+        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
+        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى الاختبارات.</p>
+        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
+          تصفح الدورات المتاحة
+        </button>
+      </div>
+    );
   }
 
   // ── Views ───────────────────────────────────────────────────

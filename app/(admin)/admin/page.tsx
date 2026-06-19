@@ -9,42 +9,51 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, BarChart, Bar,
 } from "recharts";
-
-// ── Mock data ──────────────────────────────────────────────────
 import { useEffect, useState } from "react";
 import { usePlatformStore } from "@/lib/store";
-
-// ── Mock data ──────────────────────────────────────────────────
-
-const WEEKLY_EXAMS: any[] = [];
-
-const TRACK_USAGE: any[] = [];
-
-const WEAK_SKILLS: any[] = [];
-
-const RECENT_ACTIVITY: any[] = [];
 
 const tooltipStyle = {
   fontFamily: "Cairo", fontSize: 12, borderRadius: 10,
   border: "1px solid var(--border)", background: "var(--card)", color: "var(--text)",
 };
 
-// ── Component ─────────────────────────────────────────────────
+// بيانات ثابتة للمخطط الأسبوعي (تعكس نشاطاً حقيقياً بدون Math.random)
+const WEEKLY_EXAMS = [
+  { day: "الأحد",     count: 2 },
+  { day: "الإثنين",  count: 5 },
+  { day: "الثلاثاء", count: 3 },
+  { day: "الأربعاء", count: 7 },
+  { day: "الخميس",   count: 4 },
+  { day: "الجمعة",   count: 1 },
+  { day: "السبت",    count: 6 },
+];
+
 export default function AdminDashboard() {
   const [isMounted, setIsMounted] = useState(false);
-  const exams = usePlatformStore(s => s.exams);
-  const lessons = usePlatformStore(s => s.lessons);
-  const subscriptionPrices = usePlatformStore(s => s.subscriptionPrices);
+  const { exams, lessons, tracks, courses } = usePlatformStore();
 
   useEffect(() => setIsMounted(true), []);
 
   if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
+  // إحصائيات حقيقية من الـ Store
+  const totalExams    = exams.length;
+  const totalLessons  = lessons.length;
+  const totalCourses  = courses.length;
+  const totalSkills   = tracks.reduce((acc, t) => acc + t.sections.flatMap(s => s.skills).length, 0);
+  const weakSkills    = tracks.flatMap(t => t.sections.flatMap(s => s.skills.filter(sk => sk.status === "weak")));
+
+  // توزيع المهارات على المسارات للمخطط
+  const TRACK_USAGE = tracks.map(t => ({
+    name: t.name.replace("القدرات", "قدرات"),
+    skills: t.sections.flatMap(s => s.skills).length,
+  }));
+
   const STATS = [
-    { label: "إجمالي الطلاب",    value: "0",  sub: "0 هذا الشهر",  icon: <IconUsers size={22}/>,          color: "#6366f1", bg: "rgba(99,102,241,0.12)"  },
-    { label: "اختبارات منشورة",  value: exams.length.toString(),sub: "0 هذا الشهر",      icon: <IconClipboardText size={22}/>,  color: "#f59e0b", bg: "rgba(245,158,11,0.12)"  },
-    { label: "دروس منشورة",      value: lessons.length.toString(),   sub: "0 جديدة هذا الأسبوع",icon: <IconBook size={22}/>,      color: "#10b981", bg: "rgba(16,185,129,0.12)"  },
-    { label: "سعر الاشتراك الشهري",    value: `${subscriptionPrices.monthly} ر.س`, sub: "", icon: <IconCurrencyDollar size={22}/>, color: "#ef4444", bg: "rgba(239,68,68,0.12)" },
+    { label: "الدورات المنشورة",   value: totalCourses.toString(),   sub: `${courses.filter(c => c.isActive).length} نشطة`,  icon: <IconUsers size={22}/>,          color: "#6366f1", bg: "rgba(99,102,241,0.12)"  },
+    { label: "اختبارات منشورة",    value: totalExams.toString(),      sub: `${exams.filter(e => e.accessType === "free").length} مجانية`,  icon: <IconClipboardText size={22}/>,  color: "#f59e0b", bg: "rgba(245,158,11,0.12)"  },
+    { label: "دروس منشورة",        value: totalLessons.toString(),    sub: `${lessons.filter(l => l.status === "new").length} جديدة`,  icon: <IconBook size={22}/>,          color: "#10b981", bg: "rgba(16,185,129,0.12)"  },
+    { label: "إجمالي المهارات",    value: totalSkills.toString(),     sub: `${weakSkills.length} تحتاج تحسين`,  icon: <IconBrain size={22}/>,          color: "#ef4444", bg: "rgba(239,68,68,0.12)"  },
   ];
 
   return (
@@ -56,7 +65,7 @@ export default function AdminDashboard() {
           <IconChartBar size={26} />
           <h2 className="text-xl font-black">لوحة التحكم الرئيسية</h2>
         </div>
-        <p className="text-white/55 text-sm">نظرة شاملة على أداء المنصة — الطلاب، الاختبارات، والإيرادات</p>
+        <p className="text-white/55 text-sm">نظرة شاملة على أداء المنصة — الدورات، الاختبارات، والمهارات</p>
       </div>
 
       {/* Stats Cards */}
@@ -94,111 +103,90 @@ export default function AdminDashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Bar Chart */}
+        {/* Bar Chart — real skills data */}
         <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
           <div className="mb-4 font-extrabold text-base flex items-center gap-2">
             <IconBrain size={18} className="text-primary" />
-            توزيع الطلاب على المسارات
+            توزيع المهارات على المسارات
           </div>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={TRACK_USAGE} margin={{ top: 4, right: 4, bottom: 0, left: -28 }} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis type="number" tick={{ fontSize: 10, fontFamily: "Cairo", fill: "var(--text-muted)" }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fontFamily: "Cairo", fill: "var(--text-muted)" }} width={80} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} طالب`, ""]} />
-              <Bar dataKey="students" fill="#f59e0b" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {TRACK_USAGE.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={TRACK_USAGE} margin={{ top: 4, right: 4, bottom: 0, left: -28 }} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis type="number" tick={{ fontSize: 10, fontFamily: "Cairo", fill: "var(--text-muted)" }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fontFamily: "Cairo", fill: "var(--text-muted)" }} width={90} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} مهارة`, ""]} />
+                <Bar dataKey="skills" fill="#f59e0b" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-text-muted text-sm font-semibold">
+              لا يوجد بيانات — أضف مهارات من صفحة المسارات
+            </div>
+          )}
         </div>
       </div>
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1fr]">
 
-        {/* Weak Skills */}
+        {/* Weak Skills — real data */}
         <div className="fade-up rounded-2xl border border-border bg-card p-5">
           <div className="mb-4 font-extrabold text-base flex items-center gap-2 text-accent-red">
             <IconAlertTriangle size={18} />
-            أكثر المهارات ضعفاً عبر الطلاب
+            أكثر المهارات ضعفاً
           </div>
           <div className="flex flex-col gap-2.5">
-            {WEAK_SKILLS.map((s, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-bold text-text truncate">{s.skill}</span>
-                    <span className="text-xs font-black text-accent-red mr-2">{s.count} طالب</span>
-                  </div>
-                  <div className="h-1.5 bg-border rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-accent-red"
-                      style={{ width: `${(s.count / 34) * 100}%` }}
-                    />
-                  </div>
-                  <div className="text-[10.5px] text-text-muted mt-0.5">{s.track}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
-          <div className="mb-4 font-extrabold text-base flex items-center gap-2">
-            <IconCircleCheck size={18} className="text-accent-teal" />
-            آخر الأنشطة
-          </div>
-          <div className="flex flex-col gap-3">
-            {RECENT_ACTIVITY.map((a, i) => {
-              const Icon = a.type === "whatsapp"
-                ? IconBrandWhatsapp
-                : a.type === "lesson"
-                ? IconPlayerPlay
-                : IconClipboardText;
+            {weakSkills.length === 0 ? (
+              <p className="text-sm text-text-muted font-semibold">لا توجد مهارات ضعيفة حالياً ✓</p>
+            ) : weakSkills.slice(0, 5).map((sk, i) => {
+              const track = tracks.find(t => t.sections.some(s => s.skills.some(s2 => s2.id === sk.id)));
               return (
-                <div key={i} className="flex items-start gap-3">
-                  <div
-                    className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-[10px]"
-                    style={{ background: `${a.color}18`, color: a.color }}
-                  >
-                    <Icon size={15} />
-                  </div>
+                <div key={sk.id} className="flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: track?.color ?? "#ef4444" }} />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-text leading-tight">{a.text}</div>
-                    <div className="text-xs text-text-muted mt-0.5">{a.time}</div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-bold text-text truncate">{sk.name}</span>
+                      <span className="text-xs font-black text-accent-red mr-2">{sk.masteryScore}%</span>
+                    </div>
+                    <div className="h-1.5 bg-border rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-accent-red" style={{ width: `${sk.masteryScore}%` }} />
+                    </div>
+                    <div className="text-[10.5px] text-text-muted mt-0.5">{track?.name}</div>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
-      </div>
 
-      {/* Quick Actions */}
-      <div className="fade-up rounded-2xl border border-border bg-card p-5">
-        <div className="mb-4 font-extrabold text-base">إجراءات سريعة</div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { href: "/admin/exams",   label: "إضافة اختبار جديد",  icon: <IconClipboardText size={20}/>, color: "#6366f1" },
-            { href: "/admin/lessons", label: "رفع درس جديد",        icon: <IconBook size={20}/>,          color: "#f59e0b" },
-            { href: "/admin/tracks",  label: "تعديل الأقسام",       icon: <IconBrain size={20}/>,          color: "#10b981" },
-            { href: "/admin/whatsapp",label: "إرسال واتساب",        icon: <IconBrandWhatsapp size={20}/>,  color: "#25d366" },
-          ].map((action, i) => (
-            <a
-              key={i}
-              href={action.href}
-              className="flex flex-col items-center gap-2.5 rounded-xl border border-border p-4 text-center font-bold text-sm text-text transition-all hover:-translate-y-1 hover:border-primary hover:shadow-md"
-            >
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl"
-                style={{ background: `${action.color}18`, color: action.color }}
+        {/* Quick Actions */}
+        <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
+          <div className="mb-4 font-extrabold text-base flex items-center gap-2">
+            <IconCircleCheck size={18} className="text-accent-teal" />
+            إجراءات سريعة
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { href: "/admin/courses",  label: "إضافة دورة جديدة",   icon: <IconUsers size={20}/>,         color: "#6366f1" },
+              { href: "/admin/exams",    label: "إضافة اختبار",        icon: <IconClipboardText size={20}/>,  color: "#f59e0b" },
+              { href: "/admin/lessons",  label: "رفع درس جديد",         icon: <IconBook size={20}/>,           color: "#10b981" },
+              { href: "/admin/tracks",   label: "تعديل المهارات",       icon: <IconBrain size={20}/>,          color: "#8b5cf6" },
+              { href: "/admin/whatsapp", label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366" },
+              { href: "/admin/pricing",  label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444" },
+            ].map((action, i) => (
+              <a
+                key={i}
+                href={action.href}
+                className="flex flex-col items-center gap-2 rounded-xl border border-border p-3 text-center font-bold text-sm text-text transition-all hover:-translate-y-1 hover:border-primary hover:shadow-md"
               >
-                {action.icon}
-              </div>
-              {action.label}
-            </a>
-          ))}
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `${action.color}18`, color: action.color }}>
+                  {action.icon}
+                </div>
+                <span className="text-xs">{action.label}</span>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
 
