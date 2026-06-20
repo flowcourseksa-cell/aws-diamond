@@ -22,11 +22,14 @@ export function useAuth() {
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      // Guard against a hung request keeping the UI on a spinner forever.
+      const result = await Promise.race([
+        supabase.from("profiles").select("*").eq("id", userId).single(),
+        new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: { message: "timeout" } }), 8000)
+        ),
+      ]);
+      const { data, error } = result as { data: AuthProfile | null; error: { message: string } | null };
 
       if (error) {
         console.warn("Profile fetch error (might not exist yet):", error.message);
@@ -42,6 +45,11 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
+
+    // Absolute safety net: never leave the app stuck on a loading spinner.
+    const hardStop = setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 10000);
 
     async function init() {
       try {
@@ -94,12 +102,24 @@ export function useAuth() {
 
     return () => {
       mounted = false;
+      clearTimeout(hardStop);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
 
-  const signOut = useCallback(async () => {
+  // Sign out ONLY after the user re-confirms their own password.
+  // Returns true on success, false if the password is wrong / fails.
+  const signOut = useCallback(async (password?: string): Promise<boolean> => {
     const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const email = session?.user?.email;
+
+    // Require password confirmation before logging out.
+    if (!password || !email) return false;
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return false; // wrong password -> do NOT sign out
+
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
@@ -107,6 +127,7 @@ export function useAuth() {
       localStorage.removeItem("flow-logged-in");
       localStorage.removeItem("flow-user-role");
     }
+    return true;
   }, []);
 
   return { user, profile, isLoading, signOut };
