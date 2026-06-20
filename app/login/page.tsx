@@ -108,11 +108,6 @@ export default function LoginPage() {
         }
 
         const isAdmin = profile.role === "admin";
-        
-        // حفظ حالة مؤقتة للواجهة (اختياري)
-        if (typeof window !== 'undefined') {
-          localStorage.setItem("flow-user-role", profile.role);
-        }
 
         showToast(
           isAdmin ? "مرحباً بك مدير الأوس الماسية! جاري التحويل..." : "تم تسجيل الدخول بنجاح، جاري التحويل...",

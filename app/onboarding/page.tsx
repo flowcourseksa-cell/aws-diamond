@@ -98,12 +98,6 @@ export default function OnboardingPage() {
       }
 
       showToast("تم إكمال ملفك بنجاح! جاري تحويلك للمنصة...", "success");
-      
-      // حفظ حالة محلية مؤقتة للسرعة (كما في النظام السابق)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("flow-logged-in", "true");
-        localStorage.setItem("flow-user-role", "student");
-      }
 
       setTimeout(() => {
         window.location.href = "/dashboard";
