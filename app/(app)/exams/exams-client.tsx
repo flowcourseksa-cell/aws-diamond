@@ -6,8 +6,9 @@ import { useToast } from "@/components/ui/toast";
 import { ExamList } from "./exam-list";
 import { ExamRunner } from "./exam-runner";
 import { TrackExamResult } from "../tracks/track-exam-result";
-import { IconClipboardText, IconAlertTriangle } from "@tabler/icons-react";
-import { useRouter } from "next/navigation";
+import { IconClipboardText } from "@tabler/icons-react";
+import { useAuth } from "@/hooks/use-auth";
+import { submitExamAttempt } from "@/lib/supabase/services/progress";
 
 type FilterValue = "all" | string; // trackId or "all"
 
@@ -24,21 +25,19 @@ export function ExamsClient() {
   const [state, setState]     = useState<ViewState>({ view: "list" });
   const [scores, setScores]   = useState<ScoreMap>({});
   const { showToast }         = useToast();
+  const { user }              = useAuth();
   const hasSub = true;
-  const { exams: storeExams, tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
-  const router = useRouter();
+  const { exams: storeExams, tracks: storeTracks } = usePlatformStore();
 
-  const activeTracks = storeTracks.filter(t => 
-    enrolledCourseId ? courses.find(c => c.id === enrolledCourseId)?.trackIds.includes(t.id) : false
-  );
+  // Use ALL tracks directly (free platform - no enrollment needed)
+  const activeTracks = storeTracks;
   
-  const activeExams = storeExams.filter(e => 
-    enrolledCourseId ? courses.find(c => c.id === enrolledCourseId)?.trackIds.includes(e.trackId) : false
-  );
+  // Directly use store exams
+  const allExams = storeExams;
 
   const filtered = useMemo(() =>
-    activeExams.filter(e => filter === "all" || e.trackId === filter),
-    [filter, activeExams]
+    allExams.filter(e => filter === "all" || e.trackId === filter),
+    [filter, allExams]
   );
 
   const FILTERS = [
@@ -48,49 +47,33 @@ export function ExamsClient() {
 
   // اختبار نشط
   const activeExam = state.view !== "list"
-    ? storeExams.find(e => e.id === state.examId)
+    ? allExams.find(e => e.id === state.examId)
     : null;
 
   function handleStart(id: string) {
-    const exam = storeExams.find(e => e.id === id);
+    const exam = allExams.find(e => e.id === id);
     if (!exam) return;
-    if (exam.accessType === "paid" && !hasSub) {
-      showToast("هذا الاختبار مدفوع — يرجى الاشتراك للوصول إليه", "warning");
-      return;
-    }
     setState({ view: "exam", examId: id });
   }
 
-  function handleFinish(answers: (number | null)[]) {
+  async function handleFinish(answers: (number | null)[]) {
     if (!activeExam) return;
     const correct = activeExam.questions.filter((q, i) => answers[i] === q.correctIndex).length;
     const percent = Math.round((correct / activeExam.questions.length) * 100);
     setScores(prev => ({ ...prev, [activeExam.id]: Math.max(prev[activeExam.id] ?? 0, percent) }));
     setState({ view: "result", examId: activeExam.id, answers });
 
-    // Send WhatsApp notification
-    const studentName = "أحمد"; // In a real app this comes from user profile
-    const phoneNumber = "966500000000"; // Parent's phone number
-    const message = `تم الانتهاء من اختبار ${activeExam.name} بنسبة ${percent}%. التفاصيل والمراجعة متاحة في حساب الطالب.`;
-    
-    // We would make an API call here to send the WhatsApp message
-    // fetch('/api/whatsapp/send', { method: 'POST', body: JSON.stringify({ phone: phoneNumber, message }) });
-    showToast(`تم إرسال نتيجة الاختبار (${percent}%) عبر الواتساب لولي الأمر بنجاح!`, "success");
-  }
+    showToast(`تم حفظ نتيجة الاختبار (${percent}%) وتحديث مستوى إتقانك!`, "success");
 
-  const currentCourse = courses.find(c => c.id === enrolledCourseId);
-
-  if (!enrolledCourseId || !currentCourse) {
-    return (
-      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
-        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
-        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
-        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى الاختبارات.</p>
-        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
-          تصفح الدورات المتاحة
-        </button>
-      </div>
-    );
+    if (user) {
+      const mappedAnswers = activeExam.questions.map((q, i) => ({
+        question_id: q.id,
+        selected_option_id: null, // Note: We don't have option IDs in local state, only index. For analytics, we skip it or mock it.
+        is_correct: answers[i] === q.correctIndex,
+        micro_skill_id: q.skillId
+      }));
+      await submitExamAttempt(user.id, activeExam.id, mappedAnswers);
+    }
   }
 
   // ── Views ───────────────────────────────────────────────────

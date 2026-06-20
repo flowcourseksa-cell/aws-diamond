@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { IconUpload, IconVideo, IconFileTypePdf, IconCheck } from "@tabler/icons-react";
-import { SUBJECTS } from "@/lib/mock-data";
+import { usePlatformStore } from "@/lib/store";
 import { useToast } from "@/components/ui/toast";
 
 type AccessType = "free" | "paid";
@@ -35,20 +35,21 @@ function AccessToggle({ value, onChange }: { value: AccessType; onChange: (v: Ac
 
 export default function ContentPage() {
   const { showToast } = useToast();
+  const { tracks } = usePlatformStore();
 
-  const [lesson, setLesson] = useState({ title: "", subjectId: "0", videoUrl: "", order: "", access: "free" as AccessType, price: "" });
-  const [file, setFile] = useState({ title: "", subjectId: "0", type: "pdf", access: "free" as AccessType, price: "" });
+  const [lesson, setLesson] = useState({ title: "", subjectId: tracks[0]?.id || "0", videoUrl: "", order: "", access: "free" as AccessType, price: "" });
+  const [file, setFile] = useState({ title: "", subjectId: tracks[0]?.id || "0", type: "pdf", access: "free" as AccessType, price: "" });
 
   function submitLesson() {
     if (!lesson.title || !lesson.videoUrl) { showToast("الرجاء تعبئة اسم الدرس ورابط الفيديو", "error"); return; }
     showToast("تم رفع الدرس بنجاح ✅", "success");
-    setLesson({ title: "", subjectId: "0", videoUrl: "", order: "", access: "free", price: "" });
+    setLesson({ title: "", subjectId: tracks[0]?.id || "0", videoUrl: "", order: "", access: "free", price: "" });
   }
 
   function submitFile() {
     if (!file.title) { showToast("الرجاء تعبئة اسم الملف", "error"); return; }
     showToast("تم رفع الملف بنجاح ✅", "success");
-    setFile({ title: "", subjectId: "0", type: "pdf", access: "free", price: "" });
+    setFile({ title: "", subjectId: tracks[0]?.id || "0", type: "pdf", access: "free", price: "" });
   }
 
   return (
@@ -62,9 +63,9 @@ export default function ContentPage() {
           <FormGroup label="اسم الدرس">
             <input className={inputCls} value={lesson.title} onChange={e => setLesson(p => ({ ...p, title: e.target.value }))} placeholder="مثال: التفاضل والتكامل — الجزء الثاني" />
           </FormGroup>
-          <FormGroup label="المادة">
+          <FormGroup label="المسار">
             <select className={inputCls} value={lesson.subjectId} onChange={e => setLesson(p => ({ ...p, subjectId: e.target.value }))}>
-              {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {tracks.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </FormGroup>
           <FormGroup label="رابط الفيديو">
@@ -96,9 +97,9 @@ export default function ContentPage() {
           <FormGroup label="اسم الملف">
             <input className={inputCls} value={file.title} onChange={e => setFile(p => ({ ...p, title: e.target.value }))} placeholder="مثال: ملخص قوانين الفيزياء" />
           </FormGroup>
-          <FormGroup label="المادة">
+          <FormGroup label="المسار">
             <select className={inputCls} value={file.subjectId} onChange={e => setFile(p => ({ ...p, subjectId: e.target.value }))}>
-              {SUBJECTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {tracks.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </FormGroup>
           <FormGroup label="نوع الملف">
@@ -127,3 +128,4 @@ export default function ContentPage() {
     </>
   );
 }
+

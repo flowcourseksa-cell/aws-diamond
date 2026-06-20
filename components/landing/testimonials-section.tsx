@@ -5,7 +5,7 @@ export default function TestimonialsSection() {
   const reviews = [
     {
       name: "عبدالملك العنزي",
-      text: "شكراً لمنصة فلو، الدورة التأسيسية كانت شاملة ومفهومة جداً وجبت درجة عالية بفضل الله ثم فضلكم.",
+      text: "شكراً لمنصة الأوس الماسية، الدورة التأسيسية كانت شاملة ومفهومة جداً وجبت درجة عالية بفضل الله ثم فضلكم.",
       stars: 5,
       bg: "bg-indigo-50"
     },
@@ -59,7 +59,7 @@ export default function TestimonialsSection() {
                 </div>
                 <div>
                   <span className="font-bold text-slate-800 text-lg block">{rev.name}</span>
-                  <span className="text-sm text-slate-400 font-medium">طالب في منصة فلو</span>
+                  <span className="text-sm text-slate-400 font-medium">طالب في منصة الأوس الماسية</span>
                 </div>
               </div>
             </div>
@@ -75,3 +75,4 @@ export default function TestimonialsSection() {
     </section>
   );
 }
+

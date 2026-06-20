@@ -38,3 +38,4 @@ export function CountdownTimer({ targetDate }: { targetDate: string }) {
     </div>
   );
 }
+

@@ -47,21 +47,13 @@ export default function HeroSection() {
               F
             </div>
             <div className="flex flex-col">
-              <span className="font-black text-2xl text-slate-800 leading-none tracking-tight">منصة فلو</span>
+              <span className="font-black text-2xl text-slate-800 leading-none tracking-tight">منصة الأوس الماسية</span>
               <span className="text-sm text-amber-500 font-bold">التعليمية</span>
             </div>
           </Link>
           
           {/* Center Links */}
           <div className="hidden md:flex items-center gap-8 font-bold text-slate-600">
-            <a href="#tahsili" onClick={(e) => handleSmoothScroll(e, 'tahsili')} className="hover:text-indigo-600 transition-colors relative group">
-              دورة فلو للتحصيلي
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
-            </a>
-            <a href="#step" onClick={(e) => handleSmoothScroll(e, 'step')} className="hover:text-indigo-600 transition-colors relative group">
-              دورة فلو للستيب
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-indigo-600 transition-all group-hover:w-full"></span>
-            </a>
           </div>
 
           {/* Left Icons */}
@@ -98,7 +90,7 @@ export default function HeroSection() {
             </div>
 
             <h1 className="text-6xl md:text-8xl font-black text-slate-800 mb-6 leading-tight tracking-tight">
-              منصة فلو <br/>
+              منصة الأوس الماسية <br/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">
                 التعليمية
               </span>
@@ -131,7 +123,7 @@ export default function HeroSection() {
               {/* Actual Image */}
               <img 
                 src="/hero-books.png" 
-                alt="كتب فلو" 
+                alt="كتب الأوس الماسية" 
                 className="relative z-10 w-full h-full object-contain drop-shadow-[0_20px_50px_rgba(79,70,229,0.4)] animate-float"
               />
               
@@ -182,3 +174,4 @@ export default function HeroSection() {
     </div>
   );
 }
+

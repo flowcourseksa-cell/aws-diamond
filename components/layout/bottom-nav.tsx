@@ -40,3 +40,4 @@ export function BottomNav() {
     </nav>
   );
 }
+

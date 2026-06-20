@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { FLOW_TRACKS, type FlowTrack, type SkillQuestion } from "@/lib/mock-data";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -15,6 +14,40 @@ export type AdminLesson = {
   accessType: "free" | "paid";
   price: number;
   status: "new" | "normal" | "completed";
+};
+
+// Use generic flow models since mock-data is removed
+export type FlowSkill = {
+  id: string;
+  name: string;
+  masteryScore: number;
+  status: "strong" | "average" | "weak" | "not_started";
+  remedialVideoUrl?: string;
+};
+
+export type FlowSection = {
+  id: string;
+  name: string;
+  skills: FlowSkill[];
+};
+
+export type FlowTrack = {
+  id: string;
+  name: string;
+  color: string;
+  gradient: string;
+  icon: string;
+  sections: FlowSection[];
+};
+
+export type SkillQuestion = {
+  id: string;
+  questionText: string;
+  options: string[];
+  correctIndex: number;
+  explanation?: string;
+  skillId: string;
+  skillName: string;
 };
 
 export type AdminExam = {
@@ -70,7 +103,7 @@ export type Course = {
   trackIds: string[];        // المسارات المضمنة ["qudrat-komi","qudrat-lafzi"]
   features: string[];        // ["200+ درس مصور","3000+ سؤال تدريبي","شرح المهارات الضعيفة"]
   tags: string[];            // ["قدرات","كمي","لفظي"]
-  instructorName: string;    // "فريق فلو التعليمي"
+  instructorName: string;    // "فريق الأوس الماسية التعليمي"
   totalHours: string;        // "80 ساعة"
   studentsCount: number;     // 1200
   isActive: boolean;         // هل الدورة مفعّلة على الواجهة
@@ -101,68 +134,91 @@ type PlatformState = {
   setCourses: (courses: Course[] | ((prev: Course[]) => Course[])) => void;
   setEnrolledCourseId: (id: string | null) => void;
 
+  applyUserProgress: (skillsProgress: any[], lessonsProgress: any[]) => void;
   updateItemPrice: (type: "lesson" | "exam" | "file", id: string, newPrice: number) => void;
 
   resetStore: () => void;
 };
 
-export const usePlatformStore = create<PlatformState>()(
-  persist(
-    (set) => ({
-      tracks: FLOW_TRACKS,
-      lessons: [],
-      exams: [],
-      files: [],
-      discountCodes: [],
-      subscriptionPrices: { monthly: 0, yearly: 0 },
-      courses: [],
-      enrolledCourseId: null,
+export const usePlatformStore = create<PlatformState>((set) => ({
+  tracks: [],
+  lessons: [],
+  exams: [],
+  files: [],
+  discountCodes: [],
+  subscriptionPrices: { monthly: 0, yearly: 0 },
+  courses: [],
+  enrolledCourseId: null,
 
-      setTracks: (updater) => set((state) => ({
-        tracks: typeof updater === "function" ? updater(state.tracks) : updater
-      })),
+  setTracks: (updater) => set((state) => ({
+    tracks: typeof updater === "function" ? updater(state.tracks) : updater
+  })),
 
-      setLessons: (updater) => set((state) => ({
-        lessons: typeof updater === "function" ? updater(state.lessons) : updater
-      })),
+  setLessons: (updater) => set((state) => ({
+    lessons: typeof updater === "function" ? updater(state.lessons) : updater
+  })),
 
-      setExams: (updater) => set((state) => ({
-        exams: typeof updater === "function" ? updater(state.exams) : updater
-      })),
+  setExams: (updater) => set((state) => ({
+    exams: typeof updater === "function" ? updater(state.exams) : updater
+  })),
 
-      setFiles: (updater) => set((state) => ({
-        files: typeof updater === "function" ? updater(state.files) : updater
-      })),
+  setFiles: (updater) => set((state) => ({
+    files: typeof updater === "function" ? updater(state.files) : updater
+  })),
 
-      setDiscountCodes: (updater) => set((state) => ({
-        discountCodes: typeof updater === "function" ? updater(state.discountCodes) : updater
-      })),
+  setDiscountCodes: (updater) => set((state) => ({
+    discountCodes: typeof updater === "function" ? updater(state.discountCodes) : updater
+  })),
 
-      setSubscriptionPrices: (updater) => set((state) => ({
-        subscriptionPrices: typeof updater === "function" ? updater(state.subscriptionPrices) : updater
-      })),
+  setSubscriptionPrices: (updater) => set((state) => ({
+    subscriptionPrices: typeof updater === "function" ? updater(state.subscriptionPrices) : updater
+  })),
 
-      setCourses: (updater) => set((state) => ({
-        courses: typeof updater === "function" ? updater(state.courses) : updater
-      })),
+  setCourses: (updater) => set((state) => ({
+    courses: typeof updater === "function" ? updater(state.courses) : updater
+  })),
 
-      setEnrolledCourseId: (id) => set({ enrolledCourseId: id }),
+  setEnrolledCourseId: (id) => set({ enrolledCourseId: id }),
 
-      updateItemPrice: (type, id, newPrice) => set((state) => {
-        if (type === "lesson") return { lessons: state.lessons.map(l => l.id === id ? { ...l, price: newPrice } : l) };
-        if (type === "exam") return { exams: state.exams.map(e => e.id === id ? { ...e, price: newPrice } : e) };
-        if (type === "file") return { files: state.files.map(f => f.id === id ? { ...f, price: newPrice } : f) };
-        return state;
-      }),
+  updateItemPrice: (type, id, newPrice) => set((state) => {
+    if (type === "lesson") return { lessons: state.lessons.map(l => l.id === id ? { ...l, price: newPrice } : l) };
+    if (type === "exam") return { exams: state.exams.map(e => e.id === id ? { ...e, price: newPrice } : e) };
+    if (type === "file") return { files: state.files.map(f => f.id === id ? { ...f, price: newPrice } : f) };
+    return state;
+  }),
 
-      resetStore: () => set({
-        tracks: FLOW_TRACKS, lessons: [], exams: [], files: [],
-        discountCodes: [], subscriptionPrices: { monthly: 0, yearly: 0 },
-        courses: [], enrolledCourseId: null,
-      }),
-    }),
-    {
-      name: "nokhba-platform-storage",
-    }
-  )
-);
+  applyUserProgress: (skillsProgress, lessonsProgress) => set((state) => {
+    const skillsMap = new Map(skillsProgress.map(s => [s.micro_skill_id, s.mastery_score]));
+    const lessonsMap = new Map(lessonsProgress.map(l => [l.lesson_id, l.is_completed]));
+
+    const updatedTracks = state.tracks.map(track => ({
+      ...track,
+      sections: track.sections.map(section => ({
+        ...section,
+        skills: section.skills.map(skill => {
+          const score = skillsMap.get(skill.id) || 0;
+          let status: "not_started" | "weak" | "average" | "strong" = "not_started";
+          if (score > 0) {
+            if (score < 50) status = "weak";
+            else if (score < 80) status = "average";
+            else status = "strong";
+          }
+          return { ...skill, masteryScore: score, status };
+        })
+      }))
+    }));
+
+    const updatedLessons = state.lessons.map(lesson => ({
+      ...lesson,
+      status: lessonsMap.get(lesson.id) ? "completed" : "normal"
+    })) as AdminLesson[];
+
+    return { tracks: updatedTracks, lessons: updatedLessons };
+  }),
+
+  resetStore: () => set({
+    tracks: [], lessons: [], exams: [], files: [],
+    discountCodes: [], subscriptionPrices: { monthly: 0, yearly: 0 },
+    courses: [], enrolledCourseId: null,
+  }),
+}));

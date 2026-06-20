@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ExamQuestion } from "@/lib/types";
+import type { SkillQuestion as ExamQuestion } from "@/lib/store";
 import { ProgressBar } from "@/components/ui/progress-bar";
 
 const LETTERS = ["أ", "ب", "ج", "د"];
@@ -121,3 +121,4 @@ export function ExamRunner({ examTitle, questions, timeMinutes, onFinish }: Exam
     </>
   );
 }
+

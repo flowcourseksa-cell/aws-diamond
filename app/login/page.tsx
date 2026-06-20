@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
+import { createClient } from "@/lib/supabase/client";
 import {
   IconRocket,
   IconMoon,
@@ -32,12 +33,14 @@ export default function LoginPage() {
   const [emailError, setEmailError] = useState(false);
   const [passError, setPassError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const supabase = createClient();
 
   useEffect(() => setMounted(true), []);
 
   const isDark = mounted && resolvedTheme === "dark";
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
 
     const emailValid = isValidEmailOrPhone(emailOrPhone.trim());
@@ -49,37 +52,80 @@ export default function LoginPage() {
     if (!emailValid || !passValid) return;
 
     setLoading(true);
-
-    // تحقق بسيط من الدور — سيُستبدل بـ Supabase Auth لاحقاً
-    // المدير: admin@flow.sa / أي باسورد 6+ أحرف
-    // الطالب: أي ايميل/رقم آخر
-    setTimeout(() => {
-      setLoading(false);
-      const isAdmin = emailOrPhone.trim().toLowerCase() === "admin@flow.sa";
-      
-      // حفظ حالة تسجيل الدخول
-      if (typeof window !== 'undefined') {
-        localStorage.setItem("flow-logged-in", "true");
-        localStorage.setItem("flow-user-role", isAdmin ? "admin" : "student");
-      }
-
-      let destination = isAdmin ? "/admin" : "/dashboard";
-      
-      // التحقق من وجود مسار عودة
-      if (!isAdmin && typeof window !== 'undefined') {
-        const redirect = localStorage.getItem("flow-redirect-after-login");
-        if (redirect) {
-          destination = redirect;
-          localStorage.removeItem("flow-redirect-after-login");
+    
+    try {
+      if (isRegistering) {
+        // --- التسجيل (Sign Up) عبر الـ API لتجاوز Rate Limits و تأكيد البريد ---
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: emailOrPhone.trim(), password })
+        });
+        
+        const dataRes = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(dataRes.error || "فشل إنشاء الحساب، يرجى المحاولة لاحقاً");
         }
-      }
 
-      showToast(
-        isAdmin ? "مرحباً بك مدير فلو! جاري التحويل..." : "تم تسجيل الدخول بنجاح، جاري التحويل...",
-        "success"
-      );
-      setTimeout(() => router.push(destination), 600);
-    }, 1000);
+        // تسجيل الدخول مباشرة بعد إنشاء الحساب عبر الـ API
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: emailOrPhone.trim(),
+          password,
+        });
+
+        if (signInError) throw signInError;
+        
+        showToast("تم إنشاء الحساب بنجاح! جاري تحويلك لإعداد الملف الشخصي...", "success");
+        setTimeout(() => {
+          window.location.href = "/onboarding";
+        }, 1500);
+      } else {
+        // --- تسجيل الدخول (Sign In) ---
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: emailOrPhone.trim(),
+          password,
+        });
+
+        if (error) {
+          if (error.message.includes('Invalid login credentials')) {
+            throw new Error('بيانات الدخول غير صحيحة، تأكد من البريد وكلمة المرور');
+          }
+          throw error;
+        }
+
+        // التحقق من وجود الملف الشخصي، إذا لم يكن موجوداً يذهب لـ onboarding
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role, parent_phone")
+          .eq("id", data.user.id)
+          .single();
+
+        if (!profile || !profile.parent_phone) {
+          showToast("يرجى إكمال ملفك الشخصي أولاً", "warning");
+          window.location.href = "/onboarding";
+          return;
+        }
+
+        const isAdmin = profile.role === "admin";
+        
+        // حفظ حالة مؤقتة للواجهة (اختياري)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem("flow-user-role", profile.role);
+        }
+
+        showToast(
+          isAdmin ? "مرحباً بك مدير الأوس الماسية! جاري التحويل..." : "تم تسجيل الدخول بنجاح، جاري التحويل...",
+          "success"
+        );
+        setTimeout(() => {
+          window.location.href = isAdmin ? "/admin" : "/dashboard";
+        }, 600);
+      }
+    } catch (err: any) {
+      showToast(err.message || "حدث خطأ غير متوقع", "error");
+      setLoading(false);
+    }
   }
 
 
@@ -116,15 +162,19 @@ export default function LoginPage() {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white">
             <IconRocket size={28} />
           </div>
-          <div className="text-[22px] font-black tracking-wide">فلو</div>
+          <div className="text-[22px] font-black tracking-wide">الأوس الماسية</div>
           <div className="text-xs font-semibold tracking-widest text-text-muted">
             EDUCATION PLATFORM
           </div>
         </div>
 
-        <h1 className="mb-1.5 text-center text-[22px] font-bold">مرحباً بك مجدداً 👋</h1>
+        <h1 className="mb-1.5 text-center text-[22px] font-bold">
+          {isRegistering ? "إنشاء حساب جديد ✨" : "مرحباً بك مجدداً 👋"}
+        </h1>
         <p className="mb-7 text-center text-[13.5px] text-text-muted">
-          سجّل دخولك لمتابعة رحلتك نحو التميز
+          {isRegistering 
+            ? "أدخل بريدك الإلكتروني وكلمة مرور قوية للبدء" 
+            : "سجّل دخولك لمتابعة رحلتك نحو التميز"}
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4.5" noValidate>
@@ -203,6 +253,14 @@ export default function LoginPage() {
             </a>
           </div>
 
+            <button
+              type="button"
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-[13px] font-semibold text-primary transition-colors duration-200 hover:text-primary-dark"
+            >
+              {isRegistering ? "لديك حساب بالفعل؟ تسجيل الدخول" : "تفعيل حساب جديد (إنشاء حساب)"}
+            </button>
+
           <button
             type="submit"
             disabled={loading}
@@ -211,27 +269,32 @@ export default function LoginPage() {
             {loading && (
               <span className="h-4.5 w-4.5 animate-spin rounded-full border-2.5 border-white/40 border-t-white" />
             )}
-            {loading ? "جاري التحقق..." : "تسجيل الدخول"}
+            {loading ? "جاري المعالجة..." : (isRegistering ? "إنشاء الحساب" : "تسجيل الدخول")}
           </button>
         </form>
 
-        <div className="my-1.5 flex items-center gap-3 text-[12.5px] font-semibold text-text-muted">
-          <span className="h-px flex-1 bg-border" />
-          أو
-          <span className="h-px flex-1 bg-border" />
-        </div>
+        {!isRegistering && (
+          <>
+            <div className="my-1.5 mt-6 flex items-center gap-3 text-[12.5px] font-semibold text-text-muted">
+              <span className="h-px flex-1 bg-border" />
+              أو
+              <span className="h-px flex-1 bg-border" />
+            </div>
 
-        <button
-          onClick={() => showToast("سيتم توجيهك إلى صفحة تفعيل الحساب الجديد (قريباً)", "warning")}
-          className="h-12.5 w-full rounded-[10px] border-[1.5px] border-primary text-[15px] font-bold text-primary transition-all duration-200 hover:-translate-y-px hover:bg-primary-light active:scale-98"
-        >
-          تفعيل حساب جديد
-        </button>
+            <button
+              onClick={() => setIsRegistering(true)}
+              className="mt-4 h-12.5 w-full rounded-[10px] border-[1.5px] border-primary text-[15px] font-bold text-primary transition-all duration-200 hover:-translate-y-px hover:bg-primary-light active:scale-98"
+            >
+              تفعيل حساب جديد
+            </button>
+          </>
+        )}
 
         <p className="mt-7 text-center text-[11.5px] text-text-muted">
-          © 2026 منصة فلو التعليمية — جميع الحقوق محفوظة
+          © 2026 منصة الأوس الماسية التعليمية — جميع الحقوق محفوظة
         </p>
       </div>
     </div>
   );
 }
+

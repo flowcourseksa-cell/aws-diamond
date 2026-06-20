@@ -2,7 +2,7 @@
 
 import { IconHelpCircle, IconClock, IconLock, IconPlayerPlay } from "@tabler/icons-react";
 import { ProgressBar } from "@/components/ui/progress-bar";
-import { FLOW_TRACKS } from "@/lib/mock-data";
+import { usePlatformStore } from "@/lib/store";
 
 export function scoreColor(score: number) {
   if (score >= 75) return "var(--accent-teal)";
@@ -28,6 +28,8 @@ type Props = {
 };
 
 export function ExamList({ exams, hasActiveSubscription, onStart }: Props) {
+  const { tracks } = usePlatformStore();
+
   if (exams.length === 0) {
     return (
       <div className="col-span-full flex min-h-32 items-center justify-center rounded-2xl border border-dashed border-border text-sm text-text-muted">
@@ -38,9 +40,9 @@ export function ExamList({ exams, hasActiveSubscription, onStart }: Props) {
 
   // اجلب لون المسار
   const trackColor = (trackId: string) =>
-    FLOW_TRACKS.find(t => t.id === trackId)?.color ?? "#6366f1";
+    tracks.find(t => t.id === trackId)?.color ?? "#6366f1";
   const trackName = (trackId: string) =>
-    FLOW_TRACKS.find(t => t.id === trackId)?.name ?? "";
+    tracks.find(t => t.id === trackId)?.name ?? "";
 
   return (
     <>
@@ -126,3 +128,4 @@ export function ExamList({ exams, hasActiveSubscription, onStart }: Props) {
     </>
   );
 }
+

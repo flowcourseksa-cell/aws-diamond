@@ -4,8 +4,8 @@ import {
   IconCheck, IconX, IconMinus, IconBrain,
   IconPlayerPlay, IconArrowRight, IconAlertTriangle, IconVideo,
 } from "@tabler/icons-react";
-import type { SkillQuestion } from "@/lib/mock-data";
-import { FLOW_TRACKS } from "@/lib/mock-data";
+import type { SkillQuestion } from "@/lib/store";
+import { usePlatformStore } from "@/lib/store";
 
 const LETTERS = ["أ", "ب", "ج", "د"];
 const RADIUS = 78;
@@ -46,8 +46,8 @@ export function TrackExamResult({ exam, answers, onRetry, onBack }: Props) {
   const weakSkills   = skillResults.filter(s => s.status === "weak");
   const strongSkills = skillResults.filter(s => s.status === "strong");
 
-  // إيجاد فيديوهات علاجية للمهارات الضعيفة
-  const allSkills = FLOW_TRACKS.flatMap(t => t.sections.flatMap(sec => sec.skills));
+  const { tracks } = usePlatformStore();
+  const allSkills = tracks.flatMap(t => t.sections.flatMap(sec => sec.skills));
   const remedialSkills = weakSkills.map(ws => ({
     ...ws,
     remedialVideoUrl: allSkills.find(s => s.id === ws.id)?.remedialVideoUrl,
@@ -235,3 +235,4 @@ export function TrackExamResult({ exam, answers, onRetry, onBack }: Props) {
     </>
   );
 }
+

@@ -8,6 +8,7 @@ import {
   IconBrush, IconAlertTriangle,
 } from "@tabler/icons-react";
 import { usePlatformStore, type Course } from "@/lib/store";
+import { fetchCourses, createCourse, updateCourse, deleteCourse } from "@/lib/supabase/services/courses";
 
 const GRADIENT_OPTIONS = [
   { label: "بنفسجي أزرق", value: "from-indigo-500 to-purple-600" },
@@ -52,7 +53,13 @@ export default function AdminCoursesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_COURSE());
 
-  useEffect(() => setIsMounted(true), []);
+  useEffect(() => {
+    setIsMounted(true);
+    fetchCourses().then(data => {
+      // Avoid overwriting the free simulator if it's there, or just overwrite with DB data.
+      setCourses(data);
+    });
+  }, []);
 
   if (!isMounted) return (
     <div className="flex items-center justify-center h-64">
@@ -73,34 +80,50 @@ export default function AdminCoursesPage() {
     setShowForm(true);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.title.trim()) return;
     if (editId) {
-      setCourses(prev => prev.map(c => c.id === editId ? { ...c, ...form } : c));
+      const success = await updateCourse(editId, form);
+      if (success) {
+        setCourses(prev => prev.map(c => c.id === editId ? { ...c, ...form } : c));
+      }
     } else {
-      const newCourse: Course = {
+      const newCourse = await createCourse({
         ...form,
-        id: `course-${Date.now()}`,
-        createdAt: new Date().toISOString(),
         features: form.features.filter(f => f.trim()),
         tags: form.tags.filter(t => t.trim()),
-      };
-      setCourses(prev => [...prev, newCourse]);
+      });
+      if (newCourse) {
+        setCourses(prev => [newCourse, ...prev]);
+      }
     }
     setShowForm(false);
   }
 
-  function handleDelete(id: string) {
-    setCourses(prev => prev.filter(c => c.id !== id));
+  async function handleDelete(id: string) {
+    const success = await deleteCourse(id);
+    if (success) {
+      setCourses(prev => prev.filter(c => c.id !== id));
+    }
     setDeleteId(null);
   }
 
-  function toggleActive(id: string) {
-    setCourses(prev => prev.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c));
+  async function toggleActive(id: string) {
+    const course = courses.find(c => c.id === id);
+    if (!course) return;
+    const success = await updateCourse(id, { isActive: !course.isActive });
+    if (success) {
+      setCourses(prev => prev.map(c => c.id === id ? { ...c, isActive: !c.isActive } : c));
+    }
   }
 
-  function toggleFeatured(id: string) {
-    setCourses(prev => prev.map(c => c.id === id ? { ...c, isFeatured: !c.isFeatured } : c));
+  async function toggleFeatured(id: string) {
+    const course = courses.find(c => c.id === id);
+    if (!course) return;
+    const success = await updateCourse(id, { isFeatured: !course.isFeatured });
+    if (success) {
+      setCourses(prev => prev.map(c => c.id === id ? { ...c, isFeatured: !c.isFeatured } : c));
+    }
   }
 
   function updateFeature(i: number, val: string) {
@@ -351,7 +374,7 @@ export default function AdminCoursesPage() {
                   <label className="block text-xs font-bold text-text-muted mb-1">اسم المدرب</label>
                   <input value={form.instructorName}
                     onChange={e => setForm(f => ({ ...f, instructorName: e.target.value }))}
-                    placeholder="فريق فلو"
+                    placeholder="فريق الأوس الماسية"
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none"
                   />
                 </div>
@@ -465,3 +488,4 @@ export default function AdminCoursesPage() {
     </div>
   );
 }
+

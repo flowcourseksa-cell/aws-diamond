@@ -17,13 +17,24 @@ import {
   IconStar,
   IconStarFilled,
 } from "@tabler/icons-react";
+
+import { fetchCourses } from "@/lib/supabase/services/courses";
+import { type Course } from "@/lib/store";
 import {
-  type FlowTrack,
-  type FlowSection,
-  type FlowSkill,
-  type SkillStatus,
-} from "@/lib/mock-data";
-import { usePlatformStore } from "@/lib/store";
+  fetchHierarchyByCourse,
+  createTrack,
+  updateTrack,
+  deleteTrack,
+  createSection,
+  updateSection,
+  deleteSection,
+  createSkill,
+  updateSkill,
+  deleteSkill,
+  type DbTrack,
+  type DbSection,
+  type DbMicroSkill,
+} from "@/lib/supabase/services/hierarchy";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
@@ -36,39 +47,13 @@ interface ConfirmDialogState {
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function uid(): string {
-  return Math.random().toString(36).slice(2, 9);
-}
-
-const STATUS_COLORS: Record<SkillStatus, string> = {
-  strong:      "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  average:     "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  weak:        "bg-red-500/15 text-red-400 border-red-500/30",
-  not_started: "bg-slate-500/15 text-slate-400 border-slate-500/30",
-};
-
-const STATUS_LABELS: Record<SkillStatus, string> = {
-  strong:      "متقن",
-  average:     "متوسط",
-  weak:        "ضعيف",
-  not_started: "لم يبدأ",
-};
-
-function ScoreIcon({ score }: { score: number }) {
-  if (score >= 80) return <IconStarFilled size={13} className="text-amber-400" />;
-  if (score >= 50) return <IconStar size={13} className="text-amber-400/60" />;
-  return null;
-}
-
+// Default accents
 const TRACK_ACCENT: Record<string, { pill: string; dot: string }> = {
-  "qudrat-komi":  { pill: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30",   dot: "bg-indigo-500"  },
-  "qudrat-lafzi": { pill: "bg-purple-500/20 text-purple-300 border-purple-500/30",   dot: "bg-purple-500"  },
-  "nafis":        { pill: "bg-red-500/20 text-red-300 border-red-500/30",             dot: "bg-red-500"     },
-  "tasis":        { pill: "bg-amber-500/20 text-amber-300 border-amber-500/30",      dot: "bg-amber-500"   },
+  default: { pill: "bg-indigo-500/20 text-indigo-300 border-indigo-500/30", dot: "bg-indigo-500" },
 };
 
 function getAccent(trackId: string) {
-  return TRACK_ACCENT[trackId] ?? TRACK_ACCENT["qudrat-komi"];
+  return TRACK_ACCENT.default;
 }
 
 // ─── ConfirmModal ─────────────────────────────────────────────────────────────
@@ -107,7 +92,7 @@ function ConfirmModal({
             }}
             className="flex-1 rounded-xl bg-red-500 py-2.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90 active:scale-[0.98]"
           >
-            تأكيد الحذف
+            تأكيد
           </button>
           <button
             onClick={onClose}
@@ -175,7 +160,7 @@ function SkillRow({
   onEdit,
   onDelete,
 }: {
-  skill: FlowSkill;
+  skill: DbMicroSkill;
   onEdit: (name: string) => void;
   onDelete: () => void;
 }) {
@@ -204,20 +189,7 @@ function SkillRow({
             <span className="truncate text-[13px] font-semibold text-text">
               {skill.name}
             </span>
-            <ScoreIcon score={skill.masteryScore} />
           </div>
-
-          <span
-            className={`flex-shrink-0 rounded-lg border px-2 py-0.5 text-[10.5px] font-bold ${STATUS_COLORS[skill.status]}`}
-          >
-            {STATUS_LABELS[skill.status]}
-          </span>
-
-          {skill.masteryScore > 0 && (
-            <span className="flex-shrink-0 text-[12px] font-bold tabular-nums text-text-muted">
-              {skill.masteryScore}٪
-            </span>
-          )}
 
           <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <button
@@ -253,7 +225,7 @@ function SectionCard({
   onDeleteSkill,
   onRequestConfirm,
 }: {
-  section: FlowSection;
+  section: DbSection;
   trackId: string;
   onUpdateSection: (name: string) => void;
   onDeleteSection: () => void;
@@ -268,12 +240,13 @@ function SectionCard({
   const [newSkillName, setNewSkillName] = useState("");
   const accent = getAccent(trackId);
 
+  const skills = section.micro_skills || [];
+
   return (
     <div
       className="rounded-2xl border border-border bg-card shadow-sm"
       style={{ animation: "fadeUp 0.3s ease both" }}
     >
-      {/* Section header */}
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
         <span className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${accent.dot}`} />
 
@@ -296,7 +269,7 @@ function SectionCard({
                 {section.name}
               </span>
               <span className="mr-2 text-[12px] text-text-muted">
-                {section.skills.length} مهارة
+                {skills.length} مهارة
               </span>
             </div>
             <div className="flex flex-shrink-0 items-center gap-1.5">
@@ -324,15 +297,14 @@ function SectionCard({
         )}
       </div>
 
-      {/* Skills */}
       <div className="flex flex-col gap-2 p-4">
-        {section.skills.length === 0 ? (
+        {skills.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border py-6 text-text-muted">
             <IconBook2 size={24} strokeWidth={1.5} />
             <span className="text-[13px]">لا توجد مهارات في هذا القسم</span>
           </div>
         ) : (
-          section.skills.map((skill) => (
+          skills.map((skill) => (
             <SkillRow
               key={skill.id}
               skill={skill}
@@ -348,7 +320,6 @@ function SectionCard({
           ))
         )}
 
-        {/* Add skill */}
         {addingSkill ? (
           <div className="mt-1">
             <InlineInput
@@ -383,21 +354,45 @@ function SectionCard({
 
 export default function TracksPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const tracks = usePlatformStore(s => s.tracks);
-  const setTracks = usePlatformStore(s => s.setTracks);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [activeCourseId, setActiveCourseId] = useState<string>("");
   
+  const [tracks, setTracks] = useState<DbTrack[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<string>("");
   
+  const [isLoading, setIsLoading] = useState(false);
+
   useEffect(() => {
     setIsMounted(true);
+    fetchCourses().then((data) => {
+      setCourses(data);
+      if (data.length > 0) {
+        setActiveCourseId(data[0].id);
+      }
+    });
   }, []);
 
   useEffect(() => {
-    if (isMounted && tracks.length > 0 && !activeTrackId) {
-      setActiveTrackId(tracks[0].id);
+    if (activeCourseId) {
+      setIsLoading(true);
+      fetchHierarchyByCourse(activeCourseId).then((data) => {
+        setTracks(data);
+        if (data.length > 0) {
+          setActiveTrackId(data[0].id);
+        } else {
+          setActiveTrackId("");
+        }
+        setIsLoading(false);
+      });
+    } else {
+      setTracks([]);
+      setActiveTrackId("");
     }
-  }, [isMounted, tracks, activeTrackId]);
+  }, [activeCourseId]);
 
+  const [addingTrack, setAddingTrack] = useState(false);
+  const [newTrackName, setNewTrackName] = useState("");
+  
   const [addingSection, setAddingSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [confirm, setConfirm] = useState<ConfirmDialogState>({
@@ -411,96 +406,148 @@ export default function TracksPage() {
 
   // ── mutations ─────────────────────────────────────────────────────────────
 
-  function addSection(name: string) {
-    const newSection: FlowSection = { id: uid(), name, skills: [] };
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id === activeTrackId
-          ? { ...t, sections: [...t.sections, newSection] }
-          : t
-      )
-    );
+  async function handleAddTrack() {
+    if (!newTrackName.trim() || !activeCourseId) return;
+    const newTrack = await createTrack(activeCourseId, newTrackName.trim(), "📝");
+    if (newTrack) {
+      setTracks((prev) => [...prev, newTrack]);
+      setActiveTrackId(newTrack.id);
+      setNewTrackName("");
+      setAddingTrack(false);
+    }
   }
 
-  function updateSection(sectionId: string, name: string) {
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id === activeTrackId
-          ? { ...t, sections: t.sections.map((s) => s.id === sectionId ? { ...s, name } : s) }
-          : t
-      )
-    );
+  async function handleDeleteTrack(id: string) {
+    const success = await deleteTrack(id);
+    if (success) {
+      const newTracks = tracks.filter((t) => t.id !== id);
+      setTracks(newTracks);
+      if (activeTrackId === id) {
+        setActiveTrackId(newTracks.length > 0 ? newTracks[0].id : "");
+      }
+    }
   }
 
-  function deleteSection(sectionId: string) {
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id === activeTrackId
-          ? { ...t, sections: t.sections.filter((s) => s.id !== sectionId) }
-          : t
-      )
-    );
+  async function handleAddSection(name: string) {
+    if (!activeTrackId) return;
+    const newSection = await createSection(activeTrackId, name);
+    if (newSection) {
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id === activeTrackId
+            ? { ...t, sections: [...(t.sections || []), newSection] }
+            : t
+        )
+      );
+    }
   }
 
-  function addSkill(sectionId: string, name: string) {
-    const newSkill: FlowSkill = { id: uid(), name, masteryScore: 0, status: "not_started" };
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id !== activeTrackId ? t : {
-          ...t,
-          sections: t.sections.map((s) =>
-            s.id === sectionId ? { ...s, skills: [...s.skills, newSkill] } : s
-          ),
-        }
-      )
-    );
+  async function handleUpdateSection(sectionId: string, name: string) {
+    const success = await updateSection(sectionId, name);
+    if (success) {
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id === activeTrackId
+            ? {
+                ...t,
+                sections: t.sections.map((s) => (s.id === sectionId ? { ...s, name } : s)),
+              }
+            : t
+        )
+      );
+    }
   }
 
-  function editSkill(sectionId: string, skillId: string, name: string) {
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id !== activeTrackId ? t : {
-          ...t,
-          sections: t.sections.map((s) =>
-            s.id !== sectionId ? s : {
-              ...s,
-              skills: s.skills.map((sk) => sk.id === skillId ? { ...sk, name } : sk),
-            }
-          ),
-        }
-      )
-    );
+  async function handleDeleteSection(sectionId: string) {
+    const success = await deleteSection(sectionId);
+    if (success) {
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id === activeTrackId
+            ? { ...t, sections: t.sections.filter((s) => s.id !== sectionId) }
+            : t
+        )
+      );
+    }
   }
 
-  function deleteSkill(sectionId: string, skillId: string) {
-    setTracks((prev) =>
-      prev.map((t) =>
-        t.id !== activeTrackId ? t : {
-          ...t,
-          sections: t.sections.map((s) =>
-            s.id !== sectionId ? s : {
-              ...s,
-              skills: s.skills.filter((sk) => sk.id !== skillId),
-            }
-          ),
-        }
-      )
-    );
+  async function handleAddSkill(sectionId: string, name: string) {
+    const newSkill = await createSkill(sectionId, name);
+    if (newSkill) {
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id !== activeTrackId
+            ? t
+            : {
+                ...t,
+                sections: t.sections.map((s) =>
+                  s.id === sectionId
+                    ? { ...s, micro_skills: [...(s.micro_skills || []), newSkill] }
+                    : s
+                ),
+              }
+        )
+      );
+    }
+  }
+
+  async function handleEditSkill(sectionId: string, skillId: string, name: string) {
+    const success = await updateSkill(skillId, name);
+    if (success) {
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id !== activeTrackId
+            ? t
+            : {
+                ...t,
+                sections: t.sections.map((s) =>
+                  s.id !== sectionId
+                    ? s
+                    : {
+                        ...s,
+                        micro_skills: s.micro_skills.map((sk) =>
+                          sk.id === skillId ? { ...sk, name } : sk
+                        ),
+                      }
+                ),
+              }
+        )
+      );
+    }
+  }
+
+  async function handleDeleteSkill(sectionId: string, skillId: string) {
+    const success = await deleteSkill(skillId);
+    if (success) {
+      setTracks((prev) =>
+        prev.map((t) =>
+          t.id !== activeTrackId
+            ? t
+            : {
+                ...t,
+                sections: t.sections.map((s) =>
+                  s.id !== sectionId
+                    ? s
+                    : {
+                        ...s,
+                        micro_skills: s.micro_skills.filter((sk) => sk.id !== skillId),
+                      }
+                ),
+              }
+        )
+      );
+    }
   }
 
   // ── derived stats ─────────────────────────────────────────────────────────
 
-  const totalSections = activeTrack?.sections.length ?? 0;
-  const totalSkills = activeTrack?.sections.reduce((a, s) => a + s.skills.length, 0) ?? 0;
-  const strongSkills = activeTrack?.sections.reduce(
-    (a, s) => a + s.skills.filter((sk) => sk.status === "strong").length,
-    0
-  ) ?? 0;
+  const totalSections = activeTrack?.sections?.length ?? 0;
+  const totalSkills = activeTrack?.sections?.reduce((a, s) => a + (s.micro_skills?.length || 0), 0) ?? 0;
   const activeAccent = getAccent(activeTrackId);
 
   // ─────────────────────────────────────────────────────────────────────────
 
-  if (!isMounted || !activeTrack) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
+  if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
   return (
     <>
@@ -509,181 +556,229 @@ export default function TracksPage() {
         onClose={() => setConfirm((d) => ({ ...d, open: false }))}
       />
 
-      {/* Page header */}
-      <div className="fade-up flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-indigo-500/15">
-            <IconBrain size={22} className="text-indigo-400" />
+      <div className="flex flex-col gap-6 pb-10" dir="rtl">
+        {/* Page header */}
+        <div className="fade-up flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-indigo-500/15">
+              <IconBrain size={22} className="text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-[18px] font-black text-text">
+                إدارة المسارات والأقسام
+              </h1>
+              <p className="text-[12.5px] text-text-muted">
+                تنظيم الهيكل الداخلي لكل دورة
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-[18px] font-black text-text">
-              إدارة المسارات والأقسام
-            </h1>
-            <p className="text-[12.5px] text-text-muted">
-              تنظيم المسارات التعليمية ومهاراتها — {tracks.length} مسارات
-            </p>
-          </div>
-        </div>
 
-        {/* Stats row */}
-        <div className="flex items-center gap-2">
-          {[
-            { label: "أقسام",  value: totalSections, color: "text-indigo-400" },
-            { label: "مهارات", value: totalSkills,    color: "text-amber-400"  },
-            { label: "متقنة",  value: strongSkills,   color: "text-emerald-400"},
-          ].map((stat) => (
-            <div
-              key={stat.label}
-              className="rounded-xl border border-border bg-card px-4 py-2 text-center"
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-text-muted">اختر الدورة:</span>
+            <select 
+              className="bg-card border border-border rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-indigo-500"
+              value={activeCourseId}
+              onChange={(e) => setActiveCourseId(e.target.value)}
             >
-              <div className={`text-[17px] font-black ${stat.color}`}>{stat.value}</div>
-              <div className="text-[11px] text-text-muted">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Two-panel layout */}
-      <div className="fade-up delay-1 flex flex-col gap-5 lg:flex-row lg:items-start">
-
-        {/* LEFT — Track tab list */}
-        <div className="flex-shrink-0 rounded-2xl border border-border bg-card p-3 lg:w-[240px]">
-          <p className="mb-2.5 px-2 text-[10.5px] font-bold uppercase tracking-wider text-text-muted">
-            المسارات
-          </p>
-          <nav className="flex flex-col gap-1">
-            {tracks.map((track) => {
-              const acc = getAccent(track.id);
-              const isActive = track.id === activeTrackId;
-              const sCount = track.sections.length;
-              const skCount = track.sections.reduce((a, s) => a + s.skills.length, 0);
-              return (
-                <button
-                  key={track.id}
-                  onClick={() => {
-                    setActiveTrackId(track.id);
-                    setAddingSection(false);
-                    setNewSectionName("");
-                  }}
-                  className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-right transition-all ${
-                    isActive ? "bg-indigo-500/10" : "hover:bg-bg"
-                  }`}
-                >
-                  <span
-                    className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${acc.dot} ${
-                      isActive ? "ring-2 ring-indigo-500/30 ring-offset-1 ring-offset-card" : ""
-                    }`}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div
-                      className={`flex items-center gap-1.5 text-[13px] font-bold ${
-                        isActive ? "text-text" : "text-text-muted"
-                      }`}
-                    >
-                      <span>{track.icon}</span>
-                      <span className="truncate">{track.name}</span>
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-text-muted">
-                      {sCount} قسم · {skCount} مهارة
-                    </div>
-                  </div>
-                  {isActive && (
-                    <IconChevronLeft size={15} className="flex-shrink-0 text-indigo-400" />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* RIGHT — Sections panel */}
-        <div className="min-w-0 flex-1">
-
-          {/* Panel header */}
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <span className="text-[24px] leading-none">{activeTrack.icon}</span>
-              <div>
-                <h2 className="text-[16px] font-extrabold text-text">
-                  {activeTrack.name}
-                </h2>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-lg border px-2.5 py-0.5 text-[11px] font-bold ${activeAccent.pill}`}
-                  >
-                    {totalSections} قسم
-                  </span>
-                  <span className="text-[12px] text-text-muted">
-                    {totalSkills} مهارة إجمالاً
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {addingSection ? (
-              <div className="w-full sm:w-auto sm:min-w-[300px]">
-                <InlineInput
-                  value={newSectionName}
-                  onChange={setNewSectionName}
-                  onConfirm={() => {
-                    if (newSectionName.trim()) {
-                      addSection(newSectionName.trim());
-                      setNewSectionName("");
-                      setAddingSection(false);
-                    }
-                  }}
-                  onCancel={() => { setNewSectionName(""); setAddingSection(false); }}
-                  placeholder="اسم القسم الجديد..."
-                />
-              </div>
-            ) : (
-              <button
-                onClick={() => setAddingSection(true)}
-                className="flex flex-shrink-0 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-[13px] font-bold text-white shadow-lg shadow-amber-500/20 transition-all hover:bg-amber-400 active:scale-[0.97]"
-              >
-                <IconLayoutGridAdd size={16} />
-                إضافة قسم جديد
-              </button>
-            )}
-          </div>
-
-          {/* Sections or empty state */}
-          {activeTrack.sections.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border bg-card py-20 text-text-muted">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-bg">
-                <IconSparkles size={32} strokeWidth={1.2} />
-              </div>
-              <div className="text-center">
-                <p className="text-[15px] font-bold text-text">لا توجد أقسام بعد</p>
-                <p className="mt-1 text-[13px]">ابدأ بإضافة قسم جديد لهذا المسار</p>
-              </div>
-              <button
-                onClick={() => setAddingSection(true)}
-                className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:bg-amber-400"
-              >
-                <IconPlus size={16} />
-                إضافة قسم
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {activeTrack.sections.map((section) => (
-                <SectionCard
-                  key={section.id}
-                  section={section}
-                  trackId={activeTrackId}
-                  onUpdateSection={(name) => updateSection(section.id, name)}
-                  onDeleteSection={() => deleteSection(section.id)}
-                  onAddSkill={(name) => addSkill(section.id, name)}
-                  onEditSkill={(skillId, name) => editSkill(section.id, skillId, name)}
-                  onDeleteSkill={(skillId) => deleteSkill(section.id, skillId)}
-                  onRequestConfirm={(opts) => setConfirm({ ...opts, open: true })}
-                />
+              {courses.length === 0 && <option value="">لا توجد دورات</option>}
+              {courses.map(c => (
+                <option key={c.id} value={c.id}>{c.title}</option>
               ))}
-            </div>
-          )}
+            </select>
+          </div>
         </div>
+
+        {/* Loading State */}
+        {isLoading ? (
+           <div className="flex items-center justify-center py-20 text-text-muted">
+             جاري جلب الهيكلة...
+           </div>
+        ) : (
+          <div className="fade-up delay-1 flex flex-col gap-5 lg:flex-row lg:items-start">
+            
+            {/* LEFT — Track tab list */}
+            <div className="flex-shrink-0 rounded-2xl border border-border bg-card p-3 lg:w-[240px]">
+              <div className="flex items-center justify-between mb-2.5 px-2">
+                <p className="text-[10.5px] font-bold uppercase tracking-wider text-text-muted">
+                  المسارات
+                </p>
+                <button 
+                  onClick={() => setAddingTrack(true)}
+                  className="text-indigo-400 hover:text-indigo-300"
+                  title="إضافة مسار"
+                >
+                  <IconPlus size={16} />
+                </button>
+              </div>
+
+              <nav className="flex flex-col gap-1">
+                {addingTrack && (
+                  <div className="p-2">
+                    <InlineInput
+                      value={newTrackName}
+                      onChange={setNewTrackName}
+                      onConfirm={handleAddTrack}
+                      onCancel={() => { setNewTrackName(""); setAddingTrack(false); }}
+                      placeholder="اسم المسار..."
+                    />
+                  </div>
+                )}
+                {tracks.length === 0 && !addingTrack && (
+                  <div className="px-2 py-4 text-center text-[12px] text-text-muted">
+                    لا يوجد مسارات. أضف مساراً جديداً.
+                  </div>
+                )}
+                {tracks.map((track) => {
+                  const isActive = track.id === activeTrackId;
+                  const sCount = track.sections?.length || 0;
+                  const skCount = track.sections?.reduce((a, s) => a + (s.micro_skills?.length || 0), 0) || 0;
+                  return (
+                    <div key={track.id} className="relative group">
+                      <button
+                        onClick={() => {
+                          setActiveTrackId(track.id);
+                          setAddingSection(false);
+                          setNewSectionName("");
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-[12px] px-3 py-3 text-right transition-all ${
+                          isActive ? "bg-indigo-500/10" : "hover:bg-bg"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={`flex items-center gap-1.5 text-[13px] font-bold ${
+                              isActive ? "text-text" : "text-text-muted"
+                            }`}
+                          >
+                            <span>{track.icon || "📝"}</span>
+                            <span className="truncate">{track.name}</span>
+                          </div>
+                          <div className="mt-0.5 text-[11px] text-text-muted">
+                            {sCount} قسم · {skCount} مهارة
+                          </div>
+                        </div>
+                        {isActive && (
+                          <IconChevronLeft size={15} className="flex-shrink-0 text-indigo-400" />
+                        )}
+                      </button>
+                      <button 
+                        className="absolute left-2 top-3 p-1 rounded-md text-text-muted opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-500/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirm({
+                            open: true,
+                            title: "حذف مسار",
+                            message: `هل أنت متأكد من حذف مسار "${track.name}" وجميع أقسامه؟`,
+                            onConfirm: () => handleDeleteTrack(track.id)
+                          });
+                        }}
+                      >
+                        <IconTrash size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </nav>
+            </div>
+
+            {/* RIGHT — Sections panel */}
+            <div className="min-w-0 flex-1">
+              {activeTrack ? (
+                <>
+                  {/* Panel header */}
+                  <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[24px] leading-none">{activeTrack.icon || "📝"}</span>
+                      <div>
+                        <h2 className="text-[16px] font-extrabold text-text">
+                          {activeTrack.name}
+                        </h2>
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-lg border px-2.5 py-0.5 text-[11px] font-bold ${activeAccent.pill}`}
+                          >
+                            {totalSections} قسم
+                          </span>
+                          <span className="text-[12px] text-text-muted">
+                            {totalSkills} مهارة إجمالاً
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {addingSection ? (
+                      <div className="w-full sm:w-auto sm:min-w-[300px]">
+                        <InlineInput
+                          value={newSectionName}
+                          onChange={setNewSectionName}
+                          onConfirm={() => {
+                            if (newSectionName.trim()) {
+                              handleAddSection(newSectionName.trim());
+                              setNewSectionName("");
+                              setAddingSection(false);
+                            }
+                          }}
+                          onCancel={() => { setNewSectionName(""); setAddingSection(false); }}
+                          placeholder="اسم القسم الجديد..."
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setAddingSection(true)}
+                        className="flex flex-shrink-0 items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-[13px] font-bold text-white shadow-lg shadow-amber-500/20 transition-all hover:bg-amber-400 active:scale-[0.97]"
+                      >
+                        <IconLayoutGridAdd size={16} />
+                        إضافة قسم جديد
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sections or empty state */}
+                  {activeTrack.sections?.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-dashed border-border bg-card py-20 text-text-muted">
+                      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-bg">
+                        <IconSparkles size={32} strokeWidth={1.2} />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[15px] font-bold text-text">لا توجد أقسام بعد</p>
+                        <p className="mt-1 text-[13px]">ابدأ بإضافة قسم جديد لهذا المسار</p>
+                      </div>
+                      <button
+                        onClick={() => setAddingSection(true)}
+                        className="flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 text-[13px] font-bold text-white transition-all hover:bg-amber-400"
+                      >
+                        <IconPlus size={16} />
+                        إضافة قسم
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {activeTrack.sections?.map((section) => (
+                        <SectionCard
+                          key={section.id}
+                          section={section}
+                          trackId={activeTrackId}
+                          onUpdateSection={(name) => handleUpdateSection(section.id, name)}
+                          onDeleteSection={() => handleDeleteSection(section.id)}
+                          onAddSkill={(name) => handleAddSkill(section.id, name)}
+                          onEditSkill={(skillId, name) => handleEditSkill(section.id, skillId, name)}
+                          onDeleteSkill={(skillId) => handleDeleteSkill(section.id, skillId)}
+                          onRequestConfirm={(opts) => setConfirm({ ...opts, open: true })}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                 <div className="flex flex-col items-center justify-center py-20 text-text-muted border border-border bg-card rounded-2xl">
+                   اختر مساراً لعرص التفاصيل أو قم بإضافة مسار جديد
+                 </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
 }
+

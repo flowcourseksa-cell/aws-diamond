@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { IconX } from "@tabler/icons-react";
-import { FLOW_TRACKS } from "@/lib/mock-data";
+import { usePlatformStore } from "@/lib/store";
 import type { StudyTask } from "@/lib/types";
 
 const DAY_OPTIONS = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس"];
@@ -27,8 +27,10 @@ type Props = {
 };
 
 export function TaskDrawer({ open, defaultDay, onClose, onSave }: Props) {
+  const { tracks } = usePlatformStore();
+  
   const [title,     setTitle]    = useState("");
-  const [trackId,   setTrackId]  = useState(FLOW_TRACKS[0].id);
+  const [trackId,   setTrackId]  = useState(tracks[0]?.id || "");
   const [day,       setDay]      = useState(defaultDay);
   const [time,      setTime]     = useState("10:00");
   const [priority,  setPriority] = useState<StudyTask["priority"]>("medium");
@@ -71,7 +73,7 @@ export function TaskDrawer({ open, defaultDay, onClose, onSave }: Props) {
         <div className="flex flex-col gap-1.75">
           <label className="text-[13px] font-bold">المسار</label>
           <select value={trackId} onChange={e => setTrackId(e.target.value)} className={inputCls}>
-            {FLOW_TRACKS.map(t => (
+            {tracks.map(t => (
               <option key={t.id} value={t.id}>{t.icon} {t.name}</option>
             ))}
           </select>
@@ -112,3 +114,4 @@ export function TaskDrawer({ open, defaultDay, onClose, onSave }: Props) {
     </>
   );
 }
+

@@ -29,7 +29,7 @@ export default function CoursesSection() {
   const storeCourses = usePlatformStore(s => s.courses);
   useEffect(() => setIsMounted(true), []);
 
-  const active = isMounted ? storeCourses.filter(c => c.isActive) : [];
+  const active = isMounted ? storeCourses : [];
 
   if (isMounted && active.length === 0) return null;
 
@@ -76,10 +76,7 @@ export default function CoursesSection() {
 }
 
 function CourseCard({ course, index }: { course: Course; index: number }) {
-  const discountPct = course.price > 0
-    ? Math.round((1 - course.discountedPrice / course.price) * 100)
-    : 0;
-  const isFree = course.discountedPrice === 0;
+  const isFree = true; // Forcing all courses to be free
 
   return (
     <div className={`group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-400 hover:-translate-y-2 fade-up delay-${(index % 3) + 1}`}>
@@ -136,10 +133,10 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
             ) : (
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-primary">{course.discountedPrice} <span className="text-sm">{course.currency}</span></span>
-                {discountPct > 0 && (
+                {course.price > course.discountedPrice && (
                   <>
                     <span className="text-sm text-text-muted line-through">{course.price}</span>
-                    <span className="text-xs font-black text-accent-teal bg-accent-teal/10 rounded-full px-2 py-0.5">خصم {discountPct}%</span>
+                    <span className="text-xs font-black text-accent-teal bg-accent-teal/10 rounded-full px-2 py-0.5">خصم {Math.round((1 - course.discountedPrice / course.price) * 100)}%</span>
                   </>
                 )}
               </div>
@@ -157,3 +154,4 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
     </div>
   );
 }
+

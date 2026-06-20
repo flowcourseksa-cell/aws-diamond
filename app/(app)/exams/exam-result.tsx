@@ -151,3 +151,4 @@ export function ExamResult({ questions, answers, onRetry, onBackToList }: ExamRe
     </>
   );
 }
+

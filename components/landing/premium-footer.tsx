@@ -12,7 +12,7 @@ export default function PremiumFooter() {
             ن
           </div>
           <div className="flex flex-col text-right">
-            <span className="font-black text-2xl text-white leading-none">منصة فلو</span>
+            <span className="font-black text-2xl text-white leading-none">منصة الأوس الماسية</span>
             <span className="text-sm text-accent-amber font-bold">التعليمية</span>
           </div>
         </div>
@@ -73,10 +73,11 @@ export default function PremiumFooter() {
           </div>
 
           <p className="text-gray-500 text-sm">
-            جميع الحقوق محفوظة {new Date().getFullYear()} © منصة فلو التعليمية
+            جميع الحقوق محفوظة {new Date().getFullYear()} © منصة الأوس الماسية التعليمية
           </p>
         </div>
       </div>
     </footer>
   );
 }
+

@@ -1,24 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconX,
   IconClipboardText, IconChevronDown, IconChevronUp,
-  IconAlertTriangle, IconPlayerPlay, IconLock,
+  IconPlayerPlay, IconLock, IconTool,
 } from "@tabler/icons-react";
-import { type SkillQuestion } from "@/lib/mock-data";
-import { usePlatformStore, type AdminExam } from "@/lib/store";
+import { fetchCourses } from "@/lib/supabase/services/courses";
+import { fetchHierarchyByCourse, type DbTrack } from "@/lib/supabase/services/hierarchy";
+import { fetchExamsByTracks, createExam, updateExam, deleteExam, type DbExam } from "@/lib/supabase/services/exams";
+import { type Course } from "@/lib/store";
 
-type FormStep = 1 | 2 | 3;
-
-const EMPTY_QUESTION = (): Omit<SkillQuestion, "id" | "skillId" | "skillName"> => ({
-  questionText: "",
-  options: ["", "", "", ""],
-  correctIndex: 0,
-  explanation: "",
-});
-
-// ── Pill badge ────────────────────────────────────────────────
 function Badge({ label, color }: { label: string; color: string }) {
   return (
     <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold text-white" style={{ background: color }}>
@@ -27,392 +20,318 @@ function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
-// ── Step Indicator ────────────────────────────────────────────
-function StepBar({ step }: { step: FormStep }) {
-  const steps = ["المعلومات الأساسية", "الأسئلة", "مراجعة وحفظ"];
-  return (
-    <div className="flex items-center gap-0 mb-6">
-      {steps.map((label, i) => {
-        const n = (i + 1) as FormStep;
-        const done = step > n;
-        const active = step === n;
-        return (
-          <div key={i} className="flex items-center gap-0 flex-1">
-            <div className="flex flex-col items-center gap-1">
-              <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-black border-2 transition-all ${
-                active ? "border-primary bg-primary text-white" :
-                done ? "border-emerald-500 bg-emerald-500 text-white" :
-                "border-border bg-card text-text-muted"
-              }`}>
-                {done ? <IconCheck size={14}/> : n}
-              </div>
-              <span className={`text-[10.5px] font-bold hidden sm:block ${active ? "text-primary" : done ? "text-emerald-600" : "text-text-muted"}`}>
-                {label}
-              </span>
-            </div>
-            {i < 2 && (
-              <div className={`h-0.5 flex-1 mx-1 rounded-full transition-all ${done ? "bg-emerald-400" : "bg-border"}`}/>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function AdminExamsPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const exams = usePlatformStore(s => s.exams);
-  const setExams = usePlatformStore(s => s.setExams);
-  const tracks = usePlatformStore(s => s.tracks);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [activeCourseId, setActiveCourseId] = useState<string>("");
+  const [tracks, setTracks] = useState<DbTrack[]>([]);
+  const [exams, setExams] = useState<DbExam[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => setIsMounted(true), []);
+  useEffect(() => {
+    setIsMounted(true);
+    fetchCourses().then(data => {
+      setCourses(data);
+      if (data.length > 0) setActiveCourseId(data[0].id);
+    });
+  }, []);
 
-  const [expandedId,  setExpandedId]  = useState<string | null>(null);
-  const [showForm,    setShowForm]    = useState(false);
-  const [editingExam, setEditingExam] = useState<AdminExam | null>(null);
-  const [confirmDel,  setConfirmDel]  = useState<string | null>(null);
+  useEffect(() => {
+    if (activeCourseId) {
+      setIsLoading(true);
+      fetchHierarchyByCourse(activeCourseId).then(hierarchy => {
+        setTracks(hierarchy);
+        const trackIds = hierarchy.map(t => t.id);
+        fetchExamsByTracks(trackIds).then(examData => {
+          setExams(examData);
+          setIsLoading(false);
+        });
+      });
+    } else {
+      setTracks([]);
+      setExams([]);
+    }
+  }, [activeCourseId]);
 
-  // ── Form state ─────────────────────────────────────────────
-  const [step,     setStep]     = useState<FormStep>(1);
-  const [formName, setFormName] = useState("");
-  const [formTrack, setFormTrack] = useState("");
-  const [formSection, setFormSection] = useState("");
-  const [formTime,  setFormTime]  = useState(15);
-  const [formFree,  setFormFree]  = useState(true);
-  const [formPrice, setFormPrice] = useState(0);
-  const [formQuestions, setFormQuestions] = useState<ReturnType<typeof EMPTY_QUESTION>[]>([EMPTY_QUESTION()]);
+  const [filterTrack, setFilterTrack] = useState<string>("all");
+  const [showForm, setShowForm] = useState(false);
+  const [editingExam, setEditingExam] = useState<DbExam | null>(null);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
-  const trackSections = tracks.find(t => t.id === formTrack)?.sections ?? [];
+  // ── Form State ─────────────────────────────────────────────
+  const [title, setTitle] = useState("");
+  const [trackId, setTrackId] = useState("");
+  const [sectionId, setSectionId] = useState("");
+  const [timeMinutes, setTimeMinutes] = useState(15);
+  const [isFree, setIsFree] = useState(true);
+  const [price, setPrice] = useState(0);
+  const [isPublished, setIsPublished] = useState(false);
+
+  const trackSections = tracks.find(t => t.id === trackId)?.sections ?? [];
 
   function openAdd() {
     setEditingExam(null);
-    setFormName(""); setFormTrack(tracks[0]?.id ?? "");
-    setFormSection(tracks[0]?.sections[0]?.id ?? "");
-    setFormTime(15); setFormFree(true); setFormPrice(0);
-    setFormQuestions([EMPTY_QUESTION()]);
-    setStep(1); setShowForm(true);
+    setTitle(""); 
+    setTrackId(tracks[0]?.id ?? "");
+    setSectionId(tracks[0]?.sections?.[0]?.id ?? "");
+    setTimeMinutes(15); 
+    setIsFree(true); 
+    setPrice(0);
+    setIsPublished(false);
+    setShowForm(true);
   }
 
-  function openEdit(exam: AdminExam) {
+  function openEdit(exam: DbExam) {
     setEditingExam(exam);
-    setFormName(exam.name); setFormTrack(exam.trackId);
-    setFormSection(exam.sectionId); setFormTime(exam.timeMinutes);
-    setFormFree(exam.accessType === "free"); setFormPrice(exam.price);
-    setFormQuestions(exam.questions.map(q => ({
-      questionText: q.questionText, options: [...q.options],
-      correctIndex: q.correctIndex, explanation: q.explanation ?? "",
-    })));
-    setStep(1); setShowForm(true);
+    setTitle(exam.title); 
+    setTrackId(exam.track_id); 
+    setSectionId(exam.section_id || "");
+    setTimeMinutes(Math.floor(exam.time_limit_seconds / 60));
+    setIsFree(exam.access_type === "free"); 
+    setPrice(exam.price || 0);
+    setIsPublished(exam.is_published);
+    setShowForm(true);
   }
 
-  function saveExam() {
-    const track = tracks.find(t => t.id === formTrack);
-    const section = track?.sections.find(s => s.id === formSection);
-    const newExam: AdminExam = {
-      id: editingExam?.id ?? `e-${Date.now()}`,
-      trackId: formTrack, sectionId: formSection,
-      name: formName, timeMinutes: formTime,
-      accessType: formFree ? "free" : "paid", price: formFree ? 0 : formPrice,
-      questions: formQuestions.map((q, i) => ({
-        id: `q-${Date.now()}-${i}`,
-        skillId: "custom", skillName: section?.name ?? "",
-        questionText: q.questionText, options: q.options,
-        correctIndex: q.correctIndex, explanation: q.explanation,
-      })),
+  async function saveExam() {
+    const payload: Partial<DbExam> = {
+      title, 
+      track_id: trackId, 
+      section_id: sectionId || null,
+      time_limit_seconds: timeMinutes * 60,
+      access_type: isFree ? "free" : "paid", 
+      price: isFree ? 0 : price,
+      is_published: isPublished,
     };
+
     if (editingExam) {
-      setExams(prev => prev.map(e => e.id === editingExam.id ? newExam : e));
+      const success = await updateExam(editingExam.id, payload);
+      if (success) {
+        setExams(prev => prev.map(e => e.id === editingExam.id ? { ...e, ...payload } as DbExam : e));
+      }
     } else {
-      setExams(prev => [...prev, newExam]);
+      const newExam = await createExam(payload);
+      if (newExam) {
+        setExams(prev => [newExam, ...prev]);
+        // Ideally we redirect to the builder here, but for now we just show it in the list
+      }
     }
     setShowForm(false);
   }
 
-  function deleteExam(id: string) {
-    setExams(prev => prev.filter(e => e.id !== id));
+  async function handleDeleteExam(id: string) {
+    const success = await deleteExam(id);
+    if (success) {
+      setExams(prev => prev.filter(e => e.id !== id));
+    }
     setConfirmDel(null);
   }
 
-  function updateQuestion(idx: number, field: string, value: string | number) {
-    setFormQuestions(prev => prev.map((q, i) => i === idx ? { ...q, [field]: value } : q));
-  }
-
-  function updateOption(qIdx: number, optIdx: number, value: string) {
-    setFormQuestions(prev => prev.map((q, i) =>
-      i === qIdx ? { ...q, options: q.options.map((o, j) => j === optIdx ? value : o) } : q
-    ));
-  }
+  const filteredExams = filterTrack === "all" ? exams : exams.filter(e => e.track_id === filterTrack);
 
   if (!isMounted) return <div className="p-8 text-center font-bold text-text-muted">جاري التحميل...</div>;
 
   return (
-    <div className="flex flex-col gap-6">
-
+    <div className="flex flex-col gap-6" dir="rtl">
       {/* Header */}
-      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <IconClipboardText size={26}/>
-              <h2 className="text-xl font-black">إنشاء وإدارة الاختبارات</h2>
-            </div>
-            <p className="text-white/55 text-sm">أضف اختبارات لكل قسم — حدد الأسئلة والخيارات والإجابات الصحيحة</p>
+      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <IconClipboardText size={26} />
+            <h2 className="text-xl font-black">إدارة الاختبارات</h2>
           </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-3 text-sm font-bold text-white hover:bg-accent-amber/90 transition-colors">
-            <IconPlus size={17}/> اختبار جديد
+          <p className="text-white/55 text-sm">أضف اختبارات أساسية، ثم استخدم المصمم لإضافة الأسئلة المرتبطة بالمهارات.</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+             <span className="text-sm font-bold text-white/80">الدورة:</span>
+             <select 
+               className="bg-bg text-text border border-border rounded-xl px-3 py-2 text-sm font-bold outline-none"
+               value={activeCourseId}
+               onChange={(e) => setActiveCourseId(e.target.value)}
+             >
+               {courses.length === 0 && <option value="">لا توجد دورات</option>}
+               {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+             </select>
+          </div>
+          <button onClick={openAdd} disabled={!activeCourseId}
+            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-2 text-sm font-bold text-white hover:bg-accent-amber/90 transition-colors disabled:opacity-50">
+            <IconPlus size={17} /> إضافة اختبار
           </button>
         </div>
       </div>
 
-      {/* Exams Table */}
-      <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[620px] border-collapse text-[13.5px]">
-            <thead>
-              <tr className="border-b border-border bg-bg/60">
-                {["الاختبار", "المسار", "القسم", "الأسئلة", "الوقت", "النوع", "إجراءات"].map(h => (
-                  <th key={h} className="px-4 py-3.5 text-right text-xs font-black text-text-muted uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {exams.map(exam => {
-                const track = tracks.find(t => t.id === exam.trackId);
-                const section = track?.sections.find(s => s.id === exam.sectionId);
-                const expanded = expandedId === exam.id;
-                return [
-                  <tr key={exam.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => setExpandedId(expanded ? null : exam.id)}
-                          className="flex items-center gap-2 font-extrabold text-text hover:text-primary transition-colors">
-                          {expanded ? <IconChevronUp size={14}/> : <IconChevronDown size={14}/>}
-                          {exam.name}
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {track && <Badge label={`${track.icon} ${track.name}`} color={track.color} />}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-text-muted">{section?.name ?? "—"}</td>
-                    <td className="px-4 py-3.5 font-black">{exam.questions.length}</td>
-                    <td className="px-4 py-3.5 font-semibold">{exam.timeMinutes} دقيقة</td>
-                    <td className="px-4 py-3.5">
-                      {exam.accessType === "free"
-                        ? <span className="flex items-center gap-1 text-emerald-600 font-bold text-xs"><IconPlayerPlay size={12}/> مجاني</span>
-                        : <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><IconLock size={12}/> {exam.price} ر.س</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => openEdit(exam)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
-                          <IconEdit size={13}/>
-                        </button>
-                        {confirmDel === exam.id ? (
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => deleteExam(exam.id)}
-                              className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-bold text-white">
-                              <IconCheck size={11}/> نعم
-                            </button>
-                            <button onClick={() => setConfirmDel(null)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted">
-                              <IconX size={11}/>
-                            </button>
+      {isLoading ? (
+        <div className="p-8 text-center text-text-muted font-bold">جاري جلب بيانات الاختبارات...</div>
+      ) : (
+        <>
+          {/* Table */}
+          <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] border-collapse text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-border bg-bg/60">
+                    {["الاختبار", "المسار", "الوقت", "النوع", "الحالة", "إجراءات"].map(h => (
+                      <th key={h} className="px-4 py-3.5 text-right text-xs font-black text-text-muted uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredExams.map(exam => {
+                    const track = tracks.find(t => t.id === exam.track_id);
+                    return (
+                      <tr key={exam.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2 font-extrabold text-text">
+                            {exam.title}
                           </div>
-                        ) : (
-                          <button onClick={() => setConfirmDel(exam.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-accent-red hover:text-accent-red transition-colors">
-                            <IconTrash size={13}/>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>,
-
-                  // Expanded questions view
-                  expanded && (
-                    <tr key={`${exam.id}-q`} className="border-b border-border">
-                      <td colSpan={7} className="px-6 py-4 bg-bg/50">
-                        <div className="text-xs font-black text-text-muted uppercase tracking-wider mb-3">أسئلة الاختبار</div>
-                        <div className="flex flex-col gap-2.5">
-                          {exam.questions.map((q, qi) => (
-                            <div key={q.id} className="rounded-xl border border-border bg-card p-3.5">
-                              <div className="font-bold text-sm mb-2.5 flex items-center gap-2">
-                                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-white text-[10px] font-black flex-shrink-0">{qi + 1}</span>
-                                {q.questionText}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {track ? <Badge label={`${track.icon || '📝'} ${track.name}`} color={track.color || '#6366f1'} /> : "—"}
+                        </td>
+                        <td className="px-4 py-3.5 font-semibold text-text-muted">{Math.floor(exam.time_limit_seconds / 60)} دقيقة</td>
+                        <td className="px-4 py-3.5">
+                          {exam.access_type === "free"
+                            ? <span className="flex items-center gap-1 text-emerald-600 font-bold text-xs"><IconPlayerPlay size={12} /> مجاني</span>
+                            : <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><IconLock size={12} /> {exam.price} ر.س</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {exam.is_published 
+                            ? <Badge label="منشور" color="#10b981" /> 
+                            : <Badge label="مسودة" color="#f59e0b" />}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            {/* Builder Button */}
+                            <Link href={`/admin/exams/${exam.id}/builder`}
+                              className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-colors"
+                              title="تصميم الأسئلة">
+                              <IconTool size={13} /> مصمم الأسئلة
+                            </Link>
+                            
+                            <button onClick={() => openEdit(exam)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
+                              <IconEdit size={13} />
+                            </button>
+                            {confirmDel === exam.id ? (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => handleDeleteExam(exam.id)}
+                                  className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-bold text-white">
+                                  <IconCheck size={11} /> نعم
+                                </button>
+                                <button onClick={() => setConfirmDel(null)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted">
+                                  <IconX size={11} />
+                                </button>
                               </div>
-                              <div className="grid grid-cols-2 gap-1.5">
-                                {q.options.map((opt, oi) => (
-                                  <div key={oi} className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-semibold ${oi === q.correctIndex ? "bg-emerald-50 border border-emerald-300 text-emerald-700" : "bg-bg border border-border text-text-muted"}`}>
-                                    <span className="font-black">{["أ","ب","ج","د"][oi]}.</span> {opt}
-                                    {oi === q.correctIndex && <IconCheck size={12} className="mr-auto text-emerald-600"/>}
-                                  </div>
-                                ))}
-                              </div>
-                              {q.explanation && (
-                                <div className="mt-2 text-xs text-text-muted font-semibold border-r-2 border-primary/40 pr-2">💡 {q.explanation}</div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
+                            ) : (
+                              <button onClick={() => setConfirmDel(exam.id)}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-accent-red hover:text-accent-red transition-colors">
+                                <IconTrash size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredExams.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-text-muted font-bold">لا توجد اختبارات. أضف اختباراً جديداً.</td>
                     </tr>
-                  ),
-                ].filter(Boolean);
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
-      {/* Form Overlay */}
+      {/* Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-12 bg-black/45 overflow-y-auto" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
-          <div className="w-full max-w-2xl rounded-2xl border border-border bg-card p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45" onClick={e => { if (e.target === e.currentTarget) setShowForm(false); }}>
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-black">{editingExam ? "تعديل الاختبار" : "إضافة اختبار جديد"}</h3>
-              <button onClick={() => setShowForm(false)} className="flex h-8 w-8 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text"><IconX size={16}/></button>
+              <h3 className="text-lg font-black">{editingExam ? "تعديل إعدادات الاختبار" : "إضافة اختبار جديد"}</h3>
+              <button onClick={() => setShowForm(false)} className="flex h-8 w-8 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text"><IconX size={16} /></button>
             </div>
 
-            <StepBar step={step} />
-
-            {/* Step 1: Basic info */}
-            {step === 1 && (
-              <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="text-xs font-black text-text-muted mb-1.5 block">اسم الاختبار</label>
+                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: اختبار القدرات الشامل..."
+                  className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary" />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-black text-text-muted mb-1.5 block">اسم الاختبار</label>
-                  <input value={formName} onChange={e => setFormName(e.target.value)} placeholder="مثال: اختبار الجبر الشامل"
-                    className="w-full rounded-xl border border-border bg-bg px-4 py-3 text-sm font-semibold outline-none focus:border-primary"/>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">المسار (الأساس)</label>
+                  <select value={trackId} onChange={e => { setTrackId(e.target.value); setSectionId(tracks.find(t => t.id === e.target.value)?.sections?.[0]?.id ?? ""); }}
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+                    {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-black text-text-muted mb-1.5 block">المسار</label>
-                    <select value={formTrack} onChange={e => { setFormTrack(e.target.value); setFormSection(tracks.find(t => t.id === e.target.value)?.sections[0]?.id ?? ""); }}
-                      className="w-full rounded-xl border border-border bg-bg px-3 py-3 text-sm font-semibold outline-none focus:border-primary">
-                      {tracks.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-black text-text-muted mb-1.5 block">القسم</label>
-                    <select value={formSection} onChange={e => setFormSection(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-bg px-3 py-3 text-sm font-semibold outline-none focus:border-primary">
-                      {trackSections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-xs font-black text-text-muted mb-1.5 block">الوقت (دقيقة)</label>
-                    <input type="number" value={formTime} onChange={e => setFormTime(Number(e.target.value))} min={1}
-                      className="w-full rounded-xl border border-border bg-bg px-3 py-3 text-sm font-bold outline-none focus:border-primary text-center"/>
-                  </div>
-                  <div>
-                    <label className="text-xs font-black text-text-muted mb-1.5 block">النوع</label>
-                    <div className="flex gap-2 mt-0.5">
-                      {(["free", "paid"] as const).map(t => (
-                        <button key={t} onClick={() => setFormFree(t === "free")}
-                          className={`flex-1 rounded-xl border py-2.5 text-xs font-bold transition-colors ${(formFree ? t === "free" : t === "paid") ? "border-primary bg-primary text-white" : "border-border text-text-muted"}`}>
-                          {t === "free" ? "مجاني" : "مدفوع"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {!formFree && (
-                    <div>
-                      <label className="text-xs font-black text-text-muted mb-1.5 block">السعر (ر.س)</label>
-                      <input type="number" value={formPrice} onChange={e => setFormPrice(Number(e.target.value))} min={0}
-                        className="w-full rounded-xl border border-border bg-bg px-3 py-3 text-sm font-bold outline-none focus:border-primary text-center"/>
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-end mt-2">
-                  <button onClick={() => setStep(2)} disabled={!formName.trim() || !formSection}
-                    className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-40 disabled:cursor-not-allowed">
-                    التالي — الأسئلة <IconChevronDown size={16} className="rotate-[-90deg]"/>
-                  </button>
+                <div>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">القسم (اختياري)</label>
+                  <select value={sectionId} onChange={e => setSectionId(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+                    <option value="">-- عام للمسار بالكامل --</option>
+                    {trackSections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
-            )}
 
-            {/* Step 2: Questions */}
-            {step === 2 && (
-              <div className="flex flex-col gap-4 max-h-[55vh] overflow-y-auto">
-                {formQuestions.map((q, qi) => (
-                  <div key={qi} className="rounded-xl border border-border bg-bg p-4 relative">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white text-[10px] font-black">{qi + 1}</span>
-                      {formQuestions.length > 1 && (
-                        <button onClick={() => setFormQuestions(prev => prev.filter((_, i) => i !== qi))}
-                          className="text-accent-red/60 hover:text-accent-red transition-colors"><IconTrash size={14}/></button>
-                      )}
-                    </div>
-                    <input value={q.questionText} onChange={e => updateQuestion(qi, "questionText", e.target.value)}
-                      placeholder="نص السؤال..."
-                      className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm font-semibold mb-3 outline-none focus:border-primary"/>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      {q.options.map((opt, oi) => (
-                        <div key={oi} className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${oi === q.correctIndex ? "border-emerald-400 bg-emerald-50" : "border-border bg-card"}`}>
-                          <button onClick={() => updateQuestion(qi, "correctIndex", oi)}
-                            className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2 text-xs font-black transition-all ${oi === q.correctIndex ? "border-emerald-500 bg-emerald-500 text-white" : "border-border"}`}>
-                            {oi === q.correctIndex && <IconCheck size={11}/>}
-                          </button>
-                          <input value={opt} onChange={e => updateOption(qi, oi, e.target.value)}
-                            placeholder={`الخيار ${["أ","ب","ج","د"][oi]}`}
-                            className="flex-1 bg-transparent text-xs font-semibold outline-none min-w-0"/>
-                        </div>
-                      ))}
-                    </div>
-                    <input value={q.explanation} onChange={e => updateQuestion(qi, "explanation", e.target.value)}
-                      placeholder="الشرح (اختياري)..."
-                      className="w-full rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold outline-none focus:border-primary"/>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">المدة (دقائق)</label>
+                  <input type="number" value={timeMinutes} onChange={e => setTimeMinutes(Number(e.target.value))} min={1}
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-bold outline-none focus:border-primary text-center" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">نوع الوصول</label>
+                  <div className="flex gap-2 mt-0.5">
+                    {(["free", "paid"] as const).map(t => (
+                      <button key={t} onClick={() => setIsFree(t === "free")}
+                        className={`flex-1 rounded-xl border py-2 text-xs font-bold transition-colors ${(isFree ? t === "free" : t === "paid") ? "border-primary bg-primary text-white" : "border-border text-text-muted"}`}>
+                        {t === "free" ? "مجاني" : "مدفوع"}
+                      </button>
+                    ))}
                   </div>
-                ))}
+                </div>
+              </div>
 
-                <button onClick={() => setFormQuestions(prev => [...prev, EMPTY_QUESTION()])}
-                  className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border py-3 text-sm font-bold text-text-muted hover:border-primary hover:text-primary transition-colors">
-                  <IconPlus size={15}/> إضافة سؤال جديد
+              {!isFree && (
+                <div>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">السعر (ر.س)</label>
+                  <input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} min={0}
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-bold outline-none focus:border-primary text-center" />
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 mt-2 p-3 rounded-xl border border-border bg-bg">
+                <input type="checkbox" id="published" checked={isPublished} onChange={e => setIsPublished(e.target.checked)} 
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" />
+                <label htmlFor="published" className="text-sm font-bold text-text select-none cursor-pointer">
+                  نشر الاختبار مباشرة للطلاب
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
+                <button onClick={() => setShowForm(false)} className="px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text transition-colors">
+                  إلغاء
                 </button>
-
-                <div className="flex justify-between sticky bottom-0 bg-card pt-2 border-t border-border">
-                  <button onClick={() => setStep(1)} className="flex items-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text">
-                    <IconChevronDown size={16} className="rotate-90"/> رجوع
-                  </button>
-                  <button onClick={() => setStep(3)} disabled={formQuestions.some(q => !q.questionText.trim())}
-                    className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-40">
-                    مراجعة وحفظ <IconChevronDown size={16} className="-rotate-90"/>
-                  </button>
-                </div>
+                <button onClick={saveExam} disabled={!title.trim() || !trackId}
+                  className="flex items-center gap-2 rounded-xl bg-accent-amber px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-amber/90 disabled:opacity-50">
+                  <IconCheck size={16} /> حفظ البيانات الأساسية
+                </button>
               </div>
-            )}
-
-            {/* Step 3: Review */}
-            {step === 3 && (
-              <div className="flex flex-col gap-4">
-                <div className="rounded-xl border border-border bg-bg p-4 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="font-black text-text-muted">الاختبار</span><span className="font-extrabold">{formName}</span></div>
-                  <div className="flex justify-between"><span className="font-black text-text-muted">المسار</span><span className="font-bold">{tracks.find(t => t.id === formTrack)?.name}</span></div>
-                  <div className="flex justify-between"><span className="font-black text-text-muted">القسم</span><span className="font-bold">{trackSections.find(s => s.id === formSection)?.name}</span></div>
-                  <div className="flex justify-between"><span className="font-black text-text-muted">الوقت</span><span className="font-bold">{formTime} دقيقة</span></div>
-                  <div className="flex justify-between"><span className="font-black text-text-muted">الأسئلة</span><span className="font-bold">{formQuestions.length} سؤال</span></div>
-                  <div className="flex justify-between"><span className="font-black text-text-muted">النوع</span><span className={`font-bold ${formFree ? "text-emerald-600" : "text-amber-600"}`}>{formFree ? "مجاني" : `مدفوع — ${formPrice} ر.س`}</span></div>
-                </div>
-                <div className="flex justify-between">
-                  <button onClick={() => setStep(2)} className="flex items-center gap-2 rounded-xl border border-border px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text">
-                    <IconChevronDown size={16} className="rotate-90"/> تعديل الأسئلة
-                  </button>
-                  <button onClick={saveExam}
-                    className="flex items-center gap-2 rounded-xl bg-accent-amber px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-amber/90">
-                    <IconCheck size={16}/> حفظ الاختبار
-                  </button>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+

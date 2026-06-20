@@ -45,7 +45,7 @@ export default function FeaturesSection() {
         <div className="text-center mb-16 fade-up">
           <span className="text-indigo-600 font-bold tracking-wider uppercase text-sm mb-2 block">لماذا نحن؟</span>
           <h2 className="text-4xl md:text-5xl font-black text-slate-800">
-            ما الذي يميز <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">فلو</span>؟
+            ما الذي يميز <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">الأوس الماسية</span>؟
           </h2>
         </div>
 
@@ -76,3 +76,4 @@ export default function FeaturesSection() {
     </section>
   );
 }
+

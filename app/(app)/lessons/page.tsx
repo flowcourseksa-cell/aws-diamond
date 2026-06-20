@@ -5,12 +5,13 @@ import {
   IconSearch, IconPlayerPlay, IconPlayerPause, IconCheck,
   IconLock, IconArrowRight, IconVideo, IconUser, IconBrain,
 } from "@tabler/icons-react";
-import { CURRENT_SUBSCRIPTION } from "@/lib/mock-data";
 import { useToast } from "@/components/ui/toast";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { usePlatformStore, type AdminLesson } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { IconAlertTriangle } from "@tabler/icons-react";
+import { useAuth } from "@/hooks/use-auth";
+import { markLessonCompleted } from "@/lib/supabase/services/progress";
 
 // ── بيانات الدروس مرتبطة بالمسارات الصحيحة ────────────────
 
@@ -106,7 +107,7 @@ function VideoPlayer({ lesson, onBack, onComplete }: {
 export default function LessonsPage() {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
-  const { lessons, tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
+  const { lessons, tracks: storeTracks } = usePlatformStore();
   
   useEffect(() => setIsMounted(true), []);
 
@@ -115,27 +116,14 @@ export default function LessonsPage() {
   const [selected, setSelected]   = useState<TrackLesson | null>(null);
   const [done, setDone]           = useState<Set<string>>(new Set());
   const { showToast }             = useToast();
-  const hasSub = true; // In the real system, they have a sub if they are enrolled
+  const { user }                  = useAuth();
+  const hasSub = true;
 
   if (!isMounted) return <div className="p-8 text-center font-bold">جاري التحميل...</div>;
 
-  const currentCourse = courses.find(c => c.id === enrolledCourseId);
-
-  if (!enrolledCourseId || !currentCourse) {
-    return (
-      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
-        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
-        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
-        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى الدروس والشروحات.</p>
-        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
-          تصفح الدورات المتاحة
-        </button>
-      </div>
-    );
-  }
-
-  const activeTracks = storeTracks.filter(t => currentCourse.trackIds.includes(t.id));
-  const activeLessons = lessons.filter(l => currentCourse.trackIds.includes(l.trackId));
+  // Use all tracks directly - free platform
+  const activeTracks = storeTracks;
+  const activeLessons = lessons;
 
   const mappedLessons: TrackLesson[] = activeLessons.map(l => {
     const track = activeTracks.find(t => t.id === l.trackId);
@@ -183,7 +171,12 @@ export default function LessonsPage() {
       <VideoPlayer
         lesson={selected}
         onBack={() => setSelected(null)}
-        onComplete={() => setDone(p => new Set([...p, selected.id]))}
+        onComplete={async () => {
+          setDone(p => new Set([...p, selected.id]));
+          if (user) {
+            await markLessonCompleted(user.id, selected.id);
+          }
+        }}
       />
     );
   }
@@ -274,3 +267,4 @@ export default function LessonsPage() {
     </>
   );
 }
+

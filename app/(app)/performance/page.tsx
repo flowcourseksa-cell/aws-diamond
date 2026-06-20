@@ -49,29 +49,14 @@ const tooltipStyle = {
 export default function PerformancePage() {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
-  const { tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
+  const { tracks: storeTracks } = usePlatformStore();
 
   useEffect(() => setIsMounted(true), []);
 
   if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
-  const currentCourse = courses.find(c => c.id === enrolledCourseId);
-
-  if (!enrolledCourseId || !currentCourse) {
-    return (
-      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
-        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
-        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
-        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى تحليل الأداء.</p>
-        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
-          تصفح الدورات المتاحة
-        </button>
-      </div>
-    );
-  }
-
-  // فلترة المسارات بناءً على الدورة المشترك فيها فقط
-  const activeTracks = storeTracks.filter(t => currentCourse.trackIds.includes(t.id));
+  // Use all tracks directly - free platform
+  const activeTracks = storeTracks;
 
   // حساب متوسط الإتقان الحقيقي من كل مسار
   const trackStats = activeTracks.map(t => {
@@ -239,3 +224,4 @@ export default function PerformancePage() {
     </>
   );
 }
+

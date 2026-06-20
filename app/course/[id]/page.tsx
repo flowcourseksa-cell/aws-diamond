@@ -16,7 +16,7 @@ export default function CourseDetailsPage() {
   const courseId = params.id as string;
   
   const [isMounted, setIsMounted] = useState(false);
-  const { courses, setEnrolledCourseId } = usePlatformStore();
+  const { courses } = usePlatformStore();
   
   useEffect(() => setIsMounted(true), []);
 
@@ -35,12 +35,12 @@ export default function CourseDetailsPage() {
   const isFree = course.discountedPrice === 0;
   const discountPct = course.price > 0 ? Math.round((1 - course.discountedPrice / course.price) * 100) : 0;
 
-  const handleSubscribe = () => {
-    // التحقق من تسجيل الدخول (استخدام حالة بسيطة من الـ localStorage)
-    const isLoggedIn = typeof window !== 'undefined' && localStorage.getItem("flow-logged-in") === "true";
+  const handleSubscribe = async () => {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
     
-    if (!isLoggedIn) {
-      // توجيه لصفحة تسجيل الدخول مع حفظ مسار العودة
+    if (!session) {
       if (typeof window !== 'undefined') {
         localStorage.setItem("flow-redirect-after-login", `/course/${course.id}`);
       }
@@ -48,8 +48,6 @@ export default function CourseDetailsPage() {
       return;
     }
 
-    // الفعل الحقيقي: تسجيل الطالب في الدورة
-    setEnrolledCourseId(course.id);
     router.push("/dashboard");
   };
 
@@ -66,7 +64,7 @@ export default function CourseDetailsPage() {
             <div className="w-10 h-10 rounded-xl bg-accent-amber text-white flex items-center justify-center font-black text-lg">
               ف
             </div>
-            <span className="font-black text-xl tracking-tight">منصة فلو</span>
+            <span className="font-black text-xl tracking-tight">منصة الأوس الماسية</span>
           </div>
         </div>
       </nav>
@@ -199,7 +197,7 @@ export default function CourseDetailsPage() {
               {isFree ? "سجل الآن مجاناً وابدأ" : "اشترك في الدورة الآن"}
             </button>
             <p className="text-center text-xs text-text-muted mt-4 font-semibold">
-              بمجرد الضغط سيتم تسجيلك في الدورة فوراً كنسخة تجريبية
+              بمجرد الضغط سيتم توجيهك إلى منصة التعلم الشاملة
             </p>
           </div>
 

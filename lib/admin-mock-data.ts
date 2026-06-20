@@ -26,3 +26,4 @@ export const DAILY_REVENUE = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 export type StudentStatus = "active" | "pending" | "expired";
+

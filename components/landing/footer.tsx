@@ -11,7 +11,7 @@ export default function Footer() {
             <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl">
               ن
             </div>
-            <span className="font-black text-2xl text-text">فلو</span>
+            <span className="font-black text-2xl text-text">الأوس الماسية</span>
           </div>
           <p className="text-text-muted leading-relaxed max-w-sm mb-6">
             المنصة التعليمية الأولى في المملكة لتهيئة الطلاب لاجتياز اختباري القدرات والتحصيلي بأعلى الدرجات، مع نخبة من الخبراء.
@@ -46,7 +46,7 @@ export default function Footer() {
           <ul className="space-y-4 text-text-muted">
             <li className="flex items-center gap-2">
               <IconBrandWhatsapp size={18} className="text-primary" />
-              <span dir="ltr">+966 50 000 0000</span>
+              <span dir="ltr">+966 50 780 6516</span>
             </li>
             <li>الرياض، المملكة العربية السعودية</li>
             <li>info@flow.com</li>
@@ -55,7 +55,7 @@ export default function Footer() {
       </div>
 
       <div className="max-w-7xl mx-auto border-t border-border pt-8 text-center text-text-muted text-sm flex flex-col md:flex-row justify-between items-center gap-4">
-        <p>جميع الحقوق محفوظة © {new Date().getFullYear()} منصة فلو.</p>
+        <p>جميع الحقوق محفوظة © {new Date().getFullYear()} منصة الأوس الماسية.</p>
         <div className="flex gap-4">
           <a href="#" className="hover:text-primary transition-colors">الشروط والأحكام</a>
           <a href="#" className="hover:text-primary transition-colors">سياسة الخصوصية</a>
@@ -64,3 +64,4 @@ export default function Footer() {
     </footer>
   );
 }
+

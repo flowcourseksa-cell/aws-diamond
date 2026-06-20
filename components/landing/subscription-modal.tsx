@@ -33,7 +33,7 @@ export default function SubscriptionModal({ isOpen, onClose, itemName }: Subscri
   };
 
   const whatsappMessage = `مرحباً، أود الاشتراك في: ${itemName || "إحدى الباقات"}`;
-  const whatsappUrl = `https://wa.me/966500000000?text=${encodeURIComponent(whatsappMessage)}`;
+  const whatsappUrl = `https://wa.me/966507806516?text=${encodeURIComponent(whatsappMessage)}`;
 
   return (
     <div
@@ -131,3 +131,4 @@ export default function SubscriptionModal({ isOpen, onClose, itemName }: Subscri
     </div>
   );
 }
+

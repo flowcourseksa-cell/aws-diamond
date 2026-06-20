@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { IconCheck, IconListCheck } from "@tabler/icons-react";
-import { FLOW_TRACKS, MOCK_CENTER_ID } from "@/lib/mock-data";
 import type { StudyTask } from "@/lib/types";
+
+const MOCK_CENTER_ID = "center-flow-demo";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { useToast } from "@/components/ui/toast";
 import { TaskDrawer } from "./task-drawer";
@@ -281,3 +282,4 @@ export function StudyPlanClient() {
     </>
   );
 }
+

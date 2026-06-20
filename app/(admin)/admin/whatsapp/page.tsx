@@ -12,7 +12,7 @@ export default function AdminWhatsAppPage() {
   const [autoExam, setAutoExam] = useState(true);
   const [autoWeekly, setAutoWeekly] = useState(false);
   const [examTemplate, setExamTemplate] = useState(
-    "مرحباً ولي أمر {name}،\nلقد أكمل ابنكم اختبار في مسار {track} وحصل على نسبة {score}%.\n\nمنصة فلو تتمنى لكم التوفيق!"
+    "مرحباً ولي أمر {name}،\nلقد أكمل ابنكم اختبار في مسار {track} وحصل على نسبة {score}%.\n\nمنصة الأوس الماسية تتمنى لكم التوفيق!"
   );
   const [manualMessage, setManualMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -181,3 +181,4 @@ export default function AdminWhatsAppPage() {
     </div>
   );
 }
+

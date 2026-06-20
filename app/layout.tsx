@@ -4,8 +4,8 @@ import { ThemeProvider } from "./theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
-  title: "فلو — منصة تعليمية",
-  description: "منصة فلو التعليمية للطلاب المقبلين على اختبار القدرات والتحصيلي",
+  title: "الأوس الماسية — منصة تعليمية",
+  description: "منصة الأوس الماسية التعليمية للطلاب المقبلين على اختبار القدرات والتحصيلي",
 };
 
 export default function RootLayout({
@@ -31,3 +31,4 @@ export default function RootLayout({
     </html>
   );
 }
+

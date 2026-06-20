@@ -1,5 +1,5 @@
 // ============================================================
-// Supabase Client — منصة فلو
+// Supabase Client — منصة الأوس الماسية
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -23,3 +23,4 @@ export function createServerClient() {
     { auth: { persistSession: false } }
   );
 }
+

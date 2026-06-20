@@ -6,7 +6,10 @@ import {
   IconBook, IconPlayerPlay, IconLock, IconFilter,
   IconBrandYoutube,
 } from "@tabler/icons-react";
-import { usePlatformStore, type AdminLesson } from "@/lib/store";
+import { fetchCourses } from "@/lib/supabase/services/courses";
+import { fetchHierarchyByCourse, type DbTrack } from "@/lib/supabase/services/hierarchy";
+import { fetchLessonsByTracks, createLesson, updateLesson, deleteLesson, type DbLesson } from "@/lib/supabase/services/lessons";
+import { type Course } from "@/lib/store";
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
@@ -19,15 +22,40 @@ function Badge({ label, color }: { label: string; color: string }) {
 // ── Component ─────────────────────────────────────────────────
 export default function AdminLessonsPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const lessons = usePlatformStore(s => s.lessons);
-  const setLessons = usePlatformStore(s => s.setLessons);
-  const tracks = usePlatformStore(s => s.tracks);
-  
-  useEffect(() => setIsMounted(true), []);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [activeCourseId, setActiveCourseId] = useState<string>("");
+  const [tracks, setTracks] = useState<DbTrack[]>([]);
+  const [lessons, setLessons] = useState<DbLesson[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    fetchCourses().then(data => {
+      setCourses(data);
+      if (data.length > 0) setActiveCourseId(data[0].id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (activeCourseId) {
+      setIsLoading(true);
+      fetchHierarchyByCourse(activeCourseId).then(hierarchy => {
+        setTracks(hierarchy);
+        const trackIds = hierarchy.map(t => t.id);
+        fetchLessonsByTracks(trackIds).then(lessonData => {
+          setLessons(lessonData);
+          setIsLoading(false);
+        });
+      });
+    } else {
+      setTracks([]);
+      setLessons([]);
+    }
+  }, [activeCourseId]);
+
   const [filterTrack, setFilterTrack] = useState<string>("all");
-  
   const [showForm, setShowForm] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<AdminLesson | null>(null);
+  const [editingLesson, setEditingLesson] = useState<DbLesson | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
   // ── Form State ─────────────────────────────────────────────
@@ -39,18 +67,20 @@ export default function AdminLessonsPage() {
   const [duration, setDuration] = useState("");
   const [isFree, setIsFree] = useState(true);
   const [price, setPrice] = useState(0);
-  const [status, setStatus] = useState<AdminLesson["status"]>("normal");
+  const [status, setStatus] = useState<DbLesson["status"]>("normal");
   const [uploadMode, setUploadMode] = useState<"url" | "file">("url");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
 
-  const trackSections = tracks.find(t => t.id === trackId)?.sections ?? [];
+  const activeTrack = tracks.find(t => t.id === trackId);
+  const trackSections = activeTrack?.sections ?? [];
 
   function openAdd() {
     setEditingLesson(null);
     setTitle(""); setVideoUrl(""); setTeacherName("");
-    setTrackId(tracks[0]?.id ?? ""); setSectionId(tracks[0]?.sections[0]?.id ?? "");
+    setTrackId(tracks[0]?.id ?? ""); 
+    setSectionId(tracks[0]?.sections?.[0]?.id ?? "");
     setDuration(""); setIsFree(true); setPrice(0); setStatus("normal");
     setUploadMode("url");
     setFileToUpload(null);
@@ -59,13 +89,23 @@ export default function AdminLessonsPage() {
     setShowForm(true);
   }
 
-  function openEdit(lesson: AdminLesson) {
+  function openEdit(lesson: DbLesson) {
     setEditingLesson(lesson);
-    setTitle(lesson.title); setVideoUrl(lesson.videoUrl); setTeacherName(lesson.teacherName);
-    setTrackId(lesson.trackId); setSectionId(lesson.sectionId);
-    setDuration(lesson.durationLabel); setIsFree(lesson.accessType === "free");
-    setPrice(lesson.price); setStatus(lesson.status);
-    setUploadMode(lesson.videoUrl.startsWith("ملف محلي") ? "file" : "url");
+    setTitle(lesson.title); setVideoUrl(lesson.video_url); setTeacherName(lesson.teacher_name || "");
+    setTrackId(lesson.track_id); setSectionId(lesson.section_id || "");
+    
+    // Quick duration formatter (assuming stored in seconds)
+    if (lesson.duration_seconds) {
+      const m = Math.floor(lesson.duration_seconds / 60);
+      const s = lesson.duration_seconds % 60;
+      setDuration(`${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+    } else {
+      setDuration("");
+    }
+
+    setIsFree(lesson.access_type === "free");
+    setPrice(lesson.price || 0); setStatus(lesson.status || "normal");
+    setUploadMode(lesson.video_url.startsWith("ملف محلي") ? "file" : "url");
     setFileToUpload(null);
     setUploadProgress(0);
     setIsUploading(false);
@@ -79,7 +119,6 @@ export default function AdminLessonsPage() {
     setFileToUpload(file);
     setVideoUrl(`ملف محلي: ${file.name}`);
     
-    // Auto-extract video duration
     if (file.type.startsWith("video/")) {
       const url = URL.createObjectURL(file);
       const video = document.createElement("video");
@@ -114,135 +153,184 @@ export default function AdminLessonsPage() {
     }
   }
 
-  function finishSaving() {
-    const newLesson: AdminLesson = {
-      id: editingLesson?.id ?? `l-${Date.now()}`,
-      title, videoUrl, teacherName, trackId, sectionId,
-      durationLabel: duration || "00:00",
-      accessType: isFree ? "free" : "paid", price: isFree ? 0 : price,
+  async function finishSaving() {
+    let durationSecs = 0;
+    if (duration && duration.includes(":")) {
+      const [m, s] = duration.split(":");
+      durationSecs = (parseInt(m) || 0) * 60 + (parseInt(s) || 0);
+    } else if (duration) {
+      durationSecs = parseInt(duration) * 60;
+    }
+
+    const payload: Partial<DbLesson> = {
+      title, 
+      video_url: videoUrl, 
+      teacher_name: teacherName, 
+      track_id: trackId, 
+      section_id: sectionId || null,
+      duration_seconds: durationSecs,
+      access_type: isFree ? "free" : "paid", 
+      price: isFree ? 0 : price,
       status,
     };
+
     if (editingLesson) {
-      setLessons(prev => prev.map(l => l.id === editingLesson.id ? newLesson : l));
+      const success = await updateLesson(editingLesson.id, payload);
+      if (success) {
+        setLessons(prev => prev.map(l => l.id === editingLesson.id ? { ...l, ...payload } as DbLesson : l));
+      }
     } else {
-      setLessons(prev => [...prev, newLesson]);
+      const newLesson = await createLesson(payload);
+      if (newLesson) {
+        setLessons(prev => [newLesson, ...prev]);
+      }
     }
+
     setIsUploading(false);
     setUploadProgress(0);
     setShowForm(false);
   }
 
-  function deleteLesson(id: string) {
-    setLessons(prev => prev.filter(l => l.id !== id));
+  async function handleDeleteLesson(id: string) {
+    const success = await deleteLesson(id);
+    if (success) {
+      setLessons(prev => prev.filter(l => l.id !== id));
+    }
     setConfirmDel(null);
   }
 
-  const filteredLessons = filterTrack === "all" ? lessons : lessons.filter(l => l.trackId === filterTrack);
+  const filteredLessons = filterTrack === "all" ? lessons : lessons.filter(l => l.track_id === filterTrack);
 
   if (!isMounted) return <div className="p-8 text-center font-bold text-text-muted">جاري التحميل...</div>;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" dir="rtl">
       {/* Header */}
-      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <IconBook size={26} />
-              <h2 className="text-xl font-black">إدارة الدروس والفيديوهات</h2>
-            </div>
-            <p className="text-white/55 text-sm">رفع دروس جديدة، تحديد الأسعار، وتعيينها للمسارات والأقسام.</p>
+      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <IconBook size={26} />
+            <h2 className="text-xl font-black">إدارة الدروس والفيديوهات</h2>
           </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-3 text-sm font-bold text-white hover:bg-accent-amber/90 transition-colors">
+          <p className="text-white/55 text-sm">رفع دروس جديدة، تحديد الأسعار، وتعيينها للمسارات والأقسام.</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-white/80">الدورة:</span>
+            <select 
+              className="bg-bg text-text border border-border rounded-xl px-3 py-2 text-sm font-bold outline-none"
+              value={activeCourseId}
+              onChange={(e) => setActiveCourseId(e.target.value)}
+            >
+              {courses.length === 0 && <option value="">لا توجد دورات</option>}
+              {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+          </div>
+          <button onClick={openAdd} disabled={!activeCourseId}
+            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-2 text-sm font-bold text-white hover:bg-accent-amber/90 transition-colors disabled:opacity-50">
             <IconPlus size={17} /> درس جديد
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 fade-up">
-        <IconFilter size={20} className="text-text-muted" />
-        <select value={filterTrack} onChange={e => setFilterTrack(e.target.value)}
-          className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
-          <option value="all">جميع المسارات</option>
-          {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-      </div>
+      {isLoading ? (
+        <div className="p-8 text-center text-text-muted font-bold">جاري جلب بيانات الدروس...</div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex items-center gap-3 fade-up">
+            <IconFilter size={20} className="text-text-muted" />
+            <select value={filterTrack} onChange={e => setFilterTrack(e.target.value)}
+              className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+              <option value="all">جميع المسارات</option>
+              {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
 
-      {/* Table */}
-      <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] border-collapse text-[13.5px]">
-            <thead>
-              <tr className="border-b border-border bg-bg/60">
-                {["العنوان", "المسار", "القسم", "المعلم", "المدة", "النوع", "إجراءات"].map(h => (
-                  <th key={h} className="px-4 py-3.5 text-right text-xs font-black text-text-muted uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLessons.map(lesson => {
-                const track = tracks.find(t => t.id === lesson.trackId);
-                const section = track?.sections.find(s => s.id === lesson.sectionId);
-                return (
-                  <tr key={lesson.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2 font-extrabold text-text">
-                        <IconBrandYoutube size={16} className="text-red-500" />
-                        {lesson.title}
-                        {lesson.status === "new" && <span className="text-[10px] bg-accent-teal/20 text-accent-teal px-1.5 py-0.5 rounded-full">جديد</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {track && <Badge label={`${track.icon} ${track.name}`} color={track.color} />}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-text-muted">{section?.name ?? "—"}</td>
-                    <td className="px-4 py-3.5 font-semibold">{lesson.teacherName}</td>
-                    <td className="px-4 py-3.5 font-black">{lesson.durationLabel}</td>
-                    <td className="px-4 py-3.5">
-                      {lesson.accessType === "free"
-                        ? <span className="flex items-center gap-1 text-emerald-600 font-bold text-xs"><IconPlayerPlay size={12} /> مجاني</span>
-                        : <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><IconLock size={12} /> {lesson.price} ر.س</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => openEdit(lesson)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
-                          <IconEdit size={13} />
-                        </button>
-                        {confirmDel === lesson.id ? (
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => deleteLesson(lesson.id)}
-                              className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-bold text-white">
-                              <IconCheck size={11} /> نعم
-                            </button>
-                            <button onClick={() => setConfirmDel(null)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted">
-                              <IconX size={11} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setConfirmDel(lesson.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-accent-red hover:text-accent-red transition-colors">
-                            <IconTrash size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+          {/* Table */}
+          <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px] border-collapse text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-border bg-bg/60">
+                    {["العنوان", "المسار", "القسم", "المعلم", "المدة", "النوع", "إجراءات"].map(h => (
+                      <th key={h} className="px-4 py-3.5 text-right text-xs font-black text-text-muted uppercase tracking-wider">{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-              {filteredLessons.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-text-muted font-bold">لا توجد دروس مطابقة</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {filteredLessons.map(lesson => {
+                    const track = tracks.find(t => t.id === lesson.track_id);
+                    const section = track?.sections?.find(s => s.id === lesson.section_id);
+                    
+                    let durationLabel = "—";
+                    if (lesson.duration_seconds) {
+                       const m = Math.floor(lesson.duration_seconds / 60);
+                       const s = lesson.duration_seconds % 60;
+                       durationLabel = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                    }
+
+                    return (
+                      <tr key={lesson.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2 font-extrabold text-text">
+                            <IconBrandYoutube size={16} className="text-red-500" />
+                            {lesson.title}
+                            {lesson.status === "new" && <span className="text-[10px] bg-accent-teal/20 text-accent-teal px-1.5 py-0.5 rounded-full">جديد</span>}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {track ? <Badge label={`${track.icon || '📝'} ${track.name}`} color={track.color || '#6366f1'} /> : "—"}
+                        </td>
+                        <td className="px-4 py-3.5 font-semibold text-text-muted">{section?.name ?? "—"}</td>
+                        <td className="px-4 py-3.5 font-semibold">{lesson.teacher_name || "—"}</td>
+                        <td className="px-4 py-3.5 font-black">{durationLabel}</td>
+                        <td className="px-4 py-3.5">
+                          {lesson.access_type === "free"
+                            ? <span className="flex items-center gap-1 text-emerald-600 font-bold text-xs"><IconPlayerPlay size={12} /> مجاني</span>
+                            : <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><IconLock size={12} /> {lesson.price} ر.س</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => openEdit(lesson)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
+                              <IconEdit size={13} />
+                            </button>
+                            {confirmDel === lesson.id ? (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => handleDeleteLesson(lesson.id)}
+                                  className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-bold text-white">
+                                  <IconCheck size={11} /> نعم
+                                </button>
+                                <button onClick={() => setConfirmDel(null)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted">
+                                  <IconX size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setConfirmDel(lesson.id)}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-accent-red hover:text-accent-red transition-colors">
+                                <IconTrash size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredLessons.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-10 text-center text-text-muted font-bold">لا توجد دروس مطابقة</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Form Modal */}
       {showForm && (
@@ -263,7 +351,7 @@ export default function AdminLessonsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-black text-text-muted mb-1.5 block">المسار</label>
-                  <select value={trackId} onChange={e => { setTrackId(e.target.value); setSectionId(tracks.find(t => t.id === e.target.value)?.sections[0]?.id ?? ""); }}
+                  <select value={trackId} onChange={e => { setTrackId(e.target.value); setSectionId(tracks.find(t => t.id === e.target.value)?.sections?.[0]?.id ?? ""); }}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
                     {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
@@ -272,6 +360,7 @@ export default function AdminLessonsPage() {
                   <label className="text-xs font-black text-text-muted mb-1.5 block">القسم</label>
                   <select value={sectionId} onChange={e => setSectionId(e.target.value)}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+                    <option value="">-- بدون قسم --</option>
                     {trackSections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
@@ -331,7 +420,7 @@ export default function AdminLessonsPage() {
 
               <div>
                  <label className="text-xs font-black text-text-muted mb-1.5 block">الحالة (شارة)</label>
-                 <select value={status} onChange={e => setStatus(e.target.value as AdminLesson["status"])}
+                 <select value={status || "normal"} onChange={e => setStatus(e.target.value as DbLesson["status"])}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
                     <option value="new">جديد</option>
                     <option value="normal">عادي</option>
@@ -355,7 +444,7 @@ export default function AdminLessonsPage() {
                 <button onClick={() => setShowForm(false)} disabled={isUploading} className="px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text transition-colors disabled:opacity-50">
                   إلغاء
                 </button>
-                <button onClick={saveLesson} disabled={!title.trim() || !sectionId || isUploading || (uploadMode === "file" && !fileToUpload && !videoUrl.startsWith("ملف محلي"))}
+                <button onClick={saveLesson} disabled={!title.trim() || !trackId || isUploading || (uploadMode === "file" && !fileToUpload && !videoUrl.startsWith("ملف محلي"))}
                   className="flex items-center gap-2 rounded-xl bg-accent-amber px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-amber/90 disabled:opacity-50">
                   <IconCheck size={16} /> حفظ الدرس
                 </button>
@@ -367,3 +456,4 @@ export default function AdminLessonsPage() {
     </div>
   );
 }
+

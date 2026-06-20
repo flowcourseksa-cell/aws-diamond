@@ -1,7 +1,7 @@
 // @ts-nocheck
 // NOTE: Supabase table types will resolve once schema.sql is applied.
 // ============================================================
-// محرك تتبع المهارات — منصة فلو
+// محرك تتبع المهارات — منصة الأوس الماسية
 // Skill Tracking Engine
 // ============================================================
 import { supabase } from "@/lib/supabase";
@@ -225,7 +225,7 @@ function buildWhatsAppMessage({
   const weakList   = weakSkills.length   > 0 ? weakSkills.join("، ")   : "لا يوجد";
   const strongList = strongSkills.length > 0 ? strongSkills.join("، ") : "لا يوجد";
 
-  return `📊 تقرير منصة فلو التعليمية
+  return `📊 تقرير منصة الأوس الماسية التعليمية
 
 ${emoji} أنهى ابنكم/ابنتكم اختبار *${examTitle}*
 
@@ -243,7 +243,7 @@ ${strongList}
 لمتابعة التقدم الكامل وخطة الدراسة المخصصة:
 👉 flow-platform.com/dashboard
 
-منصة فلو التعليمية 💙`;
+منصة الأوس الماسية التعليمية 💙`;
 }
 
 /**
@@ -279,3 +279,4 @@ export const SKILL_STATUS_META: Record<SkillStatus, { label: string; color: stri
   average:     { label: "متوسط",    color: "text-amber-600",   bg: "bg-amber-50",    icon: "🟡" },
   strong:      { label: "ممتاز",    color: "text-emerald-600", bg: "bg-emerald-50",  icon: "🟢" },
 };
+

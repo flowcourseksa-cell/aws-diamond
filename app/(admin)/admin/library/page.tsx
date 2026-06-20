@@ -6,7 +6,10 @@ import {
   IconFolder, IconFileText, IconVideo, IconPhoto, IconNotes,
   IconLock, IconFilter, IconDownload,
 } from "@tabler/icons-react";
-import { usePlatformStore, type LibraryFile } from "@/lib/store";
+import { fetchCourses } from "@/lib/supabase/services/courses";
+import { fetchHierarchyByCourse, type DbTrack } from "@/lib/supabase/services/hierarchy";
+import { fetchFilesByTracks, createFile, updateFile, deleteFile, type DbLibraryFile } from "@/lib/supabase/services/library";
+import { type Course } from "@/lib/store";
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
@@ -16,194 +19,250 @@ function Badge({ label, color }: { label: string; color: string }) {
   );
 }
 
-function TypeIcon({ type }: { type: LibraryFile["type"] }) {
+function TypeIcon({ type }: { type: DbLibraryFile["file_type"] }) {
   switch (type) {
     case "pdf": return <IconFileText size={18} className="text-rose-500" />;
     case "video": return <IconVideo size={18} className="text-indigo-500" />;
     case "image": return <IconPhoto size={18} className="text-amber-500" />;
     case "summary": return <IconNotes size={18} className="text-emerald-500" />;
+    default: return <IconFileText size={18} className="text-gray-500" />;
   }
 }
 
 // ── Component ─────────────────────────────────────────────────
 export default function AdminLibraryPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const files = usePlatformStore(s => s.files);
-  const setFiles = usePlatformStore(s => s.setFiles);
-  const tracks = usePlatformStore(s => s.tracks);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [activeCourseId, setActiveCourseId] = useState<string>("");
+  const [tracks, setTracks] = useState<DbTrack[]>([]);
+  const [files, setFiles] = useState<DbLibraryFile[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => setIsMounted(true), []);
-  
+  useEffect(() => {
+    setIsMounted(true);
+    fetchCourses().then(data => {
+      setCourses(data);
+      if (data.length > 0) setActiveCourseId(data[0].id);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (activeCourseId) {
+      setIsLoading(true);
+      fetchHierarchyByCourse(activeCourseId).then(hierarchy => {
+        setTracks(hierarchy);
+        const trackIds = hierarchy.map(t => t.id);
+        fetchFilesByTracks(trackIds).then(fileData => {
+          setFiles(fileData);
+          setIsLoading(false);
+        });
+      });
+    } else {
+      setTracks([]);
+      setFiles([]);
+    }
+  }, [activeCourseId]);
+
   const [filterTrack, setFilterTrack] = useState<string>("all");
   const [filterType, setFilterType] = useState<string>("all");
   
   const [showForm, setShowForm] = useState(false);
-  const [editingFile, setEditingFile] = useState<LibraryFile | null>(null);
+  const [editingFile, setEditingFile] = useState<DbLibraryFile | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
 
   // ── Form State ─────────────────────────────────────────────
   const [title, setTitle] = useState("");
-  const [type, setType] = useState<LibraryFile["type"]>("pdf");
+  const [type, setType] = useState<DbLibraryFile["file_type"]>("pdf");
   const [trackId, setTrackId] = useState("");
   const [url, setUrl] = useState("");
   const [sizeLabel, setSizeLabel] = useState("");
   const [isFree, setIsFree] = useState(true);
-  const [price, setPrice] = useState(0);
   const [uploadMode, setUploadMode] = useState<"url" | "file">("url");
 
   function openAdd() {
     setEditingFile(null);
     setTitle(""); setType("pdf"); setTrackId(tracks[0]?.id ?? "");
-    setUrl(""); setSizeLabel("1 MB"); setIsFree(true); setPrice(0);
+    setUrl(""); setSizeLabel("1 MB"); setIsFree(true);
     setUploadMode("url");
     setShowForm(true);
   }
 
-  function openEdit(file: LibraryFile) {
+  function openEdit(file: DbLibraryFile) {
     setEditingFile(file);
-    setTitle(file.title); setType(file.type); setTrackId(file.trackId);
-    setUrl(file.url); setSizeLabel(file.sizeLabel); setIsFree(file.accessType === "free");
-    setPrice(file.price);
-    setUploadMode(file.url.startsWith("تم رفع") ? "file" : "url");
+    setTitle(file.title); setType(file.file_type || "pdf"); setTrackId(file.track_id);
+    setUrl(file.file_url); 
+    setSizeLabel("—"); // In a real DB we would store and fetch this
+    setIsFree(file.access_type === "free");
+    setUploadMode(file.file_url.startsWith("تم رفع") ? "file" : "url");
     setShowForm(true);
   }
 
-  function saveFile() {
-    const newFile: LibraryFile = {
-      id: editingFile?.id ?? `file-${Date.now()}`,
-      title, type, trackId, url, sizeLabel,
-      dateLabel: editingFile?.dateLabel ?? new Date().toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" }),
-      accessType: isFree ? "free" : "paid", price: isFree ? 0 : price,
+  async function saveFile() {
+    const payload: Partial<DbLibraryFile> = {
+      title, 
+      file_type: type, 
+      track_id: trackId, 
+      file_url: url,
+      access_type: isFree ? "free" : "paid",
     };
+
     if (editingFile) {
-      setFiles(prev => prev.map(f => f.id === editingFile.id ? newFile : f));
+      const success = await updateFile(editingFile.id, payload);
+      if (success) {
+        setFiles(prev => prev.map(f => f.id === editingFile.id ? { ...f, ...payload } as DbLibraryFile : f));
+      }
     } else {
-      setFiles(prev => [...prev, newFile]);
+      const newFile = await createFile(payload);
+      if (newFile) {
+        setFiles(prev => [newFile, ...prev]);
+      }
     }
     setShowForm(false);
   }
 
-  function deleteFile(id: string) {
-    setFiles(prev => prev.filter(f => f.id !== id));
+  async function handleDeleteFile(id: string) {
+    const success = await deleteFile(id);
+    if (success) {
+      setFiles(prev => prev.filter(f => f.id !== id));
+    }
     setConfirmDel(null);
   }
 
   const filteredFiles = files.filter(f => {
-    if (filterTrack !== "all" && f.trackId !== filterTrack) return false;
-    if (filterType !== "all" && f.type !== filterType) return false;
+    if (filterTrack !== "all" && f.track_id !== filterTrack) return false;
+    if (filterType !== "all" && f.file_type !== filterType) return false;
     return true;
   });
 
   if (!isMounted) return <div className="p-8 text-center font-bold text-text-muted">جاري التحميل...</div>;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" dir="rtl">
       {/* Header */}
-      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <IconFolder size={26} />
-              <h2 className="text-xl font-black">إدارة المكتبة والملفات</h2>
-            </div>
-            <p className="text-white/55 text-sm">ارفع الملخصات والخرائط الذهنية وملفات الـ PDF لكل مسار.</p>
+      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3 mb-1">
+            <IconFolder size={26} />
+            <h2 className="text-xl font-black">إدارة المكتبة والملفات</h2>
           </div>
-          <button onClick={openAdd}
-            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-3 text-sm font-bold text-white hover:bg-accent-amber/90 transition-colors">
+          <p className="text-white/55 text-sm">ارفع الملخصات والخرائط الذهنية وملفات الـ PDF لكل مسار.</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+             <span className="text-sm font-bold text-white/80">الدورة:</span>
+             <select 
+               className="bg-bg text-text border border-border rounded-xl px-3 py-2 text-sm font-bold outline-none"
+               value={activeCourseId}
+               onChange={(e) => setActiveCourseId(e.target.value)}
+             >
+               {courses.length === 0 && <option value="">لا توجد دورات</option>}
+               {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+             </select>
+          </div>
+          <button onClick={openAdd} disabled={!activeCourseId}
+            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-2 text-sm font-bold text-white hover:bg-accent-amber/90 transition-colors disabled:opacity-50">
             <IconPlus size={17} /> إضافة ملف
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-3 fade-up">
-        <IconFilter size={20} className="text-text-muted" />
-        <select value={filterTrack} onChange={e => setFilterTrack(e.target.value)}
-          className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
-          <option value="all">جميع المسارات</option>
-          {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)}
-          className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
-          <option value="all">جميع الأنواع</option>
-          <option value="pdf">PDF</option>
-          <option value="video">فيديو</option>
-          <option value="image">صورة</option>
-          <option value="summary">ملخص</option>
-        </select>
-      </div>
+      {isLoading ? (
+        <div className="p-8 text-center text-text-muted font-bold">جاري جلب بيانات المكتبة...</div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex items-center gap-3 fade-up">
+            <IconFilter size={20} className="text-text-muted" />
+            <select value={filterTrack} onChange={e => setFilterTrack(e.target.value)}
+              className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+              <option value="all">جميع المسارات</option>
+              {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+            <select value={filterType} onChange={e => setFilterType(e.target.value)}
+              className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+              <option value="all">جميع الأنواع</option>
+              <option value="pdf">PDF</option>
+              <option value="video">فيديو</option>
+              <option value="image">صورة</option>
+              <option value="summary">ملخص</option>
+            </select>
+          </div>
 
-      {/* Table */}
-      <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px] border-collapse text-[13.5px]">
-            <thead>
-              <tr className="border-b border-border bg-bg/60">
-                {["العنوان", "المسار", "النوع", "الحجم", "التاريخ", "الوصول", "إجراءات"].map(h => (
-                  <th key={h} className="px-4 py-3.5 text-right text-xs font-black text-text-muted uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredFiles.map(file => {
-                const track = tracks.find(t => t.id === file.trackId);
-                return (
-                  <tr key={file.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2 font-extrabold text-text">
-                        <TypeIcon type={file.type} />
-                        {file.title}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5">
-                      {track && <Badge label={`${track.icon} ${track.name}`} color={track.color} />}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold text-text-muted uppercase">{file.type}</td>
-                    <td className="px-4 py-3.5 font-semibold text-text-muted">{file.sizeLabel}</td>
-                    <td className="px-4 py-3.5 font-semibold text-text-muted">{file.dateLabel}</td>
-                    <td className="px-4 py-3.5">
-                      {file.accessType === "free"
-                        ? <span className="flex items-center gap-1 text-emerald-600 font-bold text-xs"><IconDownload size={12} /> مجاني</span>
-                        : <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><IconLock size={12} /> {file.price} ر.س</span>
-                      }
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <button onClick={() => openEdit(file)}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
-                          <IconEdit size={13} />
-                        </button>
-                        {confirmDel === file.id ? (
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => deleteFile(file.id)}
-                              className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-bold text-white">
-                              <IconCheck size={11} /> نعم
-                            </button>
-                            <button onClick={() => setConfirmDel(null)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted">
-                              <IconX size={11} />
-                            </button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setConfirmDel(file.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-accent-red hover:text-accent-red transition-colors">
-                            <IconTrash size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
+          {/* Table */}
+          <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[700px] border-collapse text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-border bg-bg/60">
+                    {["العنوان", "المسار", "النوع", "التاريخ", "الوصول", "إجراءات"].map(h => (
+                      <th key={h} className="px-4 py-3.5 text-right text-xs font-black text-text-muted uppercase tracking-wider">{h}</th>
+                    ))}
                   </tr>
-                );
-              })}
-              {filteredFiles.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-text-muted font-bold">لا توجد ملفات مطابقة</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody>
+                  {filteredFiles.map(file => {
+                    const track = tracks.find(t => t.id === file.track_id);
+                    const dateObj = new Date(file.created_at);
+                    const dateLabel = dateObj.toLocaleDateString('ar-EG');
+                    return (
+                      <tr key={file.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2 font-extrabold text-text">
+                            <TypeIcon type={file.file_type} />
+                            {file.title}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {track ? <Badge label={`${track.icon || '📁'} ${track.name}`} color={track.color || '#10b981'} /> : "—"}
+                        </td>
+                        <td className="px-4 py-3.5 font-semibold text-text-muted uppercase">{file.file_type || "—"}</td>
+                        <td className="px-4 py-3.5 font-semibold text-text-muted">{dateLabel}</td>
+                        <td className="px-4 py-3.5">
+                          {file.access_type === "free"
+                            ? <span className="flex items-center gap-1 text-emerald-600 font-bold text-xs"><IconDownload size={12} /> مجاني</span>
+                            : <span className="flex items-center gap-1 text-amber-600 font-bold text-xs"><IconLock size={12} /> مدفوع</span>
+                          }
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1.5">
+                            <button onClick={() => openEdit(file)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
+                              <IconEdit size={13} />
+                            </button>
+                            {confirmDel === file.id ? (
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => handleDeleteFile(file.id)}
+                                  className="flex h-7 items-center gap-1 rounded-lg bg-accent-red px-2 text-xs font-bold text-white">
+                                  <IconCheck size={11} /> نعم
+                                </button>
+                                <button onClick={() => setConfirmDel(null)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted">
+                                  <IconX size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <button onClick={() => setConfirmDel(file.id)}
+                                className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-accent-red hover:text-accent-red transition-colors">
+                                <IconTrash size={13} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {filteredFiles.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-10 text-center text-text-muted font-bold">لا توجد ملفات مطابقة</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Form Modal */}
       {showForm && (
@@ -224,7 +283,7 @@ export default function AdminLibraryPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-black text-text-muted mb-1.5 block">نوع الملف</label>
-                  <select value={type} onChange={e => setType(e.target.value as LibraryFile["type"])}
+                  <select value={type || "pdf"} onChange={e => setType(e.target.value as DbLibraryFile["file_type"])}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
                     <option value="pdf">PDF</option>
                     <option value="video">فيديو</option>
@@ -263,14 +322,9 @@ export default function AdminLibraryPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-black text-text-muted mb-1.5 block">الحجم</label>
-                  <input value={sizeLabel} onChange={e => setSizeLabel(e.target.value)} placeholder="مثال: 2 MB"
-                    className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-bold outline-none focus:border-primary text-center" dir="ltr" />
-                </div>
-                <div>
-                  <label className="text-xs font-black text-text-muted mb-1.5 block">النوع</label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">النوع (الوصول)</label>
                   <div className="flex gap-2 mt-0.5">
                     {(["free", "paid"] as const).map(t => (
                       <button key={t} onClick={() => setIsFree(t === "free")}
@@ -280,20 +334,13 @@ export default function AdminLibraryPage() {
                     ))}
                   </div>
                 </div>
-                {!isFree && (
-                  <div>
-                    <label className="text-xs font-black text-text-muted mb-1.5 block">السعر (ر.س)</label>
-                    <input type="number" value={price} onChange={e => setPrice(Number(e.target.value))} min={0}
-                      className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-bold outline-none focus:border-primary text-center" />
-                  </div>
-                )}
               </div>
 
               <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
                 <button onClick={() => setShowForm(false)} className="px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text transition-colors">
                   إلغاء
                 </button>
-                <button onClick={saveFile} disabled={!title.trim()}
+                <button onClick={saveFile} disabled={!title.trim() || !trackId}
                   className="flex items-center gap-2 rounded-xl bg-accent-amber px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-amber/90 disabled:opacity-50">
                   <IconCheck size={16} /> حفظ الملف
                 </button>
@@ -305,3 +352,4 @@ export default function AdminLibraryPage() {
     </div>
   );
 }
+

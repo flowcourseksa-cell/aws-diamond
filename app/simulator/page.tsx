@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   IconShoppingCart, IconUser, IconCheck, IconClock,
   IconBrain, IconTarget, IconChartLine, IconStarFilled,
-  IconSparkles, IconArrowDown, IconSearch
+  IconSparkles, IconArrowDown, IconSearch, IconRocket
 } from "@tabler/icons-react";
 import CartDrawer from "@/components/modals/cart-drawer";
 import { useCartStore } from "@/store/cart";
@@ -78,7 +79,7 @@ const FEATURES = [
 
 const REVIEWS = [
   { name: "ريماس فاتح", stars: 5, text: "والله تجربة رهيبة! الجو نفس قاعة الاختبار بالضبط، ساعدني أكسر رهبة اليوم الأول 🔥" },
-  { name: "سلمى شلبي", stars: 5, text: "بعد ما تدربت دخلت الاختبار وانا واثقة، الأجزاء والوقت كل شيء كان مألوف. مشكورين يا فلو 💙" },
+  { name: "سلمى شلبي", stars: 5, text: "بعد ما تدربت دخلت الاختبار وانا واثقة، الأجزاء والوقت كل شيء كان مألوف. مشكورين يا الأوس الماسية 💙" },
   { name: "بدر الناصر", stars: 5, text: "ميزة مراجعة الأخطاء خرافية. عرفت نقاط ضعفي في Grammar وركزت عليها." },
   { name: "خالد العمري", stars: 5, text: "مجاناً وبجودة عالية؟ مش معقول. أحسن إنتاج شفته على منصة تعليمية عربية 👏" },
   { name: "منيرة السبيعي", stars: 5, text: "قدرت أحدد وقت كل سؤال بدقة بسبب المحاكي. النتيجة: درجة عالية فوق ما توقعت!" },
@@ -97,7 +98,7 @@ function Navbar() {
             F
           </div>
           <span className="font-black text-xl hidden sm:block bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-purple-700">
-            منصة فلو
+            منصة الأوس الماسية
           </span>
         </Link>
 
@@ -145,7 +146,7 @@ function LaptopGraphic() {
               <div className="w-3 h-3 rounded-full bg-amber-400" />
               <div className="w-3 h-3 rounded-full bg-emerald-400" />
             </div>
-            <span className="text-white text-xs font-bold">محاكي STEP — فلو</span>
+            <span className="text-white text-xs font-bold">محاكي STEP — الأوس الماسية</span>
             <div className="text-white text-xs font-black bg-white/20 px-2 py-0.5 rounded-full">
               00:48:22
             </div>
@@ -263,18 +264,17 @@ function StickyBar({ onAdd }: { onAdd: () => void }) {
     <div className={`fixed bottom-6 inset-x-0 flex justify-center z-50 transition-all duration-500 ${scrolled ? "translate-y-0 opacity-100" : "translate-y-24 opacity-0 pointer-events-none"}`}>
       <div className="bg-white/90 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] px-4 py-3 flex items-center gap-6 mx-4 w-full max-w-sm">
         <div className="flex flex-col">
-          <span className="text-xs text-slate-400 font-bold">المحاكي المجاني STEP</span>
+          <span className="text-xs text-slate-400 font-bold">المحاكي المجاني</span>
           <div className="flex items-center gap-2">
             <span className="text-xl font-black text-indigo-600">مجاناً</span>
-            <span className="text-sm text-slate-400 line-through font-bold">٩٩ ر.س</span>
           </div>
         </div>
         <button
           onClick={onAdd}
           className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-black py-3 rounded-xl shadow-lg shadow-indigo-500/25 transition-all hover:scale-105 flex items-center justify-center gap-2"
         >
-          <IconShoppingCart size={18} />
-          أضف للسلة
+          <IconRocket size={18} />
+          ابدأ مجاناً
         </button>
       </div>
     </div>
@@ -288,14 +288,15 @@ export default function SimulatorPage() {
   const [visible, setVisible] = useState(false);
   const { addItem, openCart } = useCartStore();
 
+  const router = useRouter();
+
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 50);
     return () => clearTimeout(t);
   }, []);
 
   const handleAdd = () => {
-    addItem({ id: "simulator-step", name: "المحاكي المجاني لاختبار الستيب", price: 0 });
-    openCart();
+    router.push("/dashboard");
   };
 
   return (
@@ -455,7 +456,7 @@ export default function SimulatorPage() {
                 <h3 className="text-2xl font-black text-amber-900">تنبيه مهم 💡</h3>
               </div>
               <p className="text-amber-800 font-semibold text-lg leading-relaxed">
-                دورة فلو للستيب تغنيك عن أي مصادر أخرى ويمكنك الاكتفاء بها دون تشتت.. للاشتراك والحصول على شرح الأخطاء بالذكاء الاصطناعي وسجل الاختبارات الكامل.{" "}
+                دورة الأوس الماسية تغنيك عن أي مصادر أخرى ويمكنك الاكتفاء بها دون تشتت.. للبدء مجاناً والحصول على شرح الأخطاء وسجل الاختبارات الكامل.{" "}
                 <Link href="/#courses" className="text-indigo-700 underline font-black">من هنا →</Link>
               </p>
             </div>
@@ -481,7 +482,7 @@ export default function SimulatorPage() {
                 حاجز الخوف؟
               </h3>
               <p className="text-indigo-100 font-medium text-lg mb-8 leading-relaxed">
-                انضم لأكثر من ٥٠ ألف طالب اختاروا فلو واحصل على المحاكي المجاني الآن.
+                انضم لأكثر من ٥٠ ألف طالب اختاروا الأوس الماسية واحصل على المحاكي المجاني الآن.
               </p>
               <button
                 onClick={handleAdd}
@@ -502,10 +503,10 @@ export default function SimulatorPage() {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-lg">
               F
             </div>
-            <span className="font-black text-xl text-slate-800">منصة فلو</span>
+            <span className="font-black text-xl text-slate-800">منصة الأوس الماسية</span>
           </div>
           <p className="text-slate-500 font-medium text-center">
-            © ٢٠٢٦ منصة فلو التعليمية. جميع الحقوق محفوظة.
+            © ٢٠٢٦ منصة الأوس الماسية التعليمية. جميع الحقوق محفوظة.
           </p>
           <div className="flex gap-4">
             <Link href="/" className="text-slate-500 hover:text-indigo-600 font-bold transition-colors">الرئيسية</Link>
@@ -516,3 +517,4 @@ export default function SimulatorPage() {
     </div>
   );
 }
+

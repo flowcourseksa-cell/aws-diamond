@@ -17,7 +17,6 @@ export default function Home() {
       <main className="flex-grow">
         <HeroSection />
         <CoursesSection />
-        <MainBannersSection />
         <CommunitySection />
         <AboutSection />
         <FeaturesSection />
@@ -31,3 +30,4 @@ export default function Home() {
     </div>
   );
 }
+

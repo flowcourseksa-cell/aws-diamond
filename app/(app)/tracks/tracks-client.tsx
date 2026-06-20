@@ -6,8 +6,7 @@ import {
   IconCircleCheck, IconAlertTriangle, IconCircle,
   IconPlayerPlay, IconBrain, IconVideo, IconTarget,
 } from "@tabler/icons-react";
-import { type FlowTrack, type FlowSection, type FlowSkill } from "@/lib/mock-data";
-import { usePlatformStore, type AdminExam } from "@/lib/store";
+import { type FlowTrack, type FlowSection, type FlowSkill, usePlatformStore, type AdminExam } from "@/lib/store";
 import { ExamRunner } from "@/app/(app)/exams/exam-runner";
 import { TrackExamResult } from "./track-exam-result";
 import { useRouter } from "next/navigation";
@@ -148,35 +147,12 @@ type ViewState =
 
 export function TracksClient() {
   const [isMounted, setIsMounted] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState("");
+  const [state, setState] = useState<ViewState>({ view: "list" });
   const router = useRouter();
   const storeTracks = usePlatformStore(s => s.tracks);
   const storeExams = usePlatformStore(s => s.exams);
-  const enrolledCourseId = usePlatformStore(s => s.enrolledCourseId);
-  const courses = usePlatformStore(s => s.courses);
-  
-  const [selectedTrack, setSelectedTrack] = useState<string>("");
-  const [state, setState] = useState<ViewState>({ view: "list" });
-
-  useEffect(() => setIsMounted(true), []);
-
-  if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
-
-  const currentCourse = courses.find(c => c.id === enrolledCourseId);
-
-  if (!enrolledCourseId || !currentCourse) {
-    return (
-      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
-        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
-        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
-        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى المسارات التعليمية.</p>
-        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
-          تصفح الدورات المتاحة
-        </button>
-      </div>
-    );
-  }
-
-  const activeTracks = storeTracks.filter(t => currentCourse.trackIds.includes(t.id));
+  const activeTracks = storeTracks;
   const currentSelectedTrack = activeTracks.some(t => t.id === selectedTrack) ? selectedTrack : (activeTracks[0]?.id || "");
   const activeTrack = activeTracks.find(t => t.id === currentSelectedTrack);
   
@@ -323,3 +299,4 @@ export function TracksClient() {
     </>
   );
 }
+

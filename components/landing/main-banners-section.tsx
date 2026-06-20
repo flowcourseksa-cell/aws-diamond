@@ -58,85 +58,51 @@ export default function MainBannersSection() {
               
               <div className="relative z-10">
                 <h3 className="text-4xl md:text-5xl font-black text-amber-400 mb-2 drop-shadow-md">دورة</h3>
-                <h3 className="text-5xl md:text-7xl font-black mb-10 drop-shadow-lg leading-tight">فلو للتحصيلي</h3>
+                <h3 className="text-5xl md:text-7xl font-black mb-10 drop-shadow-lg leading-tight">الأوس الماسية الشاملة</h3>
                 
                 <button 
-                  onClick={() => handleSubscribe("دورة فلو للتحصيلي 2026", 450)}
+                  onClick={() => handleSubscribe("دورة الأوس الماسية الشاملة", 0)}
                   className="bg-gradient-to-r from-amber-400 to-orange-500 text-white hover:from-amber-500 hover:to-orange-600 px-12 py-4 rounded-full font-black text-2xl transition-all hover:scale-105 shadow-[0_10px_30px_rgba(245,158,11,0.4)] border border-amber-300"
                 >
-                  اشترك الآن
+                  ابدأ الآن مجاناً
                 </button>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ===== Two Column Banners ===== */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* ===== Bottom comprehensive features highlight ===== */}
+        <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[3rem] p-10 shadow-[0_20px_40px_rgba(79,70,229,0.4)] relative overflow-hidden flex flex-col md:flex-row items-center fade-up delay-2 group">
+          {/* Glowing Orbs */}
+          <div className="absolute -right-20 -top-20 w-64 h-64 bg-purple-400/30 rounded-full blur-3xl transition-opacity group-hover:opacity-100 opacity-50"></div>
+          <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-400/30 rounded-full blur-3xl transition-opacity group-hover:opacity-100 opacity-50"></div>
           
-          {/* Step Free Simulator */}
-          <div className="bg-white rounded-[3rem] p-10 shadow-[0_15px_40px_rgba(0,0,0,0.06)] border border-slate-100 flex flex-col items-center justify-center text-center relative overflow-hidden group fade-up delay-1">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl"></div>
-            
-            <div className="absolute top-6 left-6 bg-gradient-to-br from-rose-500 to-red-600 text-white font-black text-2xl px-6 py-2 rounded-2xl transform -rotate-12 shadow-lg shadow-rose-500/30 z-20">
-              مجانًا
+          <div className="relative z-10 w-full md:w-1/2 text-white text-center md:text-right mb-10 md:mb-0">
+            <h3 className="text-3xl md:text-4xl font-black text-amber-400 mb-2 drop-shadow-md">كل ما تحتاجه</h3>
+            <h4 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-md">في مكان واحد</h4>
+            <p className="text-lg md:text-xl font-medium text-indigo-100 mb-6 leading-relaxed">
+              تأسيس، قدرات، تحصيلي، ونافس<br/> خطط مرنة ومتابعة دقيقة لمستواك
+            </p>
+            <div className="mt-8">
+              <button 
+                onClick={() => handleSubscribe("دورة الأوس الماسية الشاملة", 0)}
+                className="bg-white text-indigo-900 hover:bg-indigo-50 px-8 py-3 rounded-full font-black text-lg shadow-xl transition-transform hover:-translate-y-1"
+              >
+                انضم للدورة مجاناً
+              </button>
             </div>
-            
-            <div className="w-full max-w-sm aspect-video bg-slate-50 rounded-3xl border border-slate-200 mb-8 flex items-center justify-center relative overflow-hidden group-hover:shadow-2xl transition-all duration-500">
-              <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/5 to-purple-600/5"></div>
-              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-500 z-10">
-                <IconPlayerPlayFilled size={40} className="text-indigo-600 ml-2" />
-              </div>
-            </div>
-            
-            <h3 className="text-3xl md:text-4xl font-black text-amber-500 mb-2">المحاكي المجاني</h3>
-            <h4 className="text-3xl md:text-4xl font-black text-slate-800">لاختبار الستيب</h4>
-            
-            <Link 
-              href="/simulator"
-              className="mt-8 bg-slate-800 hover:bg-slate-900 text-white px-10 py-4 rounded-full font-bold text-xl transition-transform hover:-translate-y-1 shadow-xl inline-block"
-            >
-              ابدأ الاختبار الآن
-            </Link>
           </div>
-
-          {/* Step Full Course */}
-          <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-[3rem] p-10 shadow-[0_20px_40px_rgba(79,70,229,0.4)] relative overflow-hidden flex flex-col md:flex-row items-center fade-up delay-2 group">
-            {/* Glowing Orbs */}
-            <div className="absolute -right-20 -top-20 w-64 h-64 bg-purple-400/30 rounded-full blur-3xl transition-opacity group-hover:opacity-100 opacity-50"></div>
-            <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-400/30 rounded-full blur-3xl transition-opacity group-hover:opacity-100 opacity-50"></div>
-            
-            <div className="relative z-10 w-full md:w-1/2 text-white text-center md:text-right mb-10 md:mb-0">
-              <h3 className="text-3xl md:text-4xl font-black text-amber-400 mb-2 drop-shadow-md">دورة فلو</h3>
-              <h4 className="text-4xl md:text-6xl font-black mb-6 drop-shadow-md">للستيب</h4>
-              <p className="text-lg md:text-xl font-medium text-indigo-100 mb-6 leading-relaxed">
-                أقوى دورة في الستيب<br/> بخطط مرنة ومكثفة تبدأ من
-              </p>
-              <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-4 rounded-3xl shadow-xl transform -rotate-3 transition-transform group-hover:rotate-0">
-                <span className="font-black text-6xl text-amber-400">7</span>
-                <span className="text-2xl font-bold mt-2">أيام</span>
+          
+          {/* Elegant Card Mockup */}
+          <div className="w-full md:w-1/2 relative z-10 flex justify-center md:justify-end">
+            <div className="w-56 aspect-[3/4] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-4 border-white/20 p-8 text-center flex flex-col justify-center transform rotate-6 group-hover:rotate-0 transition-all duration-500 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-400 to-orange-500"></div>
+              <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner text-indigo-600">
+                <IconCheck size={40} />
               </div>
-              <div className="mt-8">
-                <button 
-                  onClick={() => handleSubscribe("دورة فلو للستيب 7 أيام", 200)}
-                  className="bg-white text-indigo-900 hover:bg-indigo-50 px-8 py-3 rounded-full font-black text-lg shadow-xl transition-transform hover:-translate-y-1"
-                >
-                  اشترك في الدورة
-                </button>
-              </div>
-            </div>
-            
-            {/* Elegant Card Mockup */}
-            <div className="w-full md:w-1/2 relative z-10 flex justify-center md:justify-end">
-              <div className="w-56 aspect-[3/4] bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-4 border-white/20 p-8 text-center flex flex-col justify-center transform rotate-6 group-hover:rotate-0 transition-all duration-500 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-amber-400 to-orange-500"></div>
-                <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-inner text-indigo-600">
-                  <IconCheck size={40} />
-                </div>
-                <h4 className="font-black text-xl mb-1 text-slate-500">تجميعات</h4>
-                <h5 className="font-black text-3xl text-indigo-900 mb-2">القواعد</h5>
-                <h5 className="font-bold text-lg text-slate-400">الشاملة</h5>
-              </div>
+              <h4 className="font-black text-xl mb-1 text-slate-500">دورة</h4>
+              <h5 className="font-black text-3xl text-indigo-900 mb-2">الأوس الماسية</h5>
+              <h5 className="font-bold text-lg text-slate-400">الشاملة</h5>
             </div>
           </div>
         </div>
@@ -145,3 +111,4 @@ export default function MainBannersSection() {
     </section>
   );
 }
+

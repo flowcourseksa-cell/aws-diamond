@@ -90,3 +90,4 @@ export default function OffersSection({ onSubscribe }: OffersSectionProps) {
     </section>
   );
 }
+

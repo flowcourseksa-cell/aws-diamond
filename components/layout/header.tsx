@@ -9,13 +9,25 @@ import {
   IconSun,
   IconBell,
 } from "@tabler/icons-react";
-import { CURRENT_USER } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
 
 export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [profile, setProfile] = useState<{ full_name: string } | null>(null);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    const fetchProfile = async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { data } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+        if (data) setProfile(data);
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const isDark = mounted && resolvedTheme === "dark";
 
@@ -61,9 +73,10 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
         </button>
 
         <div className="flex h-9.5 w-9.5 items-center justify-center rounded-[10px] bg-primary text-sm font-bold text-white">
-          {CURRENT_USER.avatarInitials}
+          {profile?.full_name ? profile.full_name.charAt(0) : "؟"}
         </div>
       </div>
     </header>
   );
 }
+

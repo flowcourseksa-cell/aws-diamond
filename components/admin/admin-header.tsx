@@ -32,3 +32,4 @@ export function AdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
     </header>
   );
 }
+

@@ -49,7 +49,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => 
             <IconRocket size={20} />
           </div>
           <div>
-            <div className="text-sm font-black text-white">فلو</div>
+            <div className="text-sm font-black text-white">الأوس الماسية</div>
             <div className="text-[10px] font-bold text-white/40">لوحة التحكم</div>
           </div>
         </div>
@@ -93,7 +93,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => 
           <div className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 hover:bg-white/7">
             <div className="flex h-9.5 w-9.5 flex-shrink-0 items-center justify-center rounded-[10px] bg-accent-amber text-sm font-bold text-white">م.ن</div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13.5px] font-bold text-white">مدير فلو</div>
+              <div className="truncate text-[13.5px] font-bold text-white">مدير الأوس الماسية</div>
               <div className="text-[11.5px] text-white/45">Center Admin</div>
             </div>
             <Link href="/login" title="خروج" className="text-white/50 hover:text-accent-red">
@@ -105,3 +105,4 @@ export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => 
     </>
   );
 }
+

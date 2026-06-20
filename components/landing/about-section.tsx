@@ -13,7 +13,7 @@ export default function AboutSection() {
         {/* Title */}
         <div className="flex items-center justify-center gap-6 mb-20 fade-up">
           <div className="h-1 w-12 bg-gradient-to-r from-transparent to-indigo-600 rounded-full"></div>
-          <h2 className="text-5xl md:text-6xl font-black text-slate-800 tracking-tight">مين فلو؟</h2>
+          <h2 className="text-5xl md:text-6xl font-black text-slate-800 tracking-tight">مين الأوس الماسية؟</h2>
           <div className="h-1 w-12 bg-gradient-to-l from-transparent to-indigo-600 rounded-full"></div>
         </div>
 
@@ -34,7 +34,7 @@ export default function AboutSection() {
             <p className="text-2xl md:text-3xl text-slate-600 leading-[2.2] text-center font-bold">
               منصة تعليمية تقدم لك رحلة مختلفة في اختبار التحصيلي والقدرات بتوفير ملفات إلكترونية تشمل تأسيساً متكاملاً من الصفر، وتجميعات شاملة، واختبارات محاكية، وشروحات على جميع الملفات، وجداول وخطط متنوعة.
               <br/><br/>
-              <span className="text-indigo-600">حرصنا في جميع ملفاتنا</span> على توفير الشمولية والجمالية والمتعة التعليمية. يمكنك الاعتماد بشكل كامل على ملفات فلو كونها كتبت ودققت وصممت من قبل فريق من الخبراء، لتغنيك عن أي مصدر آخر ولتوصلك بإذن الله في نهاية هذه الرحلة إلى <span className="bg-amber-400 text-white px-3 py-1 rounded-xl mx-1 shadow-sm">المئوية (100%)</span>.
+              <span className="text-indigo-600">حرصنا في جميع ملفاتنا</span> على توفير الشمولية والجمالية والمتعة التعليمية. يمكنك الاعتماد بشكل كامل على ملفات الأوس الماسية كونها كتبت ودققت وصممت من قبل فريق من الخبراء، لتغنيك عن أي مصدر آخر ولتوصلك بإذن الله في نهاية هذه الرحلة إلى <span className="bg-amber-400 text-white px-3 py-1 rounded-xl mx-1 shadow-sm">المئوية (100%)</span>.
             </p>
 
             {/* Stars Decoration */}
@@ -51,3 +51,4 @@ export default function AboutSection() {
     </section>
   );
 }
+

@@ -35,7 +35,7 @@ const TYPE_INFO: Record<LibraryFileType, { icon: React.ReactNode; color: string 
 export default function LibraryPage() {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
-  const { files: storeFiles, tracks: storeTracks, enrolledCourseId, courses } = usePlatformStore();
+  const { files: storeFiles, tracks: storeTracks } = usePlatformStore();
 
   useEffect(() => setIsMounted(true), []);
 
@@ -43,27 +43,12 @@ export default function LibraryPage() {
   const [trackFilter, setTrackFilter] = useState("all");
   const [search,      setSearch]      = useState("");
   const { showToast }                 = useToast();
-  const hasSub = true; // In the real system, they have a sub if they are enrolled
+  const hasSub = true;
 
   if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
-  const currentCourse = courses.find(c => c.id === enrolledCourseId);
-
-  if (!enrolledCourseId || !currentCourse) {
-    return (
-      <div className="flex flex-col items-center justify-center p-10 text-center bg-card rounded-2xl border border-border mt-10 shadow-lg" dir="rtl">
-        <IconAlertTriangle size={64} className="text-amber-500 mb-4" />
-        <h2 className="text-2xl font-black mb-3">أنت غير مشترك في أي دورة حالياً</h2>
-        <p className="text-text-muted font-medium mb-6">يرجى الاشتراك في دورة للوصول إلى ملفات المكتبة.</p>
-        <button onClick={() => router.push("/#courses")} className="bg-primary text-white px-8 py-3 rounded-xl font-bold hover:opacity-90 transition-colors">
-          تصفح الدورات المتاحة
-        </button>
-      </div>
-    );
-  }
-
-  const activeTracks = storeTracks.filter(t => currentCourse.trackIds.includes(t.id));
-  const activeFiles = storeFiles.filter(f => currentCourse.trackIds.includes(f.trackId));
+  const activeTracks = storeTracks;
+  const activeFiles = storeFiles;
 
   const mappedFiles: LibraryFile[] = activeFiles.map(f => {
     const track = activeTracks.find(t => t.id === f.trackId);
@@ -187,3 +172,4 @@ export default function LibraryPage() {
     </>
   );
 }
+
