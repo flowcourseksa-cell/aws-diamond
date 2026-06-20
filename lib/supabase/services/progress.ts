@@ -66,6 +66,61 @@ export async function fetchUserProgress(userId: string) {
   };
 }
 
+// Map of lessonId -> { is_completed, progress_seconds } for the student.
+export async function fetchLessonProgressMap(
+  userId: string
+): Promise<Record<string, { is_completed: boolean; progress_seconds: number }>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("lesson_progress")
+    .select("lesson_id, is_completed, progress_seconds")
+    .eq("student_id", userId);
+
+  if (error) {
+    console.error("Error fetching lesson progress map:", error);
+    return {};
+  }
+  const map: Record<string, { is_completed: boolean; progress_seconds: number }> = {};
+  (data || []).forEach((r: any) => {
+    map[r.lesson_id] = { is_completed: !!r.is_completed, progress_seconds: r.progress_seconds || 0 };
+  });
+  return map;
+}
+
+export async function fetchLessonNote(userId: string, lessonId: string): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("lesson_notes")
+    .select("body")
+    .eq("student_id", userId)
+    .eq("lesson_id", lessonId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching lesson note:", error);
+    return "";
+  }
+  return data?.body || "";
+}
+
+export async function saveLessonNote(userId: string, lessonId: string, body: string): Promise<boolean> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("lesson_notes")
+    .upsert({
+      student_id: userId,
+      lesson_id: lessonId,
+      body,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: "student_id, lesson_id" });
+
+  if (error) {
+    console.error("Error saving lesson note:", error);
+    return false;
+  }
+  return true;
+}
+
 export async function markLessonCompleted(userId: string, lessonId: string, progressSeconds: number = 0) {
   const supabase = createClient();
 
