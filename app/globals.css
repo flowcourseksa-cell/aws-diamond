@@ -178,6 +178,151 @@ body {
   animation: pop 0.25s ease;
 }
 
+/* ============================================================= */
+/* ===== نظام التصميم الفخم (Premium Animations & Graphics) ===== */
+/* ============================================================= */
+
+/* طفو ناعم للعناصر */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-18px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+/* لمعة ماسية تمر على النص */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer-text {
+  background: linear-gradient(
+    100deg,
+    var(--primary) 20%,
+    var(--accent-amber) 40%,
+    #fff 50%,
+    var(--accent-amber) 60%,
+    var(--primary) 80%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 4s linear infinite;
+}
+
+/* تدرّج ذهبي ثابت للعناوين */
+.text-gradient-gold {
+  background: linear-gradient(135deg, #FBBF24 0%, #F59E0B 50%, #D97706 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* تدرّج بنفسجي-ذهبي متحرك (Aurora) */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.text-gradient-aurora {
+  background: linear-gradient(120deg, #7C3AED, #C084FC, #FBBF24, #7C3AED);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 6s ease infinite;
+}
+
+/* توهّج نبضي (Glow) */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px -4px var(--primary), 0 0 8px -2px var(--accent-amber); }
+  50% { box-shadow: 0 0 36px 2px var(--primary), 0 0 18px 0 var(--accent-amber); }
+}
+.glow-ring { animation: glow 3s ease-in-out infinite; }
+
+/* خلفية أورورا متحركة */
+@keyframes aurora {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(3%, -3%) scale(1.05); }
+  66% { transform: translate(-3%, 2%) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+.animate-aurora { animation: aurora 14s ease-in-out infinite; }
+
+/* دخول منزلق وتكبير */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(40px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.slide-in { animation: slide-in 0.6s cubic-bezier(0.16,1,0.3,1) both; }
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.scale-in { animation: scale-in 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+
+/* نبضة عدّ للأرقام */
+@keyframes count-pop {
+  0% { transform: scale(0.8); opacity: 0.4; }
+  60% { transform: scale(1.08); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.count-pop { animation: count-pop 0.6s ease both; }
+
+/* شريط متحرك (Marquee) */
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee 25s linear infinite; }
+
+/* حدود متوهّجة متحركة */
+.animated-border {
+  position: relative;
+  background: var(--card);
+  border-radius: 1rem;
+}
+.animated-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1.5px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, #7C3AED, #FBBF24, #7C3AED);
+  background-size: 300% 300%;
+  animation: gradient-shift 5s ease infinite;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* بطاقة ترتفع وتميل عند المرور */
+.card-hover-3d {
+  transition: transform 0.35s cubic-bezier(0.16,1,0.3,1), box-shadow 0.35s ease;
+  will-change: transform;
+}
+.card-hover-3d:hover {
+  transform: translateY(-8px) scale(1.015);
+  box-shadow: 0 24px 50px -12px rgba(124,58,237,0.28);
+}
+
+/* ظلال ونيون فخمة */
+.shadow-premium { box-shadow: 0 18px 48px -16px rgba(124,58,237,0.35); }
+.shadow-gold { box-shadow: 0 14px 40px -12px rgba(251,191,36,0.45); }
+
+/* دوران بطيء */
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+.animate-spin-slow { animation: spin-slow 12s linear infinite; }
+
+/* دخول بميلان خفيف */
+@keyframes tilt-in {
+  from { opacity: 0; transform: perspective(800px) rotateX(8deg) translateY(20px); }
+  to { opacity: 1; transform: perspective(800px) rotateX(0) translateY(0); }
+}
+.tilt-in { animation: tilt-in 0.7s cubic-bezier(0.16,1,0.3,1) both; }
+
 /* احترام تقليل الحركة */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
