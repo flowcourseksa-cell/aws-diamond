@@ -37,6 +37,16 @@ create table if not exists public.lesson_notes (
   unique (student_id, lesson_id)
 );
 
+-- Optional course metadata columns used by the UI (kept nullable).
+alter table public.courses add column if not exists currency text default 'ر.س';
+alter table public.courses add column if not exists cover_gradient text;
+alter table public.courses add column if not exists track_ids text[] default '{}';
+alter table public.courses add column if not exists features text[] default '{}';
+alter table public.courses add column if not exists tags text[] default '{}';
+alter table public.courses add column if not exists instructor_name text;
+alter table public.courses add column if not exists total_hours text;
+alter table public.courses add column if not exists students_count integer default 0;
+
 -- ---------------------------------------------------------------------
 -- 1. Admin helper (security definer to avoid recursive RLS on profiles)
 -- ---------------------------------------------------------------------
