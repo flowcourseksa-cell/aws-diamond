@@ -26,6 +26,17 @@ create table if not exists public.lesson_progress (
   unique (student_id, lesson_id)
 );
 
+-- Per-student private lesson notes.
+create table if not exists public.lesson_notes (
+  id uuid default uuid_generate_v4() primary key,
+  student_id uuid references public.profiles(id) on delete cascade not null,
+  lesson_id uuid references public.lessons(id) on delete cascade not null,
+  body text default '' not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (student_id, lesson_id)
+);
+
 -- ---------------------------------------------------------------------
 -- 1. Admin helper (security definer to avoid recursive RLS on profiles)
 -- ---------------------------------------------------------------------
@@ -69,6 +80,7 @@ alter table public.attempt_answers     enable row level security;
 alter table public.skill_progress      enable row level security;
 alter table public.study_plan_tasks    enable row level security;
 alter table public.lesson_progress     enable row level security;
+alter table public.lesson_notes        enable row level security;
 alter table public.notification_log    enable row level security;
 
 -- ---------------------------------------------------------------------
@@ -269,6 +281,13 @@ create policy "lesson_progress_select_own_or_admin" on public.lesson_progress
   for select using (student_id = auth.uid() or public.is_admin());
 drop policy if exists "lesson_progress_modify_own" on public.lesson_progress;
 create policy "lesson_progress_modify_own" on public.lesson_progress
+  for all using (student_id = auth.uid()) with check (student_id = auth.uid());
+
+drop policy if exists "lesson_notes_select_own_or_admin" on public.lesson_notes;
+create policy "lesson_notes_select_own_or_admin" on public.lesson_notes
+  for select using (student_id = auth.uid() or public.is_admin());
+drop policy if exists "lesson_notes_modify_own" on public.lesson_notes;
+create policy "lesson_notes_modify_own" on public.lesson_notes
   for all using (student_id = auth.uid()) with check (student_id = auth.uid());
 
 drop policy if exists "notification_log_select_own_or_admin" on public.notification_log;
