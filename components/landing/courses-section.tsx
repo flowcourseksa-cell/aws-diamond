@@ -47,7 +47,7 @@ export default function CoursesSection() {
           <span className="inline-block mb-3 rounded-full bg-primary/10 px-4 py-1.5 text-xs font-black text-primary">
             دوراتنا التعليمية
           </span>
-          <h2 className="text-3xl md:text-5xl font-black text-text mb-4">استكشف الدورات</h2>
+          <h2 className="text-3xl md:text-5xl font-black mb-4">استكشف <span className="text-gradient-gold">دوراتنا</span></h2>
           <p className="text-text-muted max-w-2xl mx-auto text-base">
             دورات متخصصة مصممة لمساعدتك في تحقيق أعلى الدرجات في اختباري القدرات والتحصيلي
           </p>
@@ -85,17 +85,19 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
   const isFree = course.discountedPrice === 0;
 
   return (
-    <div className={`group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-400 hover:-translate-y-2 fade-up delay-${(index % 3) + 1}`}>
+    <div className={`group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-sm card-hover-3d tilt-in delay-${(index % 3) + 1} ${course.isFeatured ? "animated-border" : ""}`}>
       {/* Featured Badge */}
       {course.isFeatured && (
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-1 rounded-full bg-accent-amber px-3 py-1 text-xs font-black text-white shadow-lg">
-          <IconStarFilled size={11} /> مميزة
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-1 rounded-full bg-accent-amber px-3 py-1 text-xs font-black text-white shadow-gold">
+          <IconStarFilled size={11} className="animate-spin-slow" /> مميزة
         </div>
       )}
 
       {/* Cover */}
-      <div className={`relative h-52 bg-gradient-to-br ${course.coverGradient} flex flex-col justify-end p-5`}>
+      <div className={`relative h-52 bg-gradient-to-br ${course.coverGradient} flex flex-col justify-end p-5 overflow-hidden`}>
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
+        {/* Sheen on hover */}
+        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
         <div className="relative z-10">
           {/* Tags */}
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -105,7 +107,7 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
               </span>
             ))}
           </div>
-          <h3 className="text-lg font-black text-white leading-snug line-clamp-2">{course.title}</h3>
+          <h3 className="text-lg font-black text-white leading-snug line-clamp-2 transition-transform duration-300 group-hover:translate-x-1">{course.title}</h3>
         </div>
       </div>
 
@@ -115,7 +117,7 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
 
         {/* Stats */}
         <div className="flex items-center justify-between text-xs text-text-muted border-b border-border pb-4">
-          <span className="flex items-center gap-1"><IconUsers size={13} /> {course.studentsCount.toLocaleString("ar")} طالب</span>
+          <span className="flex items-center gap-1 count-pop"><IconUsers size={13} /> {course.studentsCount.toLocaleString("ar")} طالب</span>
           <span className="flex items-center gap-1"><IconClock size={13} /> {course.totalHours}</span>
           {course.examDate && <CountdownBadge examDate={course.examDate} />}
         </div>
