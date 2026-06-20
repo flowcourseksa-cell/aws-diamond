@@ -6,7 +6,8 @@ import {
   IconStarFilled, IconUsers, IconClock,
   IconCheck, IconCalendar, IconArrowLeft,
 } from "@tabler/icons-react";
-import { usePlatformStore, type Course } from "@/lib/store";
+import { type Course } from "@/lib/store";
+import { fetchCourses } from "@/lib/supabase/services/courses";
 
 function CountdownBadge({ examDate }: { examDate: string }) {
   const [days, setDays] = useState<number | null>(null);
@@ -26,10 +27,15 @@ function CountdownBadge({ examDate }: { examDate: string }) {
 
 export default function CoursesSection() {
   const [isMounted, setIsMounted] = useState(false);
-  const storeCourses = usePlatformStore(s => s.courses);
-  useEffect(() => setIsMounted(true), []);
+  const [courses, setCourses] = useState<Course[]>([]);
 
-  const active = isMounted ? storeCourses : [];
+  useEffect(() => {
+    fetchCourses()
+      .then((data) => setCourses(data.filter((c) => c.isActive)))
+      .finally(() => setIsMounted(true));
+  }, []);
+
+  const active = courses;
 
   if (isMounted && active.length === 0) return null;
 
