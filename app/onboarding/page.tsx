@@ -97,10 +97,11 @@ export default function OnboardingPage() {
         throw new Error(dataRes.error || "فشل حفظ الملف الشخصي");
       }
 
-      showToast("تم إكمال ملفك بنجاح! جاري تحويلك للمنصة...", "success");
+      showToast("تم إكمال ملفك بنجاح! اختر الدورة التي ترغب بالاشتراك بها...", "success");
 
+      // الطالب الجديد يختار دورة أولاً قبل دخول لوحة التحكم
       setTimeout(() => {
-        window.location.href = "/dashboard";
+        window.location.href = "/#courses";
       }, 1000);
     } catch (error: any) {
       showToast(error.message || "حدث خطأ أثناء حفظ البيانات", "error");
