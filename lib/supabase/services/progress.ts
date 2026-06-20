@@ -13,6 +13,30 @@ export type LessonProgress = {
   progress_seconds: number;
 };
 
+// Returns the best (highest) score per exam for a student, from exam_attempts.
+export async function fetchBestScores(userId: string): Promise<Record<string, number>> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("exam_attempts")
+    .select("exam_id, score_pct")
+    .eq("student_id", userId)
+    .not("score_pct", "is", null);
+
+  if (error) {
+    console.error("Error fetching best scores:", error);
+    return {};
+  }
+
+  const best: Record<string, number> = {};
+  (data || []).forEach((row: any) => {
+    const pct = Math.round(row.score_pct || 0);
+    if (best[row.exam_id] === undefined || pct > best[row.exam_id]) {
+      best[row.exam_id] = pct;
+    }
+  });
+  return best;
+}
+
 export async function fetchUserProgress(userId: string) {
   const supabase = createClient();
   
