@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePlatformStore } from "@/lib/store";
 import { useToast } from "@/components/ui/toast";
 import { ExamList } from "./exam-list";
@@ -8,7 +8,7 @@ import { ExamRunner } from "./exam-runner";
 import { TrackExamResult } from "../tracks/track-exam-result";
 import { IconClipboardText } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/use-auth";
-import { submitExamAttempt } from "@/lib/supabase/services/progress";
+import { submitExamAttempt, fetchBestScores } from "@/lib/supabase/services/progress";
 
 type FilterValue = "all" | string; // trackId or "all"
 
@@ -28,6 +28,12 @@ export function ExamsClient() {
   const { user }              = useAuth();
   const hasSub = true;
   const { exams: storeExams, tracks: storeTracks } = usePlatformStore();
+
+  // Load real best scores per exam from the cloud (exam_attempts).
+  useEffect(() => {
+    if (!user) return;
+    fetchBestScores(user.id).then(setScores);
+  }, [user]);
 
   // Use ALL tracks directly (free platform - no enrollment needed)
   const activeTracks = storeTracks;
@@ -66,12 +72,15 @@ export function ExamsClient() {
     showToast(`تم حفظ نتيجة الاختبار (${percent}%) وتحديث مستوى إتقانك!`, "success");
 
     if (user) {
-      const mappedAnswers = activeExam.questions.map((q, i) => ({
-        question_id: q.id,
-        selected_option_id: null, // Note: We don't have option IDs in local state, only index. For analytics, we skip it or mock it.
-        is_correct: answers[i] === q.correctIndex,
-        micro_skill_id: q.skillId
-      }));
+      const mappedAnswers = activeExam.questions.map((q, i) => {
+        const selIdx = answers[i];
+        return {
+          question_id: q.id,
+          selected_option_id: selIdx !== null && q.optionIds ? q.optionIds[selIdx] ?? null : null,
+          is_correct: selIdx === q.correctIndex,
+          micro_skill_id: q.skillId,
+        };
+      });
       await submitExamAttempt(user.id, activeExam.id, mappedAnswers);
     }
   }
