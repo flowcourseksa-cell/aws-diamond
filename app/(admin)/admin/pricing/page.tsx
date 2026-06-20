@@ -1,43 +1,66 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   IconCurrencyDollar, IconDiscount2, IconCheck, IconX,
   IconPlus, IconTrash, IconEdit, IconLock,
 } from "@tabler/icons-react";
 
-import { usePlatformStore, type DiscountCode } from "@/lib/store";
+import { usePlatformStore } from "@/lib/store";
+import {
+  fetchDiscountCodes, createDiscountCode, deleteDiscountCode,
+  fetchSubscriptionPrices, saveSubscriptionPrices,
+  type DiscountCode, type SubscriptionPrice,
+} from "@/lib/supabase/services/pricing";
+
+// Default tiers used only as a starting form when nothing is saved yet.
+const DEFAULT_PRICES: SubscriptionPrice[] = [
+  { id: "monthly", label: "شهري", months: 1, price: 0, discountedPrice: null, isActive: true },
+  { id: "yearly", label: "سنوي", months: 12, price: 0, discountedPrice: null, isActive: true },
+];
 
 // ── Component ─────────────────────────────────────────────────
 export default function AdminPricingPage() {
   const [isMounted, setIsMounted] = useState(false);
-  const subscriptionPrices = usePlatformStore(s => s.subscriptionPrices);
-  const setSubscriptionPrices = usePlatformStore(s => s.setSubscriptionPrices);
-  const codes = usePlatformStore(s => s.discountCodes);
-  const setCodes = usePlatformStore(s => s.setDiscountCodes);
-  const updateItemPrice = usePlatformStore(s => s.updateItemPrice);
-  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Individual content items still come from the cloud-hydrated store.
   const lessons = usePlatformStore(s => s.lessons);
   const exams = usePlatformStore(s => s.exams);
   const files = usePlatformStore(s => s.files);
+  const updateItemPrice = usePlatformStore(s => s.updateItemPrice);
 
-  const [monthly, setMonthly] = useState(0);
-  const [yearly, setYearly] = useState(0);
+  // Cloud-backed subscription prices.
+  const [prices, setPrices] = useState<SubscriptionPrice[]>(DEFAULT_PRICES);
+
+  // Cloud-backed discount codes.
+  const [codes, setCodes] = useState<DiscountCode[]>([]);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const [cloudPrices, cloudCodes] = await Promise.all([
+      fetchSubscriptionPrices(),
+      fetchDiscountCodes(),
+    ]);
+    if (cloudPrices.length > 0) setPrices(cloudPrices);
+    setCodes(cloudCodes);
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
-    setMonthly(subscriptionPrices.monthly);
-    setYearly(subscriptionPrices.yearly);
-  }, [subscriptionPrices.monthly, subscriptionPrices.yearly]);
+    loadAll();
+  }, [loadAll]);
 
-  // Discount codes
+  // Discount code form
   const [showAddCode, setShowAddCode] = useState(false);
   const [newCode, setNewCode] = useState("");
   const [newDiscount, setNewDiscount] = useState(10);
   const [newMaxUses, setNewMaxUses] = useState(100);
   const [newExpiry, setNewExpiry] = useState("");
 
-  // Content items
+  // Content items (paid only)
   const items = [
     ...lessons.filter(l => l.accessType === "paid").map(l => ({ id: l.id, title: l.title, type: "درس", currentPrice: l.price, rawType: "lesson" as const })),
     ...exams.filter(e => e.accessType === "paid").map(e => ({ id: e.id, title: e.name, type: "اختبار", currentPrice: e.price, rawType: "exam" as const })),
@@ -47,27 +70,37 @@ export default function AdminPricingPage() {
   const [editingItem, setEditingItem] = useState<{ id: string, type: "lesson" | "exam" | "file" } | null>(null);
   const [editPriceVal, setEditPriceVal] = useState(0);
 
-  function handleSavePlans() {
-    setSubscriptionPrices({ monthly, yearly });
-    alert("تم حفظ أسعار الاشتراكات بنجاح");
+  function updatePriceField(id: string, field: "price" | "discountedPrice", value: number) {
+    setPrices(prev => prev.map(p => p.id === id ? { ...p, [field]: value } : p));
   }
 
-  function handleAddCode() {
+  async function handleSavePlans() {
+    setSaving(true);
+    const ok = await saveSubscriptionPrices(prices);
+    setSaving(false);
+    alert(ok ? "تم حفظ أسعار الاشتراكات بنجاح" : "تعذّر الحفظ. تأكد من صلاحية الأدمن.");
+  }
+
+  async function handleAddCode() {
     if (!newCode.trim()) return;
-    setCodes(prev => [...prev, {
-      id: `c-${Date.now()}`,
-      code: newCode.toUpperCase(),
+    const created = await createDiscountCode({
+      code: newCode,
       discountPercent: newDiscount,
-      uses: 0,
       maxUses: newMaxUses,
-      expiryDate: newExpiry || "2030-01-01"
-    }]);
-    setShowAddCode(false);
-    setNewCode(""); setNewDiscount(10); setNewMaxUses(100); setNewExpiry("");
+      expiryDate: newExpiry || null,
+    });
+    if (created) {
+      setCodes(prev => [created, ...prev]);
+      setShowAddCode(false);
+      setNewCode(""); setNewDiscount(10); setNewMaxUses(100); setNewExpiry("");
+    } else {
+      alert("تعذّر إضافة الكود. ربما الكود مكرّر أو لا تملك صلاحية الأدمن.");
+    }
   }
 
-  function handleDeleteCode(id: string) {
-    setCodes(prev => prev.filter(c => c.id !== id));
+  async function handleDeleteCode(id: string) {
+    const ok = await deleteDiscountCode(id);
+    if (ok) setCodes(prev => prev.filter(c => c.id !== id));
   }
 
   function saveItemPrice(id: string, type: "lesson" | "exam" | "file") {
@@ -75,7 +108,7 @@ export default function AdminPricingPage() {
     setEditingItem(null);
   }
 
-  if (!isMounted) return <div className="p-8 text-center font-bold text-text-muted">جاري التحميل...</div>;
+  if (!isMounted || loading) return <div className="p-8 text-center font-bold text-text-muted">جاري التحميل...</div>;
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,18 +132,15 @@ export default function AdminPricingPage() {
               <IconLock size={20} className="text-accent-amber"/> خطط الاشتراك (شاملة كل شيء)
             </div>
             <div className="flex flex-col gap-4">
-              <div>
-                <label className="text-xs font-black text-text-muted mb-1.5 block">الاشتراك الشهري (ر.س)</label>
-                <input type="number" value={monthly} onChange={e => setMonthly(Number(e.target.value))}
-                  className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-bold outline-none focus:border-primary" />
-              </div>
-              <div>
-                <label className="text-xs font-black text-text-muted mb-1.5 block">الاشتراك السنوي (ر.س)</label>
-                <input type="number" value={yearly} onChange={e => setYearly(Number(e.target.value))}
-                  className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-bold outline-none focus:border-primary" />
-              </div>
-              <button onClick={handleSavePlans} className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white hover:bg-primary-dark">
-                <IconCheck size={18}/> حفظ الأسعار
+              {prices.map(p => (
+                <div key={p.id}>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">الاشتراك {p.label} (ر.س)</label>
+                  <input type="number" value={p.price} onChange={e => updatePriceField(p.id, "price", Number(e.target.value))}
+                    className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-bold outline-none focus:border-primary" />
+                </div>
+              ))}
+              <button onClick={handleSavePlans} disabled={saving} className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60">
+                <IconCheck size={18}/> {saving ? "جاري الحفظ..." : "حفظ الأسعار"}
               </button>
             </div>
           </div>
@@ -121,6 +151,9 @@ export default function AdminPricingPage() {
               <IconCurrencyDollar size={20} className="text-emerald-500"/> تسعير المحتوى المنفصل
             </div>
             <div className="flex flex-col gap-3">
+              {items.length === 0 && (
+                <p className="text-xs font-bold text-text-muted text-center py-4">لا يوجد محتوى مدفوع منفصل بعد.</p>
+              )}
               {items.map(item => (
                 <div key={item.id} className="flex items-center justify-between p-3 rounded-xl border border-border bg-bg">
                   <div className="flex flex-col">
@@ -203,17 +236,20 @@ export default function AdminPricingPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {codes.length === 0 && (
+                    <tr><td colSpan={5} className="px-4 py-6 text-center text-xs font-bold text-text-muted">لا توجد كودات خصم بعد.</td></tr>
+                  )}
                   {codes.map(c => {
-                    const isExhausted = c.uses >= c.maxUses;
+                    const isExhausted = c.maxUses > 0 && c.uses >= c.maxUses;
                     return (
                       <tr key={c.id} className="border-b border-border last:border-none hover:bg-bg/40">
                         <td className="px-4 py-3 font-black text-text"><span className="bg-bg border border-border px-2 py-1 rounded text-primary">{c.code}</span></td>
                         <td className="px-4 py-3 font-black text-accent-teal">{c.discountPercent}%</td>
                         <td className="px-4 py-3 font-semibold text-text-muted">
-                          {c.uses} / {c.maxUses}
+                          {c.uses} / {c.maxUses > 0 ? c.maxUses : "∞"}
                           {isExhausted && <span className="mr-2 text-[10px] text-accent-red font-black bg-accent-red/10 px-1.5 py-0.5 rounded">مكتمل</span>}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-text-muted" dir="ltr">{c.expiryDate}</td>
+                        <td className="px-4 py-3 font-semibold text-text-muted" dir="ltr">{c.expiryDate || "—"}</td>
                         <td className="px-4 py-3">
                           <button onClick={() => handleDeleteCode(c.id)} className="text-text-muted hover:text-accent-red transition-colors"><IconTrash size={15}/></button>
                         </td>
@@ -231,4 +267,3 @@ export default function AdminPricingPage() {
     </div>
   );
 }
-
