@@ -124,16 +124,22 @@ export default function LessonsPage() {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const { lessons, tracks: storeTracks } = usePlatformStore();
-  
-  useEffect(() => setIsMounted(true), []);
 
   const [filter, setFilter]       = useState("all");
   const [search, setSearch]       = useState("");
   const [selected, setSelected]   = useState<TrackLesson | null>(null);
   const [done, setDone]           = useState<Set<string>>(new Set());
+  const [progressMap, setProgressMap] = useState<Record<string, { is_completed: boolean; progress_seconds: number }>>({});
   const { showToast }             = useToast();
   const { user }                  = useAuth();
   const hasSub = true;
+
+  useEffect(() => setIsMounted(true), []);
+
+  // Load real per-lesson progress for this student.
+  useEffect(() => {
+    if (user) fetchLessonProgressMap(user.id).then(setProgressMap);
+  }, [user]);
 
   if (!isMounted) return <div className="p-8 text-center font-bold">جاري التحميل...</div>;
 
@@ -144,6 +150,8 @@ export default function LessonsPage() {
   const mappedLessons: TrackLesson[] = activeLessons.map(l => {
     const track = activeTracks.find(t => t.id === l.trackId);
     const section = track?.sections.find(s => s.id === l.sectionId);
+    const prog = progressMap[l.id];
+    const isCompleted = prog?.is_completed || done.has(l.id);
     return {
       id: l.id,
       trackId: l.trackId,
@@ -153,8 +161,8 @@ export default function LessonsPage() {
       title: l.title,
       teacherName: l.teacherName,
       durationLabel: l.durationLabel,
-      progressPercent: 0,
-      status: l.status === "completed" ? "done" : l.status === "new" ? "new" : "",
+      progressPercent: isCompleted ? 100 : 0,
+      status: isCompleted ? "done" : l.status === "new" ? "new" : "",
       accessType: l.accessType,
       price: l.price,
     };
@@ -186,9 +194,11 @@ export default function LessonsPage() {
     return (
       <VideoPlayer
         lesson={selected}
+        userId={user?.id ?? null}
         onBack={() => setSelected(null)}
         onComplete={async () => {
           setDone(p => new Set([...p, selected.id]));
+          setProgressMap(prev => ({ ...prev, [selected.id]: { is_completed: true, progress_seconds: prev[selected.id]?.progress_seconds ?? 0 } }));
           if (user) {
             await markLessonCompleted(user.id, selected.id);
           }
