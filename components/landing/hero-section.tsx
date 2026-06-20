@@ -42,13 +42,13 @@ export default function HeroSection() {
       <nav className="relative z-40 p-4 pt-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center bg-white/60 backdrop-blur-2xl rounded-full px-8 py-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-500/30 transform transition-transform hover:scale-105">
-              F
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 via-purple-600 to-amber-500 flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-indigo-500/30 transform transition-transform group-hover:scale-110 group-hover:rotate-6 glow-ring">
+              💎
             </div>
             <div className="flex flex-col">
-              <span className="font-black text-2xl text-slate-800 leading-none tracking-tight">منصة الأوس الماسية</span>
-              <span className="text-sm text-amber-500 font-bold">التعليمية</span>
+              <span className="font-black text-2xl leading-none tracking-tight text-gradient-aurora">الأوس الماسية</span>
+              <span className="text-sm text-amber-500 font-bold">المنصة التعليمية</span>
             </div>
           </Link>
           
@@ -89,10 +89,10 @@ export default function HeroSection() {
               منصتك الأولى للتفوق
             </div>
 
-            <h1 className="text-6xl md:text-8xl font-black text-slate-800 mb-6 leading-tight tracking-tight">
-              منصة الأوس الماسية <br/>
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-500">
-                التعليمية
+            <h1 className="text-6xl md:text-8xl font-black mb-6 leading-tight tracking-tight">
+              <span className="shimmer-text">الأوس الماسية</span> <br/>
+              <span className="text-gradient-aurora">
+                للتفوّق والتميّز
               </span>
             </h1>
             
@@ -154,15 +154,8 @@ export default function HeroSection() {
         </div>
       </section>
 
-      {/* Animations */}
+      {/* Animations: float و aurora معرّفة الآن عالمياً في globals.css */}
       <style dangerouslySetInnerHTML={{__html: `
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
-        }
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
         @keyframes fade-in-up {
           0% { opacity: 0; transform: translateY(20px); }
           100% { opacity: 1; transform: translateY(0); }
