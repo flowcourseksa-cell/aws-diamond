@@ -72,6 +72,13 @@
   --color-border: var(--border);
 
   --font-sans: "Cairo", sans-serif;
+  --font-display: "Tajawal", "Cairo", sans-serif;
+}
+
+/* خط العناوين الفخم */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 /* فئات مساعدة إضافية للتصميم الراقي */
