@@ -47,6 +47,24 @@ alter table public.courses add column if not exists instructor_name text;
 alter table public.courses add column if not exists total_hours text;
 alter table public.courses add column if not exists students_count integer default 0;
 
+-- Discount codes (managed by admin).
+create table if not exists public.discount_codes (
+  id uuid default uuid_generate_v4() primary key,
+  code text not null unique,
+  discount_percent integer not null default 0,
+  uses integer not null default 0,
+  max_uses integer not null default 0,
+  expiry_date date,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Platform-wide settings as a single key/value row store (subscription prices, etc.).
+create table if not exists public.platform_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- ---------------------------------------------------------------------
 -- 1. Admin helper (security definer to avoid recursive RLS on profiles)
 -- ---------------------------------------------------------------------
@@ -91,6 +109,8 @@ alter table public.skill_progress      enable row level security;
 alter table public.study_plan_tasks    enable row level security;
 alter table public.lesson_progress     enable row level security;
 alter table public.lesson_notes        enable row level security;
+alter table public.discount_codes      enable row level security;
+alter table public.platform_settings   enable row level security;
 alter table public.notification_log    enable row level security;
 
 -- ---------------------------------------------------------------------
@@ -299,6 +319,23 @@ create policy "lesson_notes_select_own_or_admin" on public.lesson_notes
 drop policy if exists "lesson_notes_modify_own" on public.lesson_notes;
 create policy "lesson_notes_modify_own" on public.lesson_notes
   for all using (student_id = auth.uid()) with check (student_id = auth.uid());
+
+-- Discount codes: readable by any authenticated user (to validate at checkout),
+-- writable only by admins.
+drop policy if exists "discount_codes_select_auth" on public.discount_codes;
+create policy "discount_codes_select_auth" on public.discount_codes
+  for select using (auth.uid() is not null);
+drop policy if exists "discount_codes_admin_write" on public.discount_codes;
+create policy "discount_codes_admin_write" on public.discount_codes
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- Platform settings: readable by all authenticated users, writable by admins.
+drop policy if exists "platform_settings_select_auth" on public.platform_settings;
+create policy "platform_settings_select_auth" on public.platform_settings
+  for select using (auth.uid() is not null);
+drop policy if exists "platform_settings_admin_write" on public.platform_settings;
+create policy "platform_settings_admin_write" on public.platform_settings
+  for all using (public.is_admin()) with check (public.is_admin());
 
 drop policy if exists "notification_log_select_own_or_admin" on public.notification_log;
 create policy "notification_log_select_own_or_admin" on public.notification_log
