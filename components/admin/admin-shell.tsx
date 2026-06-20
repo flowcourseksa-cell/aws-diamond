@@ -9,8 +9,22 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const { user, profile, isLoading } = useAuth();
 
-  // If loading, show spinner
-  if (isLoading) {
+  // Safety net: never let the admin portal hang on a spinner forever.
+  const [forceReady, setForceReady] = useState(false);
+  useEffect(() => {
+    const timeout = setTimeout(() => setForceReady(true), 6000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  // Redirect to login if auth settled and there is no user at all.
+  useEffect(() => {
+    if ((!isLoading || forceReady) && !user) {
+      window.location.href = "/login";
+    }
+  }, [isLoading, forceReady, user]);
+
+  // If loading, show spinner (capped by forceReady)
+  if (isLoading && !forceReady) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
         <span className="h-8 w-8 animate-spin rounded-full border-4 border-primary/40 border-t-primary" />
