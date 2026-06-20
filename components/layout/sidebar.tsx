@@ -15,6 +15,8 @@ import {
   IconLogout2,
   IconBrain,
 } from "@tabler/icons-react";
+import { useState } from "react";
+import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
 import { useAuth } from "@/hooks/use-auth";
 
 type NavItem = {
@@ -26,8 +28,8 @@ type NavItem = {
 
 const MAIN_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "لوحة التحكم",    icon: <IconLayoutDashboard size={19} /> },
-  { href: "/tracks",   label: "الأقسام والمهارات",icon: <IconBrain size={19} />, badge: "8" },
-  { href: "/lessons",  label: "الدروس",           icon: <IconVideo size={19} />, badge: "12" },
+  { href: "/tracks",   label: "الأقسام والمهارات",icon: <IconBrain size={19} /> },
+  { href: "/lessons",  label: "الدروس",           icon: <IconVideo size={19} /> },
   { href: "/exams",   label: "الاختبارات",        icon: <IconClipboardText size={19} /> },
   { href: "/library", label: "المكتبة",            icon: <IconFolder size={19} /> },
 ];
@@ -35,8 +37,6 @@ const MAIN_ITEMS: NavItem[] = [
 const TOOLS_ITEMS: NavItem[] = [
   { href: "/study-plan", label: "خطة المذاكرة", icon: <IconCalendarTime size={19} /> },
   { href: "/performance", label: "تحليل الأداء", icon: <IconChartLine size={19} /> },
-  { href: "#", label: "التوقعات", icon: <IconTelescope size={19} /> },
-  { href: "#", label: "المزايا", icon: <IconStar size={19} /> },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
@@ -67,9 +67,11 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
   const { profile } = useAuth();
+  const [showLogout, setShowLogout] = useState(false);
 
   return (
     <>
+      <LogoutConfirmModal open={showLogout} onClose={() => setShowLogout(false)} />
       {/* الخلفية الشفافة (موبايل/تابلت) */}
       {open && (
         <div
@@ -125,12 +127,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               <div className="text-[11.5px] text-white/45">طالب</div>
             </div>
             <button
-              onClick={async () => {
-                const { createClient } = await import("@/lib/supabase/client");
-                const supabase = createClient();
-                await supabase.auth.signOut();
-                window.location.href = "/login";
-              }}
+              onClick={() => setShowLogout(true)}
               title="تسجيل الخروج"
               className="text-white/50 transition-colors duration-200 hover:text-accent-red cursor-pointer bg-transparent border-none p-0"
             >
