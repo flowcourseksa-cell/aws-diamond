@@ -93,6 +93,7 @@ export function PlatformHydration() {
               id: q.id,
               questionText: q.text,
               options: options.map((opt: any) => opt.text),
+              optionIds: options.map((opt: any) => opt.id),
               correctIndex: options.findIndex((opt: any) => opt.is_correct) >= 0 ? options.findIndex((opt: any) => opt.is_correct) : 0,
               explanation: q.explanation,
               skillId: q.micro_skill_id,

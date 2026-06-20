@@ -44,6 +44,7 @@ export type SkillQuestion = {
   id: string;
   questionText: string;
   options: string[];
+  optionIds: string[]; // Real question_option IDs aligned with `options`.
   correctIndex: number;
   explanation?: string;
   skillId: string;
