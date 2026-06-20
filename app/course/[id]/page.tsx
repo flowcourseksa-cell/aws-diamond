@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { usePlatformStore } from "@/lib/store";
+import { type Course } from "@/lib/store";
+import { fetchCourses } from "@/lib/supabase/services/courses";
 import {
   IconArrowRight, IconCheck, IconStarFilled,
   IconClock, IconUsers, IconCalendar, IconDeviceLaptop,
@@ -16,9 +17,13 @@ export default function CourseDetailsPage() {
   const courseId = params.id as string;
   
   const [isMounted, setIsMounted] = useState(false);
-  const { courses } = usePlatformStore();
-  
-  useEffect(() => setIsMounted(true), []);
+  const [courses, setCourses] = useState<Course[]>([]);
+
+  useEffect(() => {
+    fetchCourses()
+      .then(setCourses)
+      .finally(() => setIsMounted(true));
+  }, []);
 
   if (!isMounted) return <div className="min-h-screen bg-bg flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" /></div>;
 
