@@ -13,7 +13,9 @@ export async function fetchCourses(): Promise<Course[]> {
     return [];
   }
 
-  // Map from DB columns to the expected Course type
+  // Map from DB columns to the expected Course type.
+  // Only DB-backed values are used; optional arrays default to empty
+  // instead of fabricated marketing data.
   return data.map((d: any) => ({
     id: d.id,
     title: d.title,
@@ -21,15 +23,15 @@ export async function fetchCourses(): Promise<Course[]> {
     description: d.description || "",
     price: d.price,
     discountedPrice: d.discounted_price,
-    currency: "ر.س", // Assuming fixed currency for now
-    coverGradient: "from-amber-500 to-orange-600",
+    currency: d.currency || "ر.س",
+    coverGradient: d.cover_gradient || "from-amber-500 to-orange-600",
     examDate: d.exam_date || "",
-    trackIds: ["qudrat-komi", "qudrat-lafzi", "nafis", "tasis", "tahsili"],
-    features: ["شرح مرئي للدروس", "اختبارات ذكية لتحديد الضعف", "تقارير واتساب لولي الأمر", "مجاني بالكامل"],
-    tags: ["شاملة", "مجاني"],
-    instructorName: "منصة الأوس الماسية",
-    totalHours: "مفتوح",
-    studentsCount: 15420,
+    trackIds: Array.isArray(d.track_ids) ? d.track_ids : [],
+    features: Array.isArray(d.features) ? d.features : [],
+    tags: Array.isArray(d.tags) ? d.tags : [],
+    instructorName: d.instructor_name || "",
+    totalHours: d.total_hours || "",
+    studentsCount: d.students_count ?? 0,
     isActive: d.is_active,
     isFeatured: d.is_featured,
     createdAt: d.created_at,

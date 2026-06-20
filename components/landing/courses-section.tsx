@@ -82,7 +82,7 @@ export default function CoursesSection() {
 }
 
 function CourseCard({ course, index }: { course: Course; index: number }) {
-  const isFree = true; // Forcing all courses to be free
+  const isFree = course.discountedPrice === 0;
 
   return (
     <div className={`group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-400 hover:-translate-y-2 fade-up delay-${(index % 3) + 1}`}>
