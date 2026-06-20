@@ -163,9 +163,9 @@ export default function PerformancePage() {
 
       {/* التوصيات */}
       {TIPS.length > 0 && (
-        <section className="fade-up rounded-2xl border border-primary bg-primary-light p-5.5">
+        <section className="fade-up animated-border bg-primary-light p-5.5">
           <div className="mb-3.5 flex items-center gap-2.5 text-[15px] font-extrabold text-primary">
-            <IconSparkles size={20} /> توصياتنا لك — بناءً على أدائك الفعلي
+            <IconSparkles size={20} className="animate-spin-slow" /> توصياتنا لك — بناءً على أدائك الفعلي
           </div>
           <div className="flex flex-col gap-2.5">
             {TIPS.map((tip, i) => (
