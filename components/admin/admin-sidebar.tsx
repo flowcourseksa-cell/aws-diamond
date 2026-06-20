@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import {
   IconRocket, IconLayoutDashboard, IconUsers, IconUpload,
   IconClipboardText, IconCurrencyDollar, IconArrowRight,
   IconLogout2, IconBrain, IconBook, IconFolder, IconBrandWhatsapp,
   IconSchool,
 } from "@tabler/icons-react";
+import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -35,9 +37,11 @@ const NAV_GROUPS = [
 
 export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const [showLogout, setShowLogout] = useState(false);
 
   return (
     <>
+      <LogoutConfirmModal open={showLogout} onClose={() => setShowLogout(false)} />
       {open && (
         <div className="fixed inset-0 z-39 bg-black/35 lg:hidden" onClick={onClose} />
       )}
@@ -96,9 +100,9 @@ export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => 
               <div className="truncate text-[13.5px] font-bold text-white">مدير الأوس الماسية</div>
               <div className="text-[11.5px] text-white/45">Center Admin</div>
             </div>
-            <Link href="/login" title="خروج" className="text-white/50 hover:text-accent-red">
+            <button onClick={() => setShowLogout(true)} title="خروج" className="text-white/50 hover:text-accent-red bg-transparent border-none p-0 cursor-pointer">
               <IconLogout2 size={19} />
-            </Link>
+            </button>
           </div>
         </div>
       </aside>
