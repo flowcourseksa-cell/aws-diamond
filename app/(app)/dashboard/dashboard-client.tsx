@@ -42,16 +42,19 @@ export function DashboardClient() {
   return (
     <>
       {/* شريط الترحيب */}
-      <section className="fade-up flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-sidebar px-7 py-6 text-white">
-        <div>
+      <section className="fade-up relative overflow-hidden flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-sidebar px-7 py-6 text-white shadow-premium">
+        {/* طبقة أورورا متحركة */}
+        <div className="absolute -top-1/2 -right-20 w-72 h-72 bg-primary/30 rounded-full blur-3xl animate-aurora pointer-events-none" />
+        <div className="absolute -bottom-1/2 left-10 w-64 h-64 bg-accent-amber/20 rounded-full blur-3xl animate-aurora pointer-events-none" style={{ animationDelay: "3s" }} />
+        <div className="relative z-10">
           <h2 className="mb-1.5 text-[21px] font-extrabold flex items-center gap-2">
-            أهلاً {studentName}! استمر في تفوقك <IconSparkles size={20} className="text-accent-amber" />
+            أهلاً {studentName}! استمر في تفوقك <IconSparkles size={20} className="text-accent-amber animate-spin-slow" />
           </h2>
           <p className="text-[13.5px] text-white/70">
-            مرحباً بك في <span className="font-bold text-white">منصة الأوس الماسية</span>
+            مرحباً بك في <span className="font-black text-gradient-gold">منصة الأوس الماسية</span>
           </p>
         </div>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="relative z-10 flex flex-wrap gap-2.5">
           <div className="flex items-center gap-2 rounded-xl bg-accent-amber/15 px-4 py-2.5 text-[13px] font-bold text-accent-amber border border-accent-amber/20">
             <IconAward size={18} />
             {stats.masteredSkills} مهارة متقنة
@@ -108,9 +111,11 @@ export function DashboardClient() {
             </div>
             <div className="h-3 bg-border rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-primary to-violet-500 rounded-full transition-all duration-700"
+                className="relative h-full bg-gradient-to-r from-primary to-violet-500 rounded-full transition-all duration-700 overflow-hidden"
                 style={{ width: `${stats.avgMastery}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-marquee" />
+              </div>
             </div>
           </div>
         </div>
@@ -163,9 +168,9 @@ export function DashboardClient() {
             <Link
               key={link.href}
               href={link.href}
-              className={`fade-up delay-${i + 1} flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.75 hover:border-primary hover:shadow-[0_8px_24px_rgba(15,17,23,0.05)] group`}
+              className={`fade-up delay-${i + 1} card-hover-3d flex flex-col gap-2.5 rounded-2xl border border-border bg-card p-5 hover:border-primary group`}
             >
-              <Icon size={24} className="text-primary group-hover:scale-110 transition-transform" />
+              <Icon size={24} className="text-primary group-hover:scale-125 group-hover:rotate-6 transition-transform duration-300" />
               <div className="text-sm font-bold">{link.title}</div>
               <div className="text-xs text-text-muted">{link.sub}</div>
             </Link>
