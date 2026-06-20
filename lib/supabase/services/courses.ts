@@ -79,26 +79,35 @@ export async function createCourse(course: Partial<Course>): Promise<Course | nu
 
 export async function updateCourse(id: string, course: Partial<Course>): Promise<boolean> {
   const supabase = createClient();
+
+  // Build payload from defined fields only, so partial updates
+  // (e.g. toggling isActive) never wipe other columns with undefined.
+  const colMap: Record<string, any> = {
+    title: course.title,
+    subtitle: course.subtitle,
+    description: course.description,
+    price: course.price,
+    discounted_price: course.discountedPrice,
+    currency: course.currency,
+    cover_gradient: course.coverGradient,
+    track_ids: course.trackIds,
+    features: course.features,
+    tags: course.tags,
+    instructor_name: course.instructorName,
+    total_hours: course.totalHours,
+    students_count: course.studentsCount,
+    is_active: course.isActive,
+    is_featured: course.isFeatured,
+    exam_date: course.examDate === undefined ? undefined : (course.examDate || null),
+  };
+  const payload: Record<string, any> = {};
+  for (const [k, v] of Object.entries(colMap)) {
+    if (v !== undefined) payload[k] = v;
+  }
+
   const { error } = await supabase
     .from("courses")
-    .update({
-      title: course.title,
-      subtitle: course.subtitle,
-      description: course.description,
-      price: course.price,
-      discounted_price: course.discountedPrice,
-      currency: course.currency,
-      cover_gradient: course.coverGradient,
-      track_ids: course.trackIds,
-      features: course.features,
-      tags: course.tags,
-      instructor_name: course.instructorName,
-      total_hours: course.totalHours,
-      students_count: course.studentsCount,
-      is_active: course.isActive,
-      is_featured: course.isFeatured,
-      exam_date: course.examDate || null,
-    })
+    .update(payload)
     .eq("id", id);
 
   if (error) {
