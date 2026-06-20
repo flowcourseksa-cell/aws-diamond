@@ -11,7 +11,7 @@ import { usePlatformStore, type AdminLesson } from "@/lib/store";
 import { useRouter } from "next/navigation";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/use-auth";
-import { markLessonCompleted } from "@/lib/supabase/services/progress";
+import { markLessonCompleted, fetchLessonProgressMap, fetchLessonNote, saveLessonNote } from "@/lib/supabase/services/progress";
 
 // ── بيانات الدروس مرتبطة بالمسارات الصحيحة ────────────────
 
@@ -30,16 +30,32 @@ type TrackLesson = {
   price: number;
 };
 // ── Video Player ─────────────────────────────────────────────
-function VideoPlayer({ lesson, onBack, onComplete }: {
+function VideoPlayer({ lesson, onBack, onComplete, userId }: {
   lesson: TrackLesson;
   onBack: () => void;
   onComplete: () => void;
+  userId: string | null;
 }) {
   const [playing, setPlaying]   = useState(false);
   const [progress, setProgress] = useState(lesson.progressPercent);
   const [completed, setCompleted] = useState(lesson.status === "done");
+  const [note, setNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
   const { showToast } = useToast();
   const ref = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Load the student's saved note for this lesson from the cloud.
+  useEffect(() => {
+    if (userId) fetchLessonNote(userId, lesson.id).then(setNote);
+  }, [userId, lesson.id]);
+
+  async function handleSaveNote() {
+    if (!userId) { showToast("يجب تسجيل الدخول لحفظ الملاحظات", "warning"); return; }
+    setSavingNote(true);
+    const ok = await saveLessonNote(userId, lesson.id, note);
+    setSavingNote(false);
+    showToast(ok ? "تم حفظ ملاحظاتك" : "تعذر حفظ الملاحظات", ok ? "success" : "error");
+  }
 
   useEffect(() => {
     if (playing) {
@@ -97,8 +113,8 @@ function VideoPlayer({ lesson, onBack, onComplete }: {
           <IconCheck size={18} />{completed ? "تم إكمال الدرس" : "ضع علامة كمكتمل"}
         </button>
         <div className="text-sm font-bold mb-2">ملاحظاتي</div>
-        <textarea rows={3} placeholder="اكتب ملاحظاتك هنا..." className="w-full resize-none rounded-[10px] border border-border bg-bg p-3.5 text-[13.5px] text-text outline-none focus:border-primary" />
-        <button onClick={() => showToast("تم حفظ ملاحظاتك", "success")} className="mt-2.5 h-10 rounded-[10px] bg-primary px-5 text-sm font-bold text-white hover:bg-primary-dark">حفظ</button>
+        <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="اكتب ملاحظاتك هنا..." className="w-full resize-none rounded-[10px] border border-border bg-bg p-3.5 text-[13.5px] text-text outline-none focus:border-primary" />
+        <button onClick={handleSaveNote} disabled={savingNote} className="mt-2.5 h-10 rounded-[10px] bg-primary px-5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-60">{savingNote ? "جاري الحفظ..." : "حفظ"}</button>
       </div>
     </div>
   );
