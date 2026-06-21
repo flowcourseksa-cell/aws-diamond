@@ -206,7 +206,7 @@ body {
     100deg,
     var(--primary) 20%,
     var(--accent-amber) 40%,
-    #fff 50%,
+    var(--text) 50%,
     var(--accent-amber) 60%,
     var(--primary) 80%
   );
