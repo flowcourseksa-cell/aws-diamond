@@ -1,5 +1,8 @@
-import { createClient, createAdminClient } from "@/lib/supabase/client";
+import { createClient } from "@/lib/supabase/client";
 import { type Course } from "@/lib/store";
+
+// Admin write operations live in a server-only module ("use server").
+export { enrollStudent, unenrollStudent } from "./students-actions";
 
 export type DbProfile = {
   id: string;
@@ -26,8 +29,7 @@ export type StudentWithDetails = DbProfile & {
 // Fetch all profiles with role='student'
 export async function fetchStudents(): Promise<StudentWithDetails[]> {
   const supabase = createClient();
-  
-  // We'll fetch all students and filter enrollments in javascript.
+
   const { data: allProfiles, error: fetchErr } = await supabase
     .from("profiles")
     .select(`
@@ -53,40 +55,3 @@ export async function fetchStudents(): Promise<StudentWithDetails[]> {
 
   return filteredData as unknown as StudentWithDetails[];
 }
-
-// Grant access to a student for a specific course
-export async function enrollStudent(studentId: string, courseId: string, expiresAt: string | null = null): Promise<boolean> {
-  const supabase = createAdminClient();
-  
-  const { error } = await supabase
-    .from("enrollments")
-    .upsert([{
-      student_id: studentId,
-      course_id: courseId,
-      expires_at: expiresAt,
-      is_active: true
-    }], { onConflict: "student_id, course_id" });
-
-  if (error) {
-    console.error("Error enrolling student:", error);
-    return false;
-  }
-  return true;
-}
-
-// Revoke access
-export async function unenrollStudent(enrollmentId: string): Promise<boolean> {
-  const supabase = createAdminClient();
-  
-  const { error } = await supabase
-    .from("enrollments")
-    .delete()
-    .eq("id", enrollmentId);
-
-  if (error) {
-    console.error("Error unenrolling student:", error);
-    return false;
-  }
-  return true;
-}
-
