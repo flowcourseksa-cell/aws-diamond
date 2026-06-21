@@ -89,17 +89,17 @@ export function DashboardClient() {
 
           {/* Progress bars */}
           <div className="grid grid-cols-3 gap-3 mb-5">
-            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
-              <div className="text-2xl font-black text-emerald-600">{stats.masteredSkills}</div>
-              <div className="text-xs font-bold text-emerald-700 mt-0.5">مهارة قوية</div>
+            <div className="rounded-xl bg-accent-teal-light border border-accent-teal/30 p-3 text-center">
+              <div className="text-2xl font-black text-accent-teal">{stats.masteredSkills}</div>
+              <div className="text-xs font-bold text-accent-teal mt-0.5">مهارة قوية</div>
             </div>
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-center">
-              <div className="text-2xl font-black text-amber-600">{stats.averageSkills}</div>
-              <div className="text-xs font-bold text-amber-700 mt-0.5">متوسطة</div>
+            <div className="rounded-xl bg-accent-amber-light border border-accent-amber/30 p-3 text-center">
+              <div className="text-2xl font-black text-accent-amber">{stats.averageSkills}</div>
+              <div className="text-xs font-bold text-accent-amber mt-0.5">متوسطة</div>
             </div>
-            <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-center">
-              <div className="text-2xl font-black text-rose-600">{stats.weakSkills}</div>
-              <div className="text-xs font-bold text-rose-700 mt-0.5">تحتاج تحسين</div>
+            <div className="rounded-xl bg-accent-red-light border border-accent-red/30 p-3 text-center">
+              <div className="text-2xl font-black text-accent-red">{stats.weakSkills}</div>
+              <div className="text-xs font-bold text-accent-red mt-0.5">تحتاج تحسين</div>
             </div>
           </div>
 
@@ -122,7 +122,7 @@ export function DashboardClient() {
 
         {/* أضعف المهارات */}
         <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center gap-1.5 text-sm font-black text-rose-600 mb-4">
+          <div className="flex items-center gap-1.5 text-sm font-black text-accent-red mb-4">
             <IconAlertTriangle size={18} />
             مهارات تحتاج للتحسين
           </div>
@@ -133,17 +133,17 @@ export function DashboardClient() {
                   <div key={sk.id} className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-bold text-text truncate">{sk.name}</div>
-                      <span className="text-xs font-black text-rose-600">{sk.score}%</span>
+                      <span className="text-xs font-black text-accent-red">{sk.score}%</span>
                     </div>
                     <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
-                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${sk.score}%` }} />
+                      <div className="h-full bg-accent-red rounded-full" style={{ width: `${sk.score}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
               <Link
                 href="/tracks"
-                className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs hover:bg-rose-100 transition-colors"
+                className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent-red-light border border-accent-red/30 text-accent-red font-bold text-xs hover:opacity-90 transition-opacity"
               >
                 <IconBrain size={16} />
                 تدرّب عليها الآن
@@ -151,10 +151,10 @@ export function DashboardClient() {
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-[120px] text-center">
-              <div className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-2">
+              <div className="w-10 h-10 bg-accent-teal-light text-accent-teal rounded-full flex items-center justify-center mb-2">
                 <IconChecks size={24} />
               </div>
-              <p className="text-xs font-bold text-emerald-600">لا توجد مهارات ضعيفة حالياً، ممتاز!</p>
+              <p className="text-xs font-bold text-accent-teal">لا توجد مهارات ضعيفة حالياً، ممتاز!</p>
             </div>
           )}
         </div>
