@@ -330,6 +330,22 @@ body {
 }
 .tilt-in { animation: tilt-in 0.7s cubic-bezier(0.16,1,0.3,1) both; }
 
+/* تقليب صفحات الكتاب التفاعلي (RTL) */
+@keyframes book-flip-next {
+  0% { transform: rotateY(0deg); opacity: 0.4; }
+  100% { transform: rotateY(0deg); opacity: 1; }
+}
+@keyframes book-flip-next-in {
+  0% { transform: rotateY(-35deg); opacity: 0; }
+  100% { transform: rotateY(0deg); opacity: 1; }
+}
+@keyframes book-flip-prev-in {
+  0% { transform: rotateY(35deg); opacity: 0; }
+  100% { transform: rotateY(0deg); opacity: 1; }
+}
+.book-flip-next { animation: book-flip-next-in 0.45s cubic-bezier(0.16,1,0.3,1) both; }
+.book-flip-prev { animation: book-flip-prev-in 0.45s cubic-bezier(0.16,1,0.3,1) both; }
+
 /* احترام تقليل الحركة */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
