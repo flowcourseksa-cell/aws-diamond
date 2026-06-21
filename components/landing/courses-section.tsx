@@ -127,7 +127,11 @@ function CourseCard({ course, index, enrollmentStatus }: { course: Course; index
       )}
 
       {/* Cover */}
-      <div className={`relative h-52 bg-gradient-to-br ${course.coverGradient} flex flex-col justify-end p-5 overflow-hidden`}>
+      <div className={`relative h-52 flex flex-col justify-end p-5 overflow-hidden ${course.coverImageUrl ? "" : `bg-gradient-to-br ${course.coverGradient}`}`}>
+        {course.coverImageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={course.coverImageUrl} alt={course.title} className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+        )}
         <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors" />
         {/* Sheen on hover */}
         <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none" />
