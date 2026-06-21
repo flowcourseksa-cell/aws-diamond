@@ -1,109 +1,38 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
+// Browser client. It MUST only ever use the public anon key.
+// Row Level Security enforces per-user access for anon-key requests.
 export function createClient() {
-  const isAdmin = typeof window !== 'undefined' && localStorage.getItem("admin_secret_token") === "authorized";
-  const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+}
 
-  if (isAdmin && serviceRoleKey) {
-    return createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      anonKey,
-      {
-        global: {
-          fetch: async (url, options) => {
-            const proxyUrl = '/api/admin-proxy';
-            
-            // Safely extract headers whether it's a Headers object or a plain object
-            const rawHeaders: Record<string, string> = {};
-            if (options?.headers) {
-              if (options.headers instanceof Headers) {
-                options.headers.forEach((value, key) => { rawHeaders[key] = value; });
-              } else if (Array.isArray(options.headers)) {
-                options.headers.forEach(([key, value]) => { rawHeaders[key] = value; });
-              } else {
-                Object.assign(rawHeaders, options.headers);
-              }
-            }
-
-            return fetch(proxyUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                url: url.toString(),
-                method: options?.method || 'GET',
-                headers: rawHeaders,
-                body: options?.body
-              })
-            });
-          }
-        }
-      }
+// Privileged client that bypasses RLS using the service role key.
+//
+// SECURITY: This must only run on the server. The service role key is read from
+// SUPABASE_SERVICE_ROLE_KEY (NO NEXT_PUBLIC_ prefix) so it is never bundled into
+// client-side JavaScript. Callers must invoke this from Server Actions or Route
+// Handlers (files marked "use server"). If it is ever reached in the browser we
+// throw instead of leaking or proxying the key.
+export function createAdminClient() {
+  if (typeof window !== 'undefined') {
+    throw new Error(
+      'createAdminClient() can only be used on the server. ' +
+      'Call it from a Server Action or Route Handler, never from the browser.'
     );
   }
 
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    anonKey
-  );
-}
-
-// A dedicated client for admin actions to bypass createBrowserClient caching.
-export function createAdminClient() {
-  const serviceRoleKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  if (serviceRoleKey) {
-    if (typeof window !== 'undefined') {
-      // In the browser, we must use our proxy because Supabase API blocks 
-      // requests with the service_role key coming from a browser Origin.
-      return createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        anonKey,
-        {
-          global: {
-            fetch: async (url, options) => {
-              const proxyUrl = '/api/admin-proxy';
-              
-              const rawHeaders: Record<string, string> = {};
-              if (options?.headers) {
-                if (options.headers instanceof Headers) {
-                  options.headers.forEach((value, key) => { rawHeaders[key] = value; });
-                } else if (Array.isArray(options.headers)) {
-                  options.headers.forEach(([key, value]) => { rawHeaders[key] = value; });
-                } else {
-                  Object.assign(rawHeaders, options.headers);
-                }
-              }
-
-              return fetch(proxyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  url: url.toString(),
-                  method: options?.method || 'GET',
-                  headers: rawHeaders,
-                  body: options?.body
-                })
-              });
-            }
-          }
-        }
-      );
-    } else {
-      // On the server, we can securely use the service role key directly.
-      return createSupabaseClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        serviceRoleKey
-      );
-    }
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured on the server.');
   }
 
-  // Fallback
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    anonKey
+    serviceRoleKey,
+    { auth: { persistSession: false, autoRefreshToken: false } }
   );
 }
-

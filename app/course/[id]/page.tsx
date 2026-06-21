@@ -158,7 +158,11 @@ export default function CourseDetailsPage() {
       </nav>
 
       {/* ── Hero ── */}
-      <div className={`pt-32 pb-16 px-4 bg-gradient-to-br ${course.coverGradient} relative overflow-hidden`}>
+      <div className={`pt-32 pb-16 px-4 relative overflow-hidden ${course.coverImageUrl ? "" : `bg-gradient-to-br ${course.coverGradient}`}`}>
+        {course.coverImageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={course.coverImageUrl} alt={course.title} className="absolute inset-0 h-full w-full object-cover" />
+        )}
         <div className="absolute inset-0 bg-black/30" />
         <div className="max-w-4xl mx-auto relative z-10 text-center flex flex-col items-center">
           {course.isFeatured && (

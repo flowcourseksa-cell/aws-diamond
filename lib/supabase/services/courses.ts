@@ -1,23 +1,35 @@
-import { createClient, createAdminClient } from "@/lib/supabase/client";
+"use server";
+
+import { createClient } from "@supabase/supabase-js";
 import { Course } from "@/lib/store";
 
+// Server-only Supabase clients. The service role key MUST stay on the server
+// (no NEXT_PUBLIC_ prefix) so it is never shipped to the browser.
+function getReadClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+}
+
 export async function fetchCourses(): Promise<Course[]> {
-  const supabase = createClient();
+  const supabase = getReadClient();
   const { data, error } = await supabase
     .from("courses")
     .select("*")
     .order("created_at", { ascending: false });
 
   if (error) {
-    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-      console.warn("Network offline, cannot fetch courses.");
-    } else {
-      console.warn("Error fetching courses:", error);
-    }
+    console.warn("Error fetching courses:", error.message);
     return [];
   }
 
-  return data.map((d: any) => {
+  return (data || []).map((d: any) => {
     let meta: any = {};
     let realDescription = d.description || "";
     try {
@@ -25,7 +37,7 @@ export async function fetchCourses(): Promise<Course[]> {
         meta = JSON.parse(d.description);
         realDescription = meta.description || "";
       }
-    } catch (e) {
+    } catch {
       // Not JSON, ignore
     }
 
@@ -38,6 +50,7 @@ export async function fetchCourses(): Promise<Course[]> {
       discountedPrice: d.discounted_price,
       currency: meta.currency || "ر.س",
       coverGradient: meta.coverGradient || "from-amber-500 to-orange-600",
+      coverImageUrl: meta.coverImageUrl || "",
       examDate: d.exam_date || "",
       trackIds: Array.isArray(meta.trackIds) ? meta.trackIds : [],
       features: Array.isArray(meta.features) ? meta.features : [],
@@ -53,12 +66,13 @@ export async function fetchCourses(): Promise<Course[]> {
 }
 
 export async function createCourse(course: Partial<Course>): Promise<Course | null> {
-  const supabase = createAdminClient();
-  
+  const supabase = getAdminClient();
+
   const metadata = {
     description: course.description,
     currency: course.currency,
     coverGradient: course.coverGradient,
+    coverImageUrl: course.coverImageUrl,
     trackIds: course.trackIds,
     features: course.features,
     tags: course.tags,
@@ -85,7 +99,7 @@ export async function createCourse(course: Partial<Course>): Promise<Course | nu
     .single();
 
   if (error) {
-    console.error("Error creating course:", error instanceof Error ? error.message : JSON.stringify(error), error);
+    console.error("Error creating course:", error.message);
     return null;
   }
 
@@ -97,18 +111,19 @@ export async function createCourse(course: Partial<Course>): Promise<Course | nu
 }
 
 export async function updateCourse(id: string, course: Partial<Course>): Promise<boolean> {
-  const supabase = createAdminClient();
+  const supabase = getAdminClient();
 
-  // We need to fetch the existing course to merge metadata
+  // Fetch the existing course to merge metadata
   const { data: existing } = await supabase.from("courses").select("description").eq("id", id).single();
   let meta: any = {};
   if (existing?.description && existing.description.startsWith("{")) {
-    try { meta = JSON.parse(existing.description); } catch (e) {}
+    try { meta = JSON.parse(existing.description); } catch {}
   }
 
   if (course.description !== undefined) meta.description = course.description;
   if (course.currency !== undefined) meta.currency = course.currency;
   if (course.coverGradient !== undefined) meta.coverGradient = course.coverGradient;
+  if (course.coverImageUrl !== undefined) meta.coverImageUrl = course.coverImageUrl;
   if (course.trackIds !== undefined) meta.trackIds = course.trackIds;
   if (course.features !== undefined) meta.features = course.features;
   if (course.tags !== undefined) meta.tags = course.tags;
@@ -124,7 +139,7 @@ export async function updateCourse(id: string, course: Partial<Course>): Promise
   if (course.isActive !== undefined) payload.is_active = course.isActive;
   if (course.isFeatured !== undefined) payload.is_featured = course.isFeatured;
   if (course.examDate !== undefined) payload.exam_date = course.examDate || null;
-  
+
   // Always update description to include merged metadata
   payload.description = JSON.stringify(meta);
 
@@ -134,23 +149,22 @@ export async function updateCourse(id: string, course: Partial<Course>): Promise
     .eq("id", id);
 
   if (error) {
-    console.error("Error updating course:", error);
+    console.error("Error updating course:", error.message);
     return false;
   }
   return true;
 }
 
 export async function deleteCourse(id: string): Promise<boolean> {
-  const supabase = createAdminClient();
+  const supabase = getAdminClient();
   const { error } = await supabase
     .from("courses")
     .delete()
     .eq("id", id);
 
   if (error) {
-    console.error("Error deleting course:", error);
+    console.error("Error deleting course:", error.message);
     return false;
   }
   return true;
 }
-
