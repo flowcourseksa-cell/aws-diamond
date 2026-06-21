@@ -184,13 +184,20 @@ export default function AdminCoursesPage() {
         {courses.map(course => (
           <div key={course.id} className={`rounded-2xl border bg-card overflow-hidden ${course.isActive ? "border-border" : "border-border opacity-60"}`}>
             {/* Cover */}
-            <div className={`h-32 bg-gradient-to-br ${course.coverGradient} relative flex items-end p-4`}>
+            <div className={`h-32 relative flex items-end p-4 overflow-hidden ${course.coverImageUrl ? "" : `bg-gradient-to-br ${course.coverGradient}`}`}>
+              {course.coverImageUrl && (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={course.coverImageUrl} alt={course.title} className="absolute inset-0 h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-black/35" />
+                </>
+              )}
               {course.isFeatured && (
                 <span className="absolute top-3 right-3 flex items-center gap-1 rounded-full bg-accent-amber px-2.5 py-1 text-[11px] font-bold text-white">
                   <IconStar size={11} /> مميزة
                 </span>
               )}
-              <h3 className="text-base font-black text-white leading-tight line-clamp-2">{course.title}</h3>
+              <h3 className="relative z-10 text-base font-black text-white leading-tight line-clamp-2">{course.title}</h3>
             </div>
 
             {/* Body */}
@@ -272,8 +279,15 @@ export default function AdminCoursesPage() {
             <div className="flex flex-col gap-5 p-6">
 
               {/* Preview */}
-              <div className={`h-24 rounded-xl bg-gradient-to-br ${form.coverGradient} flex items-center justify-center`}>
-                <span className="text-white font-black text-lg">{form.title || "معاينة الغلاف"}</span>
+              <div className={`relative h-24 rounded-xl overflow-hidden flex items-center justify-center ${form.coverImageUrl ? "" : `bg-gradient-to-br ${form.coverGradient}`}`}>
+                {form.coverImageUrl && (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={form.coverImageUrl} alt="معاينة" className="absolute inset-0 h-full w-full object-cover" />
+                    <div className="absolute inset-0 bg-black/35" />
+                  </>
+                )}
+                <span className="relative z-10 text-white font-black text-lg">{form.title || "معاينة الغلاف"}</span>
               </div>
 
               {/* Basic Info */}
@@ -336,9 +350,22 @@ export default function AdminCoursesPage() {
                 </div>
               </div>
 
-              {/* Cover Gradient */}
+              {/* Cover Image URL */}
               <div>
-                <label className="block text-xs font-bold text-text-muted mb-2 flex items-center gap-1"><IconBrush size={13} /> لون الغلاف</label>
+                <label className="block text-xs font-bold text-text-muted mb-1.5 flex items-center gap-1"><IconBrush size={13} /> رابط صورة الغلاف (اختياري)</label>
+                <input
+                  value={form.coverImageUrl || ""}
+                  onChange={e => setForm(f => ({ ...f, coverImageUrl: e.target.value }))}
+                  placeholder="https://.../cover.jpg"
+                  dir="ltr"
+                  className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-text-muted">إن تركته فارغاً سيُستخدم تدرج اللون بالأسفل.</p>
+              </div>
+
+              {/* Cover Gradient (fallback) */}
+              <div>
+                <label className="block text-xs font-bold text-text-muted mb-2 flex items-center gap-1"><IconBrush size={13} /> لون الغلاف (بديل عند غياب الصورة)</label>
                 <div className="flex flex-wrap gap-2">
                   {GRADIENT_OPTIONS.map(g => (
                     <button
