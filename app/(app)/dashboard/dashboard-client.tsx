@@ -5,7 +5,7 @@ import {
   IconFlame, IconAward, IconChartBar, IconChecks,
   IconClockHour4, IconClipboardText, IconChartLine,
   IconBrain, IconAlertTriangle, IconSparkles,
-  IconVideo, IconCalendarTime,
+  IconVideo, IconCalendarTime, IconBook2,
 } from "@tabler/icons-react";
 import { MetricCard } from "@/components/ui/metric-card";
 import { useEffect, useState } from "react";
@@ -19,6 +19,7 @@ const QUICK_LINKS = [
   { href: "/exams",       title: "الاختبارات",         sub: "اختبر مستواك الآن",   icon: IconChecks },
   { href: "/study-plan",  title: "خطة المذاكرة",       sub: "نظّم وقتك بفعالية",   icon: IconCalendarTime },
   { href: "/performance", title: "تحليل الأداء",        sub: "تابع تقدمك بالتفصيل", icon: IconChartLine },
+  { href: "/book",        title: "الكتاب التفاعلي",      sub: "اقلب الصفحات وعلّق",   icon: IconBook2 },
 ];
 
 export function DashboardClient() {

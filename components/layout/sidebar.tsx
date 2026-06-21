@@ -14,6 +14,7 @@ import {
   IconStar,
   IconLogout2,
   IconBrain,
+  IconBook2,
 } from "@tabler/icons-react";
 import { useState } from "react";
 import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
@@ -37,6 +38,7 @@ const MAIN_ITEMS: NavItem[] = [
 const TOOLS_ITEMS: NavItem[] = [
   { href: "/study-plan", label: "خطة المذاكرة", icon: <IconCalendarTime size={19} /> },
   { href: "/performance", label: "تحليل الأداء", icon: <IconChartLine size={19} /> },
+  { href: "/book", label: "الكتاب التفاعلي", icon: <IconBook2 size={19} /> },
 ];
 
 function NavLink({ item, active }: { item: NavItem; active: boolean }) {
