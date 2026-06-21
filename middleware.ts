@@ -30,11 +30,12 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // 2. Use getSession() instead of getUser(). getSession reads the local cookie instantly 
-  // without making an expensive network request to the Supabase server.
+  // 2. Use getUser() which validates the token with the Supabase Auth server.
+  // This is the trusted check for protecting routes; getSession() only reads the
+  // local cookie and can be spoofed, so it must not be used for authorization.
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
@@ -48,7 +49,17 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/tracks") ||
     pathname.startsWith("/onboarding");
 
-  if (!session?.user && isProtected) {
+  // Admin area: require an authenticated session at the edge.
+  // The admin role itself is enforced server-side (admin shell + RLS).
+  const isAdminArea = pathname.includes("admin-khaled-ksa-aws-2026-org");
+
+  if (!user && isProtected) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  if (!user && isAdminArea) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
