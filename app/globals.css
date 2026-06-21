@@ -83,10 +83,10 @@
 
 /* فئات مساعدة إضافية للتصميم الراقي */
 .glass-effect {
-  background: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--card) 70%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border);
 }
 
 [data-theme="dark"] .glass-effect {
