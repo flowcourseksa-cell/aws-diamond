@@ -117,19 +117,21 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {/* معلومات المستخدم */}
         <div className="mt-auto border-t border-white/8 pt-3.5">
           <div className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 transition-colors duration-200 hover:bg-white/7">
-            <div className="flex h-9.5 w-9.5 flex-shrink-0 items-center justify-center rounded-[10px] bg-primary text-sm font-bold">
-              {profile?.full_name ? profile.full_name[0] : "T"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13.5px] font-bold text-white">
-                {profile?.full_name || "جاري التحميل..."}
+            <Link href="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80 transition-opacity">
+              <div className="flex h-9.5 w-9.5 flex-shrink-0 items-center justify-center rounded-[10px] bg-primary text-sm font-bold">
+                {profile?.full_name ? profile.full_name[0] : "T"}
               </div>
-              <div className="text-[11.5px] text-white/45">طالب</div>
-            </div>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[13.5px] font-bold text-white">
+                  {profile?.full_name || "جاري التحميل..."}
+                </div>
+                <div className="text-[11.5px] text-white/45">الملف الشخصي</div>
+              </div>
+            </Link>
             <button
               onClick={() => setShowLogout(true)}
               title="تسجيل الخروج"
-              className="text-white/50 transition-colors duration-200 hover:text-accent-red cursor-pointer bg-transparent border-none p-0"
+              className="text-white/50 transition-colors duration-200 hover:text-accent-red cursor-pointer bg-transparent border-none p-0 flex-shrink-0"
             >
               <IconLogout2 size={19} />
             </button>

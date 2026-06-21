@@ -4,11 +4,11 @@ import React, { useState } from "react";
 import { IconSearch, IconUser, IconShoppingCart, IconBooks, IconStarFilled, IconSparkles } from "@tabler/icons-react";
 import Link from "next/link";
 import SearchModal from "@/components/modals/search-modal";
-import { useCartStore } from "@/store/cart";
+import { NotificationsDropdown } from "@/components/layout/notifications-dropdown";
+import { ProfileDropdown } from "@/components/layout/profile-dropdown";
 
 export default function HeroSection() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const { items, openCart } = useCartStore();
 
   const handleSmoothScroll = (e: React.MouseEvent<HTMLElement>, id: string) => {
     e.preventDefault();
@@ -58,15 +58,8 @@ export default function HeroSection() {
 
           {/* Left Icons */}
           <div className="flex items-center gap-4 text-slate-500">
-            <button onClick={openCart} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition-colors relative">
-              <IconShoppingCart stroke={1.5} size={20} />
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-xs font-bold rounded-full flex items-center justify-center border-2 border-white shadow-sm">
-                {items.length}
-              </span>
-            </button>
-            <Link href="/login" className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition-colors text-indigo-600">
-              <IconUser stroke={1.5} size={20} />
-            </Link>
+            <NotificationsDropdown />
+            <ProfileDropdown />
             <button onClick={() => setIsSearchOpen(true)} className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition-colors">
               <IconSearch stroke={1.5} size={20} />
             </button>

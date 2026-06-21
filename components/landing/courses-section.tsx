@@ -8,6 +8,8 @@ import {
 } from "@tabler/icons-react";
 import { type Course } from "@/lib/store";
 import { fetchCourses } from "@/lib/supabase/services/courses";
+import { fetchUserEnrollments } from "@/lib/supabase/services/enrollments";
+import { createClient } from "@/lib/supabase/client";
 
 function CountdownBadge({ examDate }: { examDate: string }) {
   const [days, setDays] = useState<number | null>(null);
@@ -28,11 +30,37 @@ function CountdownBadge({ examDate }: { examDate: string }) {
 export default function CoursesSection() {
   const [isMounted, setIsMounted] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [enrollments, setEnrollments] = useState<Record<string, 'active' | 'pending'>>({});
 
   useEffect(() => {
-    fetchCourses()
-      .then((data) => setCourses(data.filter((c) => c.isActive)))
-      .finally(() => setIsMounted(true));
+    let active = true;
+    const loadData = async () => {
+      try {
+        const data = await fetchCourses();
+        if (!active) return;
+        setCourses(data.filter((c) => c.isActive));
+
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const userEnrollments = await fetchUserEnrollments(session.user.id);
+          
+          if (active && userEnrollments) {
+            const enrollMap: Record<string, 'active' | 'pending'> = {};
+            userEnrollments.forEach(e => {
+              enrollMap[e.course_id] = e.is_active ? 'active' : 'pending';
+            });
+            setEnrollments(enrollMap);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        if (active) setIsMounted(true);
+      }
+    };
+    loadData();
+    return () => { active = false; };
   }, []);
 
   const active = courses;
@@ -72,7 +100,7 @@ export default function CoursesSection() {
         {isMounted && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {active.map((course, index) => (
-              <CourseCard key={course.id} course={course} index={index} />
+              <CourseCard key={course.id} course={course} index={index} enrollmentStatus={enrollments[course.id]} />
             ))}
           </div>
         )}
@@ -81,12 +109,17 @@ export default function CoursesSection() {
   );
 }
 
-function CourseCard({ course, index }: { course: Course; index: number }) {
+function CourseCard({ course, index, enrollmentStatus }: { course: Course; index: number; enrollmentStatus?: 'active' | 'pending' }) {
   const isFree = course.discountedPrice === 0;
 
   return (
-    <div className={`group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden shadow-sm card-hover-3d tilt-in delay-${(index % 3) + 1} ${course.isFeatured ? "animated-border" : ""}`}>
-      {/* Featured Badge */}
+    <div className={`group relative flex flex-col rounded-2xl border bg-card overflow-hidden shadow-sm card-hover-3d tilt-in delay-${(index % 3) + 1} ${course.isFeatured ? "animated-border" : ""} ${enrollmentStatus === 'active' ? 'border-accent-teal shadow-accent-teal/20' : 'border-border'}`}>
+      {/* Badges */}
+      {enrollmentStatus === 'active' && (
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-1 rounded-full bg-accent-teal px-3 py-1 text-xs font-black text-white shadow-lg">
+          مشترك <IconCheck size={12} stroke={3} />
+        </div>
+      )}
       {course.isFeatured && (
         <div className="absolute top-4 right-4 z-20 flex items-center gap-1 rounded-full bg-accent-amber px-3 py-1 text-xs font-black text-white shadow-gold">
           <IconStarFilled size={11} className="animate-spin-slow" /> مميزة
@@ -150,13 +183,29 @@ function CourseCard({ course, index }: { course: Course; index: number }) {
               </div>
             )}
           </div>
-          <Link
-            href={`/course/${course.id}`}
-            className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:gap-2.5 ${isFree ? "bg-accent-teal hover:bg-accent-teal/90" : "bg-primary hover:bg-primary-dark"}`}
-          >
-            {isFree ? "ابدأ مجاناً" : "اشترك الآن"}
-            <IconArrowLeft size={15} />
-          </Link>
+          {enrollmentStatus === 'active' ? (
+            <Link
+              href={`/dashboard`}
+              className="flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:gap-2.5 bg-accent-teal hover:bg-accent-teal/90"
+            >
+              الدخول <IconArrowLeft size={15} />
+            </Link>
+          ) : enrollmentStatus === 'pending' ? (
+            <Link
+              href={`/course/${course.id}`}
+              className="flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 bg-accent-amber opacity-80 hover:bg-accent-amber/90"
+            >
+              في انتظار التحقق
+            </Link>
+          ) : (
+            <Link
+              href={`/course/${course.id}`}
+              className={`flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all duration-200 hover:gap-2.5 ${isFree ? "bg-accent-teal hover:bg-accent-teal/90" : "bg-primary hover:bg-primary-dark"}`}
+            >
+              {isFree ? "ابدأ مجاناً" : "اشترك الآن"}
+              <IconArrowLeft size={15} />
+            </Link>
+          )}
         </div>
       </div>
     </div>

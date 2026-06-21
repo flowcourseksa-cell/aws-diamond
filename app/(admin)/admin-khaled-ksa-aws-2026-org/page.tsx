@@ -164,12 +164,12 @@ export default function AdminDashboard() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { href: "/admin/courses",  label: "إضافة دورة جديدة",   icon: <IconUsers size={20}/>,         color: "#6366f1" },
-              { href: "/admin/exams",    label: "إضافة اختبار",        icon: <IconClipboardText size={20}/>,  color: "#f59e0b" },
-              { href: "/admin/lessons",  label: "رفع درس جديد",         icon: <IconBook size={20}/>,           color: "#10b981" },
-              { href: "/admin/tracks",   label: "تعديل المهارات",       icon: <IconBrain size={20}/>,          color: "#8b5cf6" },
-              { href: "/admin/whatsapp", label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366" },
-              { href: "/admin/pricing",  label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444" },
+              { href: "/admin-khaled-ksa-aws-2026-org/courses",  label: "إضافة دورة جديدة",   icon: <IconUsers size={20}/>,         color: "#6366f1" },
+              { href: "/admin-khaled-ksa-aws-2026-org/exams",    label: "إضافة اختبار",        icon: <IconClipboardText size={20}/>,  color: "#f59e0b" },
+              { href: "/admin-khaled-ksa-aws-2026-org/lessons",  label: "رفع درس جديد",         icon: <IconBook size={20}/>,           color: "#10b981" },
+              { href: "/admin-khaled-ksa-aws-2026-org/tracks",   label: "تعديل المهارات",       icon: <IconBrain size={20}/>,          color: "#8b5cf6" },
+              { href: "/admin-khaled-ksa-aws-2026-org/whatsapp", label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366" },
+              { href: "/admin-khaled-ksa-aws-2026-org/pricing",  label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444" },
             ].map((action, i) => (
               <a
                 key={i}

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createAdminClient } from "@/lib/supabase/client";
 
 export type DbExam = {
   id: string;
@@ -47,14 +47,18 @@ export async function fetchExamsByTracks(trackIds: string[]): Promise<DbExam[]> 
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching exams:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch exams.");
+    } else {
+      console.warn("Error fetching exams:", error);
+    }
     return [];
   }
   return data as DbExam[];
 }
 
 export async function createExam(exam: Partial<DbExam>): Promise<DbExam | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("exams")
     .insert([{
@@ -77,7 +81,7 @@ export async function createExam(exam: Partial<DbExam>): Promise<DbExam | null> 
 }
 
 export async function updateExam(id: string, exam: Partial<DbExam>): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("exams")
     .update({
@@ -99,7 +103,7 @@ export async function updateExam(id: string, exam: Partial<DbExam>): Promise<boo
 }
 
 export async function deleteExam(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("exams").delete().eq("id", id);
   return !error;
 }
@@ -123,7 +127,11 @@ export async function fetchExamBuilderData(examId: string): Promise<ExamWithDeta
     .single();
 
   if (error) {
-    console.error("Error fetching exam details:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch exam details.");
+    } else {
+      console.warn("Error fetching exam details:", error);
+    }
     return null;
   }
 
@@ -139,7 +147,7 @@ export async function saveQuestionWithOptions(
   question: Partial<DbQuestion>, 
   options: Partial<DbQuestionOption>[]
 ): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
 
   // If question.id exists, it's an update, else insert.
   let questionId = question.id;
@@ -197,7 +205,7 @@ export async function saveQuestionWithOptions(
 }
 
 export async function deleteQuestion(questionId: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("questions").delete().eq("id", questionId);
   return !error;
 }

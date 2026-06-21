@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "./theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { OfflineWarning } from "@/components/ui/offline-warning";
 
 export const metadata: Metadata = {
   title: "الأوس الماسية — منصة تعليمية",
@@ -24,6 +25,7 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
+        <OfflineWarning />
         <ThemeProvider>
           <ToastProvider>{children}</ToastProvider>
         </ThemeProvider>

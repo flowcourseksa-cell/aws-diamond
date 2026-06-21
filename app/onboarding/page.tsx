@@ -47,7 +47,7 @@ export default function OnboardingPage() {
 
         if (profile && profile.parent_phone) {
           // الملف مكتمل، تحويله مباشرة
-          window.location.href = profile.role === "admin" ? "/admin" : "/dashboard";
+          window.location.href = profile.role === "admin" ? "/admin-khaled-ksa-aws-2026-org" : "/dashboard";
         } else {
           setChecking(false);
         }

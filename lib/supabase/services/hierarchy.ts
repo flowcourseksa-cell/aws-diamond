@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createAdminClient } from "@/lib/supabase/client";
 
 // --- Types ---
 export type DbMicroSkill = {
@@ -51,7 +51,11 @@ export async function fetchHierarchyByCourse(courseId: string): Promise<DbTrack[
     .order("created_at", { ascending: true, foreignTable: "sections.micro_skills" });
 
   if (error) {
-    console.error("Error fetching hierarchy:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch hierarchy.");
+    } else {
+      console.warn("Error fetching hierarchy:", error);
+    }
     return [];
   }
 
@@ -60,7 +64,7 @@ export async function fetchHierarchyByCourse(courseId: string): Promise<DbTrack[
 
 // -- Tracks --
 export async function createTrack(courseId: string, name: string, icon?: string, color?: string): Promise<DbTrack | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("tracks")
     .insert([{ course_id: courseId, name, icon, color }])
@@ -75,20 +79,20 @@ export async function createTrack(courseId: string, name: string, icon?: string,
 }
 
 export async function updateTrack(id: string, name: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("tracks").update({ name }).eq("id", id);
   return !error;
 }
 
 export async function deleteTrack(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("tracks").delete().eq("id", id);
   return !error;
 }
 
 // -- Sections --
 export async function createSection(trackId: string, name: string): Promise<DbSection | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("sections")
     .insert([{ track_id: trackId, name }])
@@ -103,20 +107,20 @@ export async function createSection(trackId: string, name: string): Promise<DbSe
 }
 
 export async function updateSection(id: string, name: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("sections").update({ name }).eq("id", id);
   return !error;
 }
 
 export async function deleteSection(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("sections").delete().eq("id", id);
   return !error;
 }
 
 // -- Micro-Skills --
 export async function createSkill(sectionId: string, name: string): Promise<DbMicroSkill | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("micro_skills")
     .insert([{ section_id: sectionId, name }])
@@ -131,13 +135,13 @@ export async function createSkill(sectionId: string, name: string): Promise<DbMi
 }
 
 export async function updateSkill(id: string, name: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("micro_skills").update({ name }).eq("id", id);
   return !error;
 }
 
 export async function deleteSkill(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("micro_skills").delete().eq("id", id);
   return !error;
 }

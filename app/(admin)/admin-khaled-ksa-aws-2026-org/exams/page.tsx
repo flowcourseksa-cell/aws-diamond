@@ -205,7 +205,7 @@ export default function AdminExamsPage() {
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">
                             {/* Builder Button */}
-                            <Link href={`/admin/exams/${exam.id}/builder`}
+                            <Link href={`/admin-khaled-ksa-aws-2026-org/exams/${exam.id}/builder`}
                               className="flex items-center gap-1 rounded-lg bg-indigo-50 px-2 py-1 text-xs font-bold text-indigo-600 border border-indigo-200 hover:bg-indigo-100 transition-colors"
                               title="تصميم الأسئلة">
                               <IconTool size={13} /> مصمم الأسئلة

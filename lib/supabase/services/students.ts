@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createAdminClient } from "@/lib/supabase/client";
 import { type Course } from "@/lib/store";
 
 export type DbProfile = {
@@ -27,7 +27,8 @@ export type StudentWithDetails = DbProfile & {
 export async function fetchStudents(): Promise<StudentWithDetails[]> {
   const supabase = createClient();
   
-  const { data, error } = await supabase
+  // We'll fetch all students and filter enrollments in javascript.
+  const { data: allProfiles, error: fetchErr } = await supabase
     .from("profiles")
     .select(`
       *,
@@ -39,25 +40,32 @@ export async function fetchStudents(): Promise<StudentWithDetails[]> {
     .eq("role", "student")
     .order("created_at", { ascending: false });
 
-  if (error) {
-    console.error("Error fetching students:", error);
+  if (fetchErr) {
+    console.warn("Error fetching students:", fetchErr);
     return [];
   }
 
-  return data as unknown as StudentWithDetails[];
+  // Filter out pending enrollments
+  const filteredData = (allProfiles || []).map((student: any) => ({
+    ...student,
+    enrollments: (student.enrollments || []).filter((e: any) => e.is_active === true)
+  }));
+
+  return filteredData as unknown as StudentWithDetails[];
 }
 
 // Grant access to a student for a specific course
 export async function enrollStudent(studentId: string, courseId: string, expiresAt: string | null = null): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   
   const { error } = await supabase
     .from("enrollments")
-    .insert([{
+    .upsert([{
       student_id: studentId,
       course_id: courseId,
-      expires_at: expiresAt
-    }]);
+      expires_at: expiresAt,
+      is_active: true
+    }], { onConflict: "student_id, course_id" });
 
   if (error) {
     console.error("Error enrolling student:", error);
@@ -68,7 +76,7 @@ export async function enrollStudent(studentId: string, courseId: string, expires
 
 // Revoke access
 export async function unenrollStudent(enrollmentId: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   
   const { error } = await supabase
     .from("enrollments")

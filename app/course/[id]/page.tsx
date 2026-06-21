@@ -5,11 +5,14 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { type Course } from "@/lib/store";
 import { fetchCourses } from "@/lib/supabase/services/courses";
+import { fetchUserEnrollments } from "@/lib/supabase/services/enrollments";
+import { requestCourseActivation } from "@/lib/supabase/services/activations";
 import {
   IconArrowRight, IconCheck, IconStarFilled,
   IconClock, IconUsers, IconCalendar, IconDeviceLaptop,
   IconBook, IconRosetteDiscountCheckFilled
 } from "@tabler/icons-react";
+import { NotificationsDropdown } from "@/components/layout/notifications-dropdown";
 
 export default function CourseDetailsPage() {
   const params = useParams();
@@ -18,12 +21,46 @@ export default function CourseDetailsPage() {
   
   const [isMounted, setIsMounted] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [showPopup, setShowPopup] = useState(false);
+  const [studentInfo, setStudentInfo] = useState<{ name: string; code: string } | null>(null);
+  const [enrollmentStatus, setEnrollmentStatus] = useState<'loading' | 'none' | 'pending' | 'active'>('loading');
 
   useEffect(() => {
-    fetchCourses()
-      .then(setCourses)
-      .finally(() => setIsMounted(true));
-  }, []);
+    let active = true;
+    const load = async () => {
+      try {
+        const coursesData = await fetchCourses();
+        if (!active) return;
+        setCourses(coursesData);
+
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (session) {
+          const enrollments = await fetchUserEnrollments(session.user.id);
+          const enrollment = enrollments.find((e: any) => e.course_id === courseId);
+
+          if (active) {
+            if (enrollment) {
+              setEnrollmentStatus(enrollment.is_active ? 'active' : 'pending');
+            } else {
+              setEnrollmentStatus('none');
+            }
+          }
+        } else {
+          if (active) setEnrollmentStatus('none');
+        }
+      } catch (e) {
+        console.error("Error loading course data", e);
+        if (active) setEnrollmentStatus('none');
+      } finally {
+        if (active) setIsMounted(true);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [courseId]);
 
   if (!isMounted) return <div className="min-h-screen bg-bg flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" /></div>;
 
@@ -53,23 +90,69 @@ export default function CourseDetailsPage() {
       return;
     }
 
-    router.push("/dashboard");
+    // Get profile data
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, id")
+      .eq("id", session.user.id)
+      .single();
+
+    if (profile) {
+      const studentCode = `TKH-${profile.id.split('-')[0].toUpperCase()}`;
+      setStudentInfo({ name: profile.full_name, code: studentCode });
+      setShowPopup(true);
+    } else {
+      router.push("/dashboard");
+    }
+  };
+
+  const handleConfirmSent = async () => {
+    const { createClient } = await import("@/lib/supabase/client");
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const res = await requestCourseActivation(
+      session.user.id,
+      course.id,
+      studentInfo?.name || '',
+      course.title
+    );
+
+    if (res.success) {
+      setEnrollmentStatus('pending');
+      setShowPopup(false);
+      router.push("/");
+    } else {
+      alert("حدث خطأ أثناء إرسال الطلب: " + res.error);
+    }
+  };
+
+
+  const handleWhatsApp = () => {
+    if (!studentInfo) return;
+    const message = `مرحباً، أنا الطالب ${studentInfo.name}.\nلقد سجلت في الدورة المجانية "${course.title}".\nالرقم التعريفي الخاص بي (ID) هو: ${studentInfo.code}\nأريد تفعيل الدورة من فضلكم.`;
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/201503027736?text=${encodedMessage}`, "_blank");
   };
 
   return (
     <div className="min-h-screen bg-bg text-text font-sans pb-24" dir="rtl">
       {/* ── Navbar ── */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-bg/80 backdrop-blur-lg border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <IconArrowRight size={24} className="text-text-muted" />
-            <span className="font-bold text-text-muted">العودة</span>
+        <div className="max-w-7xl mx-auto w-full h-20 flex items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
+            <IconArrowRight size={20} className="text-white" />
+            <span className="font-bold text-white">العودة</span>
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-accent-amber text-white flex items-center justify-center font-black text-lg">
-              ف
+          <div className="flex items-center gap-4">
+            <NotificationsDropdown />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent-amber text-white flex items-center justify-center font-black text-lg">
+                ف
+              </div>
+              <span className="font-black text-xl tracking-tight text-white drop-shadow-md">منصة الأوس الماسية</span>
             </div>
-            <span className="font-black text-xl tracking-tight">منصة الأوس الماسية</span>
           </div>
         </div>
       </nav>
@@ -193,21 +276,90 @@ export default function CourseDetailsPage() {
               )}
             </ul>
 
-            <button
-              onClick={handleSubscribe}
-              className={`w-full py-4 rounded-2xl font-black text-lg text-white shadow-xl hover:-translate-y-1 transition-all duration-300 ${
-                isFree ? "bg-accent-teal shadow-accent-teal/30 hover:bg-accent-teal/90" : "bg-primary shadow-primary/30 hover:bg-primary-dark"
-              }`}
-            >
-              {isFree ? "سجل الآن مجاناً وابدأ" : "اشترك في الدورة الآن"}
-            </button>
-            <p className="text-center text-xs text-text-muted mt-4 font-semibold">
-              بمجرد الضغط سيتم توجيهك إلى منصة التعلم الشاملة
-            </p>
+            {enrollmentStatus === 'loading' ? (
+              <button disabled className="w-full py-4 rounded-2xl font-black text-lg text-white bg-slate-300 shadow-xl cursor-wait">
+                جاري التحقق...
+              </button>
+            ) : enrollmentStatus === 'active' ? (
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="w-full py-4 rounded-2xl font-black text-lg text-white shadow-xl bg-accent-teal hover:bg-accent-teal/90 transition-all duration-300"
+              >
+                الدخول للدورة
+              </button>
+            ) : enrollmentStatus === 'pending' ? (
+              <button
+                disabled
+                className="w-full py-4 rounded-2xl font-black text-lg text-white shadow-xl bg-accent-amber opacity-80 cursor-not-allowed"
+              >
+                في انتظار التفعيل
+              </button>
+            ) : (
+              <button
+                onClick={handleSubscribe}
+                className={`w-full py-4 rounded-2xl font-black text-lg text-white shadow-xl hover:-translate-y-1 transition-all duration-300 ${
+                  isFree ? "bg-accent-teal shadow-accent-teal/30 hover:bg-accent-teal/90" : "bg-primary shadow-primary/30 hover:bg-primary-dark"
+                }`}
+              >
+                {isFree ? "سجل الآن مجاناً وابدأ" : "اشترك في الدورة الآن"}
+              </button>
+            )}
+            
+            {enrollmentStatus === 'none' && (
+              <p className="text-center text-xs text-text-muted mt-4 font-semibold">
+                بمجرد الضغط سيتم توجيهك إلى رسالة التفعيل
+              </p>
+            )}
           </div>
-
         </div>
       </div>
+
+      {/* ── Popup Modal ── */}
+      {showPopup && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-card w-full max-w-md rounded-3xl p-8 border border-border shadow-2xl text-center flex flex-col items-center">
+            <div className="w-16 h-16 rounded-full bg-accent-teal/20 text-accent-teal flex items-center justify-center mb-4">
+              <IconCheck size={32} stroke={3} />
+            </div>
+            <h3 className="text-2xl font-black mb-2 text-text">خطوة أخيرة للتفعيل!</h3>
+            <p className="text-text-muted font-bold mb-6">اتبع الخطوتين التاليتين لتفعيل اشتراكك في الدورة بنجاح.</p>
+            
+            <div className="w-full space-y-3 mb-2">
+              <button
+                onClick={handleWhatsApp}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#25D366] text-white font-black text-lg shadow-lg hover:bg-[#20bd5a] transition-colors relative"
+              >
+                <span className="absolute right-4 w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-sm">1</span>
+                إرسال رسالة الواتساب
+              </button>
+              
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-card px-4 text-xs font-bold text-text-muted">ثم بعد إرسال الرسالة</span>
+                </div>
+              </div>
+
+              <button
+                onClick={handleConfirmSent}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-bg border-2 border-primary text-primary font-black text-lg shadow-sm hover:bg-primary/5 transition-colors relative"
+              >
+                <span className="absolute right-4 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-sm">2</span>
+                تم إرسال الرسالة، تأكيد الطلب
+              </button>
+            </div>
+            
+            <button
+              onClick={() => setShowPopup(false)}
+              className="mt-4 text-text-muted font-bold text-sm hover:underline"
+            >
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

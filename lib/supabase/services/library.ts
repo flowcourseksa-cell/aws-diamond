@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createAdminClient } from "@/lib/supabase/client";
 
 export type DbLibraryFile = {
   id: string;
@@ -24,14 +24,18 @@ export async function fetchFilesByTracks(trackIds: string[]): Promise<DbLibraryF
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching library files:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch library files.");
+    } else {
+      console.warn("Error fetching library files:", error);
+    }
     return [];
   }
   return data as DbLibraryFile[];
 }
 
 export async function createFile(file: Partial<DbLibraryFile>): Promise<DbLibraryFile | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("library_files")
     .insert([{
@@ -53,7 +57,7 @@ export async function createFile(file: Partial<DbLibraryFile>): Promise<DbLibrar
 }
 
 export async function updateFile(id: string, file: Partial<DbLibraryFile>): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("library_files")
     .update({
@@ -74,7 +78,7 @@ export async function updateFile(id: string, file: Partial<DbLibraryFile>): Prom
 }
 
 export async function deleteFile(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("library_files")
     .delete()

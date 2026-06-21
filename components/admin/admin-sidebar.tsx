@@ -7,9 +7,9 @@ import {
   IconRocket, IconLayoutDashboard, IconUsers, IconUpload,
   IconClipboardText, IconCurrencyDollar, IconArrowRight,
   IconLogout2, IconBrain, IconBook, IconFolder, IconBrandWhatsapp,
-  IconSchool,
+  IconSchool, IconBell,
 } from "@tabler/icons-react";
-import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
+import { AdminLogoutModal } from "@/components/ui/admin-logout-modal";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
 
@@ -17,20 +17,21 @@ const NAV_GROUPS = [
   {
     label: "الإدارة",
     items: [
-      { href: "/admin",          label: "الرئيسية",           icon: <IconLayoutDashboard size={19} /> },
-      { href: "/admin/courses",   label: "الدورات التعليمية",  icon: <IconSchool size={19} /> },
-      { href: "/admin/tracks",   label: "المسارات والأقسام",  icon: <IconBrain size={19} /> },
-      { href: "/admin/exams",    label: "إنشاء الاختبارات",   icon: <IconClipboardText size={19} /> },
-      { href: "/admin/lessons",  label: "رفع الدروس",          icon: <IconBook size={19} /> },
-      { href: "/admin/library",  label: "إدارة المكتبة",       icon: <IconFolder size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org",          label: "الرئيسية",           icon: <IconLayoutDashboard size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/courses",   label: "الدورات التعليمية",  icon: <IconSchool size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/tracks",   label: "المسارات والأقسام",  icon: <IconBrain size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/exams",    label: "إنشاء الاختبارات",   icon: <IconClipboardText size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/lessons",  label: "رفع الدروس",          icon: <IconBook size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/library",  label: "إدارة المكتبة",       icon: <IconFolder size={19} /> },
     ] as NavItem[],
   },
   {
     label: "الطلاب",
     items: [
-      { href: "/admin/students",   label: "إدارة الطلاب",      icon: <IconUsers size={19} /> },
-      { href: "/admin/whatsapp",   label: "إشعارات الواتساب",  icon: <IconBrandWhatsapp size={19} /> },
-      { href: "/admin/pricing",    label: "التسعير والكودات",   icon: <IconCurrencyDollar size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/activations", label: "إشعارات التفعيل", icon: <IconBell size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/students",   label: "إدارة الطلاب",      icon: <IconUsers size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/whatsapp",   label: "إشعارات الواتساب",  icon: <IconBrandWhatsapp size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/pricing",    label: "التسعير والكودات",   icon: <IconCurrencyDollar size={19} /> },
     ] as NavItem[],
   },
 ];
@@ -41,7 +42,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <>
-      <LogoutConfirmModal open={showLogout} onClose={() => setShowLogout(false)} />
+      <AdminLogoutModal open={showLogout} onClose={() => setShowLogout(false)} />
       {open && (
         <div className="fixed inset-0 z-39 bg-black/35 lg:hidden" onClick={onClose} />
       )}
@@ -68,7 +69,7 @@ export function AdminSidebar({ open, onClose }: { open: boolean; onClose: () => 
               <nav className="flex flex-col gap-[3px]">
                 {group.items.map(item => {
                   const active = pathname === item.href ||
-                    (item.href !== "/admin" && pathname.startsWith(item.href));
+                    (item.href !== "/admin-khaled-ksa-aws-2026-org" && pathname.startsWith(item.href));
                   return (
                     <Link key={item.href} href={item.href}
                       className={`flex items-center gap-3 rounded-[10px] px-3 py-[11px] text-sm font-semibold transition-colors duration-200 ${

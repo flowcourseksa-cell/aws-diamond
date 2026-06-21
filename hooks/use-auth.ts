@@ -22,22 +22,40 @@ export function useAuth() {
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       const supabase = createClient();
-      // Guard against a hung request keeping the UI on a spinner forever.
+      
+      // Attempt to load from cache first for instant UI response
+      const cached = localStorage.getItem(`flow-profile-${userId}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setProfile(parsed);
+        } catch (e) {}
+      }
+
       const result = await Promise.race([
         supabase.from("profiles").select("*").eq("id", userId).single(),
         new Promise<{ data: null; error: { message: string } }>((resolve) =>
-          setTimeout(() => resolve({ data: null, error: { message: "timeout" } }), 8000)
+          setTimeout(() => resolve({ data: null, error: { message: "timeout" } }), 5000)
         ),
       ]);
       const { data, error } = result as { data: AuthProfile | null; error: { message: string } | null };
 
       if (error) {
         console.warn("Profile fetch error (might not exist yet):", error.message);
+        // If there's an error (e.g. timeout or no internet) but we have cache, DO NOT return null.
+        if (cached) return JSON.parse(cached);
         return null;
+      }
+      
+      if (data) {
+        localStorage.setItem(`flow-profile-${userId}`, JSON.stringify(data));
       }
       return data as AuthProfile;
     } catch (err) {
       console.error("fetchProfile error:", err);
+      // Fallback to cache on hard throw
+      const cached = localStorage.getItem(`flow-profile-${userId}`);
+      if (cached) return JSON.parse(cached);
       return null;
     }
   }, []);
@@ -45,11 +63,6 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
-
-    // Absolute safety net: never leave the app stuck on a loading spinner.
-    const hardStop = setTimeout(() => {
-      if (mounted) setIsLoading(false);
-    }, 10000);
 
     async function init() {
       try {
@@ -102,7 +115,6 @@ export function useAuth() {
 
     return () => {
       mounted = false;
-      clearTimeout(hardStop);
       subscription.unsubscribe();
     };
   }, [fetchProfile]);
@@ -126,6 +138,9 @@ export function useAuth() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("flow-logged-in");
       localStorage.removeItem("flow-user-role");
+      if (session?.user?.id) {
+        localStorage.removeItem(`flow-profile-${session.user.id}`);
+      }
     }
     return true;
   }, []);

@@ -40,7 +40,14 @@ export default function AdminStudentsPage() {
   }, []);
 
   const filtered = students.filter(s => {
-    if (search && !s.full_name.includes(search)) return false;
+    const studentId = `TKH-${s.id.split('-')[0].toUpperCase()}`;
+    const searchLower = search.toLowerCase();
+    
+    if (search && 
+        !s.full_name.toLowerCase().includes(searchLower) && 
+        !studentId.toLowerCase().includes(searchLower)
+    ) return false;
+    
     if (filterCourse !== "all") {
       const isEnrolled = s.enrollments.some(e => e.course_id === filterCourse);
       if (!isEnrolled) return false;
@@ -110,7 +117,7 @@ export default function AdminStudentsPage() {
       <div className="flex flex-wrap items-center gap-3 fade-up">
         <div className="flex-1 min-w-[200px] relative">
           <IconSearch size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث باسم الطالب..."
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="ابحث باسم الطالب أو الـ ID..."
             className="w-full rounded-xl border border-border bg-card pl-4 pr-10 py-2.5 text-sm font-semibold outline-none focus:border-primary" />
         </div>
         <div className="flex items-center gap-2">
@@ -140,11 +147,16 @@ export default function AdminStudentsPage() {
                 return (
                   <tr key={student.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
                     <td className="px-4 py-3.5">
-                      <div className="flex items-center gap-2 font-extrabold text-text">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary font-black shadow-sm">
                           {student.full_name.charAt(0)}
                         </div>
-                        {student.full_name}
+                        <div className="flex flex-col">
+                          <span className="font-extrabold text-text">{student.full_name}</span>
+                          <span className="text-[10px] font-bold text-text-muted font-mono tracking-wider mt-0.5" dir="ltr">
+                            TKH-{student.id.split('-')[0].toUpperCase()}
+                          </span>
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5 font-semibold text-text-muted" dir="ltr">

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createAdminClient } from "@/lib/supabase/client";
 
 // ---------------------------------------------------------------------
 // Types
@@ -36,7 +36,11 @@ export async function fetchDiscountCodes(): Promise<DiscountCode[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching discount codes:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch discount codes.");
+    } else {
+      console.warn("Error fetching discount codes:", error);
+    }
     return [];
   }
 
@@ -54,7 +58,7 @@ export async function fetchDiscountCodes(): Promise<DiscountCode[]> {
 export async function createDiscountCode(
   code: Partial<DiscountCode>
 ): Promise<DiscountCode | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("discount_codes")
     .insert([
@@ -88,7 +92,7 @@ export async function updateDiscountCode(
   id: string,
   code: Partial<DiscountCode>
 ): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
 
   const colMap: Record<string, any> = {
     code: code.code ? code.code.trim().toUpperCase() : undefined,
@@ -115,7 +119,7 @@ export async function updateDiscountCode(
 }
 
 export async function deleteDiscountCode(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("discount_codes").delete().eq("id", id);
   if (error) {
     console.error("Error deleting discount code:", error);
@@ -169,7 +173,11 @@ export async function fetchSubscriptionPrices(): Promise<SubscriptionPrice[]> {
     .maybeSingle();
 
   if (error) {
-    console.error("Error fetching subscription prices:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch subscription prices.");
+    } else {
+      console.warn("Error fetching subscription prices:", error);
+    }
     return [];
   }
   if (!data || !Array.isArray(data.value)) return [];
@@ -179,7 +187,7 @@ export async function fetchSubscriptionPrices(): Promise<SubscriptionPrice[]> {
 export async function saveSubscriptionPrices(
   prices: SubscriptionPrice[]
 ): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase.from("platform_settings").upsert(
     {
       key: PRICES_KEY,

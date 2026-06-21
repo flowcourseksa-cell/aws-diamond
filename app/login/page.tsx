@@ -114,7 +114,7 @@ export default function LoginPage() {
           "success"
         );
         setTimeout(() => {
-          window.location.href = isAdmin ? "/admin" : "/dashboard";
+          window.location.href = isAdmin ? "/admin-khaled-ksa-aws-2026-org" : "/dashboard";
         }, 600);
       }
     } catch (err: any) {

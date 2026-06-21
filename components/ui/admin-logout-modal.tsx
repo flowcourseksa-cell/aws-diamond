@@ -1,28 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { IconLogout2, IconX, IconIdBadge, IconAlertCircle } from "@tabler/icons-react";
-import { useAuth } from "@/hooks/use-auth";
-import { createClient } from "@/lib/supabase/client";
+import { IconLogout2, IconX, IconLock, IconAlertCircle } from "@tabler/icons-react";
 
-// Reusable logout confirmation that REQUIRES the user's student ID.
-// The user can never be signed out without re-entering their ID.
-export function LogoutConfirmModal({
+export function AdminLogoutModal({
   open,
   onClose,
 }: {
   open: boolean;
   onClose: () => void;
 }) {
-  const { user, profile } = useAuth();
-  const [studentId, setStudentId] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
 
   if (!open) return null;
 
-  async function handleConfirm() {
-    if (!studentId || !user) {
+  function handleConfirm() {
+    if (!password) {
       setError(true);
       return;
     }
@@ -30,24 +25,16 @@ export function LogoutConfirmModal({
     setLoading(true);
     setError(false);
 
-    // Validate ID
-    const correctId = `TKH-${user.id.split('-')[0].toUpperCase()}`;
-    if (studentId.trim().toUpperCase() !== correctId) {
+    // Validate Admin Password (currently hardcoded as "0000" in admin-shell)
+    if (password !== "0000") {
       setError(true);
       setLoading(false);
       return;
     }
 
-    // Success -> Sign Out
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    
-    // Clear local storage
-    localStorage.removeItem("flow-logged-in");
-    localStorage.removeItem("flow-user-role");
-    localStorage.removeItem(`flow-profile-${user.id}`);
-    
-    window.location.href = "/login";
+    // Success -> Sign Out Admin
+    localStorage.removeItem("admin_secret_token");
+    window.location.reload();
   }
 
   return (
@@ -68,23 +55,23 @@ export function LogoutConfirmModal({
         </div>
 
         <p className="text-sm text-slate-500 mb-6 font-bold leading-relaxed">
-          لحماية حسابك وبياناتك، يُرجى إدخال <strong className="text-slate-700">الرقم التعريفي الخاص بك (ID)</strong> لتأكيد عملية الخروج.
+          يرجى إدخال <strong className="text-slate-700">الرمز السري للإدارة</strong> لتأكيد خروجك من البوابة السرية.
         </p>
 
         <div className="relative mb-3">
-          <IconIdBadge size={20} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+          <IconLock size={20} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            type="text"
-            value={studentId}
+            type="password"
+            value={password}
             autoFocus
             onChange={(e) => {
-              setStudentId(e.target.value);
+              setPassword(e.target.value);
               if (error) setError(false);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleConfirm();
             }}
-            placeholder="مثال: TKH-A1B2C3D4"
+            placeholder="الرقم السري..."
             className={`h-14 w-full rounded-2xl border-2 bg-slate-50 pr-12 pl-4 text-center font-mono text-lg font-bold text-slate-800 outline-none transition-all focus:bg-white focus:shadow-sm ${
               error ? "border-accent-red" : "border-slate-100 focus:border-indigo-500"
             }`}
@@ -93,7 +80,7 @@ export function LogoutConfirmModal({
         </div>
         {error && (
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-accent-red bg-accent-red/10 rounded-lg py-2 px-3 mb-2 animate-fade-in-up">
-            <IconAlertCircle size={16} /> الرقم التعريفي غير صحيح
+            <IconAlertCircle size={16} /> الرقم السري غير صحيح
           </div>
         )}
 
@@ -101,16 +88,15 @@ export function LogoutConfirmModal({
           <button
             onClick={onClose}
             disabled={loading}
-            className="flex-1 h-12 rounded-2xl border-2 border-slate-100 font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            className="flex-1 h-12 rounded-xl bg-slate-100 text-sm font-bold text-slate-600 hover:bg-slate-200 transition-colors disabled:opacity-50"
           >
             إلغاء
           </button>
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="flex-1 h-12 flex items-center justify-center gap-2 rounded-2xl bg-accent-red font-black text-white hover:bg-accent-red/90 disabled:opacity-60 transition-colors shadow-lg shadow-accent-red/20"
+            className="flex-1 h-12 rounded-xl bg-accent-red text-sm font-bold text-white shadow-lg shadow-accent-red/20 hover:bg-red-600 transition-colors disabled:opacity-50"
           >
-            {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
             {loading ? "جاري الخروج..." : "تأكيد الخروج"}
           </button>
         </div>

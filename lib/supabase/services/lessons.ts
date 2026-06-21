@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createClient, createAdminClient } from "@/lib/supabase/client";
 
 export type DbLesson = {
   id: string;
@@ -27,14 +27,18 @@ export async function fetchLessonsByTracks(trackIds: string[]): Promise<DbLesson
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Error fetching lessons:", error);
+    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      console.warn("Network offline, cannot fetch lessons.");
+    } else {
+      console.warn("Error fetching lessons:", error);
+    }
     return [];
   }
   return data as DbLesson[];
 }
 
 export async function createLesson(lesson: Partial<DbLesson>): Promise<DbLesson | null> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("lessons")
     .insert([{
@@ -60,7 +64,7 @@ export async function createLesson(lesson: Partial<DbLesson>): Promise<DbLesson 
 }
 
 export async function updateLesson(id: string, lesson: Partial<DbLesson>): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("lessons")
     .update({
@@ -85,7 +89,7 @@ export async function updateLesson(id: string, lesson: Partial<DbLesson>): Promi
 }
 
 export async function deleteLesson(id: string): Promise<boolean> {
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { error } = await supabase
     .from("lessons")
     .delete()

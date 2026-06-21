@@ -219,7 +219,7 @@ export default function ExamBuilderPage() {
       {/* Header bar */}
       <div className="flex items-center justify-between bg-card border border-border rounded-2xl p-4 shadow-sm sticky top-4 z-10">
         <div className="flex items-center gap-4">
-          <Link href="/admin/exams" className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg hover:bg-border transition-colors">
+          <Link href="/admin-khaled-ksa-aws-2026-org/exams" className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg hover:bg-border transition-colors">
             <IconArrowRight size={20} className="text-text-muted" />
           </Link>
           <div>

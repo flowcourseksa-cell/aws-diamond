@@ -2,14 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import {
-  IconMenu2,
-  IconSearch,
-  IconMoon,
-  IconSun,
-  IconBell,
-} from "@tabler/icons-react";
+import { IconMenu2, IconSearch, IconMoon, IconSun } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
+import { NotificationsDropdown } from "./notifications-dropdown";
 
 export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const { resolvedTheme, setTheme } = useTheme();
@@ -63,14 +58,7 @@ export function Header({ onMenuClick }: { onMenuClick: () => void }) {
           {isDark ? <IconSun size={18} /> : <IconMoon size={18} />}
         </button>
 
-        <button
-          title="الإشعارات"
-          className="relative flex h-9.5 w-9.5 items-center justify-center rounded-[10px] border border-border bg-card text-text transition-transform duration-200 hover:-translate-y-0.5"
-          aria-label="الإشعارات"
-        >
-          <IconBell size={18} />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-[1.5px] border-card bg-accent-red" />
-        </button>
+        <NotificationsDropdown />
 
         <div className="flex h-9.5 w-9.5 items-center justify-center rounded-[10px] bg-primary text-sm font-bold text-white">
           {profile?.full_name ? profile.full_name.charAt(0) : "؟"}
