@@ -50,6 +50,7 @@ export async function fetchCourses(): Promise<Course[]> {
       discountedPrice: d.discounted_price,
       currency: meta.currency || "ر.س",
       coverGradient: meta.coverGradient || "from-amber-500 to-orange-600",
+      coverImageUrl: meta.coverImageUrl || "",
       examDate: d.exam_date || "",
       trackIds: Array.isArray(meta.trackIds) ? meta.trackIds : [],
       features: Array.isArray(meta.features) ? meta.features : [],
@@ -71,6 +72,7 @@ export async function createCourse(course: Partial<Course>): Promise<Course | nu
     description: course.description,
     currency: course.currency,
     coverGradient: course.coverGradient,
+    coverImageUrl: course.coverImageUrl,
     trackIds: course.trackIds,
     features: course.features,
     tags: course.tags,
@@ -121,6 +123,7 @@ export async function updateCourse(id: string, course: Partial<Course>): Promise
   if (course.description !== undefined) meta.description = course.description;
   if (course.currency !== undefined) meta.currency = course.currency;
   if (course.coverGradient !== undefined) meta.coverGradient = course.coverGradient;
+  if (course.coverImageUrl !== undefined) meta.coverImageUrl = course.coverImageUrl;
   if (course.trackIds !== undefined) meta.trackIds = course.trackIds;
   if (course.features !== undefined) meta.features = course.features;
   if (course.tags !== undefined) meta.tags = course.tags;

@@ -100,6 +100,7 @@ export type Course = {
   discountedPrice: number;   // السعر بعد الخصم (0 = مجاني)
   currency: string;          // "ر.س"
   coverGradient: string;     // "from-indigo-500 to-purple-600"
+  coverImageUrl?: string;    // رابط صورة غلاف حقيقية (اختياري، يسبق التدرج إن وُجد)
   examDate: string;          // "2026-11-01"  تاريخ الاختبار
   trackIds: string[];        // المسارات المضمنة ["qudrat-komi","qudrat-lafzi"]
   features: string[];        // ["200+ درس مصور","3000+ سؤال تدريبي","شرح المهارات الضعيفة"]
