@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { IconLogout2, IconX, IconIdBadge, IconAlertCircle } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/use-auth";
 import { createClient } from "@/lib/supabase/client";
@@ -10,19 +11,25 @@ import { createClient } from "@/lib/supabase/client";
 export function LogoutConfirmModal({
   open,
   onClose,
+  expectedId,
 }: {
   open: boolean;
   onClose: () => void;
+  expectedId: string;
 }) {
-  const { user, profile } = useAuth();
   const [studentId, setStudentId] = useState("");
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  if (!open) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!open || !mounted) return null;
 
   async function handleConfirm() {
-    if (!studentId || !user) {
+    if (!studentId || !expectedId) {
       setError(true);
       return;
     }
@@ -30,9 +37,7 @@ export function LogoutConfirmModal({
     setLoading(true);
     setError(false);
 
-    // Validate ID
-    const correctId = `TKH-${user.id.split('-')[0].toUpperCase()}`;
-    if (studentId.trim().toUpperCase() !== correctId) {
+    if (studentId.trim().toUpperCase() !== expectedId.toUpperCase()) {
       setError(true);
       setLoading(false);
       return;
@@ -45,12 +50,11 @@ export function LogoutConfirmModal({
     // Clear local storage
     localStorage.removeItem("flow-logged-in");
     localStorage.removeItem("flow-user-role");
-    localStorage.removeItem(`flow-profile-${user.id}`);
     
     window.location.href = "/login";
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={(e) => {
@@ -115,6 +119,7 @@ export function LogoutConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

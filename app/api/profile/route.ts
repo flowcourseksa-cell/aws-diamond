@@ -27,9 +27,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Update user metadata as well to keep auth.users in sync
+    await supabaseAdmin.auth.admin.updateUserById(userId, {
+      user_metadata: { full_name: fullName, name: fullName }
+    });
+
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {
     return NextResponse.json({ error: "حدث خطأ في الخادم" }, { status: 500 });
   }
 }
-

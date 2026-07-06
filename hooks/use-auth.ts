@@ -22,40 +22,20 @@ export function useAuth() {
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       const supabase = createClient();
-      
-      // Attempt to load from cache first for instant UI response
-      const cached = localStorage.getItem(`flow-profile-${userId}`);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          setProfile(parsed);
-        } catch (e) {}
-      }
-
-      const result = await Promise.race([
-        supabase.from("profiles").select("*").eq("id", userId).single(),
-        new Promise<{ data: null; error: { message: string } }>((resolve) =>
-          setTimeout(() => resolve({ data: null, error: { message: "timeout" } }), 5000)
-        ),
-      ]);
-      const { data, error } = result as { data: AuthProfile | null; error: { message: string } | null };
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .limit(1)
+        .single();
 
       if (error) {
         console.warn("Profile fetch error (might not exist yet):", error.message);
-        // If there's an error (e.g. timeout or no internet) but we have cache, DO NOT return null.
-        if (cached) return JSON.parse(cached);
         return null;
-      }
-      
-      if (data) {
-        localStorage.setItem(`flow-profile-${userId}`, JSON.stringify(data));
       }
       return data as AuthProfile;
     } catch (err) {
       console.error("fetchProfile error:", err);
-      // Fallback to cache on hard throw
-      const cached = localStorage.getItem(`flow-profile-${userId}`);
-      if (cached) return JSON.parse(cached);
       return null;
     }
   }, []);
@@ -63,6 +43,8 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient();
     let mounted = true;
+    // BUG-31: prevent double initialization when onAuthStateChange fires during init()
+    let initDone = false;
 
     async function init() {
       try {
@@ -85,6 +67,7 @@ export function useAuth() {
       } catch (err) {
         console.error("Auth init error:", err);
       } finally {
+        initDone = true;
         if (mounted) setIsLoading(false);
       }
     }
@@ -92,6 +75,7 @@ export function useAuth() {
     init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("Auth event:", event, session ? "Session exists" : "No session");
       if (!mounted) return;
 
       if (event === "SIGNED_OUT") {
@@ -110,6 +94,9 @@ export function useAuth() {
           setProfile(profileData);
           setIsLoading(false);
         }
+      } else {
+        // If there's an event (like INITIAL_SESSION) but no user, we must ensure loading is false
+        setIsLoading(false);
       }
     });
 
@@ -119,30 +106,15 @@ export function useAuth() {
     };
   }, [fetchProfile]);
 
-  // Sign out ONLY after the user re-confirms their own password.
-  // Returns true on success, false if the password is wrong / fails.
-  const signOut = useCallback(async (password?: string): Promise<boolean> => {
+  const signOut = useCallback(async () => {
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const email = session?.user?.email;
-
-    // Require password confirmation before logging out.
-    if (!password || !email) return false;
-
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return false; // wrong password -> do NOT sign out
-
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     if (typeof window !== "undefined") {
       localStorage.removeItem("flow-logged-in");
       localStorage.removeItem("flow-user-role");
-      if (session?.user?.id) {
-        localStorage.removeItem(`flow-profile-${session.user.id}`);
-      }
     }
-    return true;
   }, []);
 
   return { user, profile, isLoading, signOut };
