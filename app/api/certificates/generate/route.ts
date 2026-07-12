@@ -28,13 +28,13 @@ export async function GET(req: NextRequest) {
   });
 
   try {
-    const chromium = await import("@sparticuz/chromium");
+    const chromium = await import("@sparticuz/chromium-min");
     const puppeteer = await import("puppeteer-core");
 
     // Use system Chrome on Windows (dev), chromium package on production (Vercel)
     const executablePath =
       process.env.NODE_ENV === "production"
-        ? await chromium.default.executablePath()
+        ? await chromium.default.executablePath("https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar")
         : process.platform === "win32"
         ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
         : "/usr/bin/google-chrome";

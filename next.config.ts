@@ -16,9 +16,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  serverExternalPackages: ['@sparticuz/chromium'],
+  serverExternalPackages: ['@sparticuz/chromium-min'],
   experimental: {
-    serverComponentsExternalPackages: ['@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['@sparticuz/chromium-min'],
     serverActions: {
       bodySizeLimit: '10mb',
     },
