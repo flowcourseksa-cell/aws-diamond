@@ -579,8 +579,8 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col-reverse md:flex-row overflow-hidden">
         {/* Left Side: Question (Takes full width if no context) */}
-        <div className={`flex-1 flex flex-col bg-white overflow-y-auto ${currentQuestion.context_text ? 'md:border-r border-slate-200' : ''}`}>
-          <div className="p-10 max-w-3xl mx-auto w-full">
+        <div className={`flex-1 flex flex-col bg-white overflow-y-auto ${currentQuestion.context_text || currentQuestion.audio_url ? 'md:border-r border-slate-200' : ''}`}>
+          <div className="p-6 md:p-10 max-w-3xl mx-auto w-full pb-20 md:pb-10">
             <div className="mb-8">
               <span className="inline-block px-3 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-bold uppercase tracking-wider mb-4 border border-slate-200">
                 Question {currentIndex + 1}
@@ -630,8 +630,8 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
 
         {/* Right Side: Context (Only if available) */}
         {(currentQuestion.context_text || currentQuestion.audio_url) && (
-          <div className="w-full md:w-[45%] h-1/2 md:h-full bg-[#F8FAFC] overflow-y-auto border-b md:border-b-0 md:border-l border-slate-200">
-            <div className="p-10">
+          <div className="w-full md:w-[45%] shrink-0 max-h-[45vh] md:max-h-none md:h-full bg-[#F8FAFC] overflow-y-auto border-b md:border-b-0 md:border-l border-slate-200">
+            <div className="p-6 md:p-10">
               <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-200">
                 <div className="w-8 h-8 rounded-md bg-orange-100 text-orange-600 flex items-center justify-center">
                   <IconFlag size={18} />
