@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ['@sparticuz/chromium'],
   experimental: {
+    serverComponentsExternalPackages: ['@sparticuz/chromium'],
     serverActions: {
       bodySizeLimit: '10mb',
     },
