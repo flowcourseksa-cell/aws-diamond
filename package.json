@@ -47,5 +47,8 @@
     "@types/web-push": "^3.6.4",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
