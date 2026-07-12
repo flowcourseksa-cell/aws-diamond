@@ -1,5 +1,5 @@
 import React from "react";
-import { IconDeviceMobile, IconCoin, IconEye, IconBooks } from "@tabler/icons-react";
+import { IconDeviceMobile, IconGift, IconEye, IconBooks } from "@tabler/icons-react";
 
 export default function FeaturesSection() {
   const features = [
@@ -12,9 +12,9 @@ export default function FeaturesSection() {
       textColor: "text-indigo-600"
     },
     {
-      icon: <IconCoin size={40} stroke={1.5} />,
-      title: "باقات تنافسية",
-      desc: "استثمارك الأفضل للمستقبل، جودة عالمية بأسعار تناسب الجميع.",
+      icon: <IconGift size={40} stroke={1.5} />,
+      title: "منصة مجانية",
+      desc: "محتوى تأسيسي وتجميعات شاملة نقدمها لك بشكل مجاني تماماً لدعم مسيرتك التعليمية.",
       gradient: "from-amber-400 to-orange-500",
       bgLight: "bg-amber-50",
       textColor: "text-amber-600"
@@ -76,4 +76,3 @@ export default function FeaturesSection() {
     </section>
   );
 }
-

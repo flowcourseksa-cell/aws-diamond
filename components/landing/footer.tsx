@@ -8,8 +8,8 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
         <div className="md:col-span-2">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white font-black text-xl">
-              ن
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#f97316] to-[#ea580c] flex items-center justify-center text-white font-black text-xl shadow-md">
+              🎓
             </div>
             <span className="font-black text-2xl text-text">الأوس الماسية</span>
           </div>
@@ -46,10 +46,10 @@ export default function Footer() {
           <ul className="space-y-4 text-text-muted">
             <li className="flex items-center gap-2">
               <IconBrandWhatsapp size={18} className="text-primary" />
-              <span dir="ltr">+966 50 780 6516</span>
+              <span dir="ltr">+966 50 000 0000</span>
             </li>
             <li>الرياض، المملكة العربية السعودية</li>
-            <li>info@flow.com</li>
+            <li>info@nokhba.com</li>
           </ul>
         </div>
       </div>
@@ -64,4 +64,3 @@ export default function Footer() {
     </footer>
   );
 }
-

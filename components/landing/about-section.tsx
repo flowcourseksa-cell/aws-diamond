@@ -8,7 +8,7 @@ export default function AboutSection() {
       <div className="absolute top-1/2 left-0 w-64 h-64 bg-indigo-100 rounded-full blur-[100px] pointer-events-none"></div>
       <div className="absolute top-0 right-0 w-64 h-64 bg-amber-100 rounded-full blur-[100px] pointer-events-none"></div>
 
-      <div className="max-w-5xl mx-auto w-full relative z-10">
+      <div className="max-w-4xl mx-auto w-full relative z-10">
         
         {/* Title */}
         <div className="flex items-center justify-center gap-6 mb-20 fade-up">
@@ -30,15 +30,15 @@ export default function AboutSection() {
             <IconQuote size={180} />
           </div>
 
-          <div className="relative z-10 bg-white rounded-[3rem] p-12 md:p-16 border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
-            <p className="text-2xl md:text-3xl text-slate-600 leading-[2.2] text-center font-bold">
+          <div className="relative z-10 bg-white rounded-[2.5rem] p-8 md:p-12 border border-slate-100 shadow-[0_20px_60px_rgba(0,0,0,0.06)]">
+            <p className="text-xl md:text-2xl text-slate-600 leading-[2] md:leading-[2.2] text-center font-bold">
               منصة تعليمية تقدم لك رحلة مختلفة في اختبار التحصيلي والقدرات بتوفير ملفات إلكترونية تشمل تأسيساً متكاملاً من الصفر، وتجميعات شاملة، واختبارات محاكية، وشروحات على جميع الملفات، وجداول وخطط متنوعة.
               <br/><br/>
               <span className="text-indigo-600">حرصنا في جميع ملفاتنا</span> على توفير الشمولية والجمالية والمتعة التعليمية. يمكنك الاعتماد بشكل كامل على ملفات الأوس الماسية كونها كتبت ودققت وصممت من قبل فريق من الخبراء، لتغنيك عن أي مصدر آخر ولتوصلك بإذن الله في نهاية هذه الرحلة إلى <span className="bg-amber-400 text-white px-3 py-1 rounded-xl mx-1 shadow-sm">المئوية (100%)</span>.
             </p>
 
             {/* Stars Decoration */}
-            <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black text-2xl px-8 py-3 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(79,70,229,0.3)] border-2 border-white">
+            <div className="absolute -bottom-5 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black text-xl px-8 py-2.5 rounded-2xl flex items-center gap-2 shadow-[0_10px_20px_rgba(79,70,229,0.3)] border-2 border-white">
               <span className="text-amber-400">★</span>
               <span className="text-amber-400">★</span>
               <span className="text-amber-400">★</span>

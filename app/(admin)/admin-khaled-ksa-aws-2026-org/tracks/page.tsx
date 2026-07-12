@@ -35,6 +35,7 @@ import {
   type DbSection,
   type DbMicroSkill,
 } from "@/lib/supabase/services/hierarchy";
+import { fetchLessonsByTracks, type DbLesson } from "@/lib/supabase/services/lessons";
 
 // ─── types ───────────────────────────────────────────────────────────────────
 
@@ -218,6 +219,7 @@ function SkillRow({
 function SectionCard({
   section,
   trackId,
+  sectionLessons,
   onUpdateSection,
   onDeleteSection,
   onAddSkill,
@@ -227,9 +229,10 @@ function SectionCard({
 }: {
   section: DbSection;
   trackId: string;
+  sectionLessons: DbLesson[];
   onUpdateSection: (name: string) => void;
   onDeleteSection: () => void;
-  onAddSkill: (name: string) => void;
+  onAddSkill: (name: string, lessonId: string) => void;
   onEditSkill: (skillId: string, name: string) => void;
   onDeleteSkill: (skillId: string) => void;
   onRequestConfirm: (opts: Omit<ConfirmDialogState, "open">) => void;
@@ -238,6 +241,7 @@ function SectionCard({
   const [nameDraft, setNameDraft] = useState(section.name);
   const [addingSkill, setAddingSkill] = useState(false);
   const [newSkillName, setNewSkillName] = useState("");
+  const [selectedLessonId, setSelectedLessonId] = useState("");
   const accent = getAccent(trackId);
 
   const skills = section.micro_skills || [];
@@ -321,21 +325,55 @@ function SectionCard({
         )}
 
         {addingSkill ? (
-          <div className="mt-1">
-            <InlineInput
-              value={newSkillName}
-              onChange={setNewSkillName}
-              onConfirm={() => {
-                if (newSkillName.trim()) {
-                  onAddSkill(newSkillName.trim());
-                  setNewSkillName("");
-                  setAddingSkill(false);
-                }
-              }}
-              onCancel={() => { setNewSkillName(""); setAddingSkill(false); }}
-              placeholder="اسم المهارة الجديدة..."
-            />
-          </div>
+          sectionLessons.length === 0 ? (
+            <div className="mt-1 flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-red-500/30 bg-red-500/5 py-4 text-red-500">
+              <IconAlertTriangle size={20} />
+              <span className="text-[13px] font-bold">لا يمكن إضافة مهارة!</span>
+              <span className="text-[12px] text-center px-4">يجب إضافة درس واحد على الأقل لهذا القسم قبل التمكن من إضافة مهارات مرتبطة به.</span>
+              <button onClick={() => setAddingSkill(false)} className="mt-2 text-[12px] underline">إلغاء</button>
+            </div>
+          ) : (
+            <div className="mt-1 flex flex-col gap-2 rounded-xl border border-indigo-500/30 p-3 bg-indigo-500/5">
+              <input
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                placeholder="اسم المهارة الجديدة..."
+                className="h-9 w-full rounded-lg border border-indigo-500/30 bg-bg px-3 text-[13px] text-text outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
+              />
+              <select
+                value={selectedLessonId}
+                onChange={(e) => setSelectedLessonId(e.target.value)}
+                className="h-9 w-full rounded-lg border border-indigo-500/30 bg-bg px-3 text-[13px] text-text outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
+              >
+                <option value="">اختر الدرس المرتبط (إجباري)</option>
+                {sectionLessons.map(l => (
+                  <option key={l.id} value={l.id}>{l.title}</option>
+                ))}
+              </select>
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  onClick={() => {
+                    if (newSkillName.trim() && selectedLessonId) {
+                      onAddSkill(newSkillName.trim(), selectedLessonId);
+                      setNewSkillName("");
+                      setSelectedLessonId("");
+                      setAddingSkill(false);
+                    }
+                  }}
+                  disabled={!newSkillName.trim() || !selectedLessonId}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-indigo-500 py-2 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  <IconCheck size={16} /> حفظ
+                </button>
+                <button
+                  onClick={() => { setNewSkillName(""); setSelectedLessonId(""); setAddingSkill(false); }}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-card py-2 text-[13px] font-bold text-text-muted transition-colors hover:text-text"
+                >
+                  <IconX size={16} /> إلغاء
+                </button>
+              </div>
+            </div>
+          )
         ) : (
           <button
             onClick={() => setAddingSkill(true)}
@@ -359,6 +397,7 @@ export default function TracksPage() {
   
   const [tracks, setTracks] = useState<DbTrack[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<string>("");
+  const [lessons, setLessons] = useState<DbLesson[]>([]);
   
   const [isLoading, setIsLoading] = useState(false);
 
@@ -379,14 +418,17 @@ export default function TracksPage() {
         setTracks(data);
         if (data.length > 0) {
           setActiveTrackId(data[0].id);
+          fetchLessonsByTracks(data.map(t => t.id)).then(setLessons);
         } else {
           setActiveTrackId("");
+          setLessons([]);
         }
         setIsLoading(false);
       });
     } else {
       setTracks([]);
       setActiveTrackId("");
+      setLessons([]);
     }
   }, [activeCourseId]);
 
@@ -471,8 +513,9 @@ export default function TracksPage() {
     }
   }
 
-  async function handleAddSkill(sectionId: string, name: string) {
-    const newSkill = await createSkill(sectionId, name);
+  async function handleAddSkill(sectionId: string, name: string, lessonId: string) {
+    if (!activeTrackId) return;
+    const newSkill = await createSkill(sectionId, name, lessonId);
     if (newSkill) {
       setTracks((prev) =>
         prev.map((t) =>
@@ -758,9 +801,10 @@ export default function TracksPage() {
                           key={section.id}
                           section={section}
                           trackId={activeTrackId}
+                          sectionLessons={lessons.filter(l => l.section_id === section.id)}
                           onUpdateSection={(name) => handleUpdateSection(section.id, name)}
                           onDeleteSection={() => handleDeleteSection(section.id)}
-                          onAddSkill={(name) => handleAddSkill(section.id, name)}
+                          onAddSkill={(name, lessonId) => handleAddSkill(section.id, name, lessonId)}
                           onEditSkill={(skillId, name) => handleEditSkill(section.id, skillId, name)}
                           onDeleteSkill={(skillId) => handleDeleteSkill(section.id, skillId)}
                           onRequestConfirm={(opts) => setConfirm({ ...opts, open: true })}

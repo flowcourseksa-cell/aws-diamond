@@ -8,7 +8,7 @@ import {
   IconBrush, IconAlertTriangle,
 } from "@tabler/icons-react";
 import { usePlatformStore, type Course } from "@/lib/store";
-import { fetchCourses, createCourse, updateCourse, deleteCourse } from "@/lib/supabase/services/courses";
+import { fetchCourses, createCourse, updateCourse, deleteCourse, uploadCourseCover } from "@/lib/supabase/services/courses";
 
 const GRADIENT_OPTIONS = [
   { label: "بنفسجي أزرق", value: "from-indigo-500 to-purple-600" },
@@ -43,6 +43,8 @@ const EMPTY_COURSE = (): Omit<Course, "id" | "createdAt"> => ({
   studentsCount: 0,
   isActive: true,
   isFeatured: false,
+  requireWhatsappActivation: true,
+  isSimulator: false,
 });
 
 export default function AdminCoursesPage() {
@@ -52,12 +54,13 @@ export default function AdminCoursesPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_COURSE());
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
     fetchCourses().then(data => {
       // Avoid overwriting the free simulator if it's there, or just overwrite with DB data.
-      setCourses(data);
+      setCourses(data.filter(c => !c.isSimulator));
     });
   }, []);
 
@@ -78,6 +81,28 @@ export default function AdminCoursesPage() {
     setForm({ ...c });
     setEditId(c.id);
     setShowForm(true);
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const url = await uploadCourseCover(formData);
+      if (url) {
+        setForm(f => ({ ...f, coverImageUrl: url }));
+      } else {
+        alert("فشل رفع الصورة");
+      }
+    } catch (err) {
+      alert("حدث خطأ أثناء الرفع");
+    } finally {
+      setIsUploading(false);
+    }
   }
 
   async function handleSave() {
@@ -142,14 +167,7 @@ export default function AdminCoursesPage() {
   function addTag() { setForm(f => ({ ...f, tags: [...f.tags, ""] })); }
   function removeTag(i: number) { setForm(f => ({ ...f, tags: f.tags.filter((_, idx) => idx !== i) })); }
 
-  function toggleTrack(id: string) {
-    setForm(f => ({
-      ...f,
-      trackIds: f.trackIds.includes(id)
-        ? f.trackIds.filter(t => t !== id)
-        : [...f.trackIds, id],
-    }));
-  }
+  // Removed toggleTrack since we no longer use Tracks selection
 
   // ── Render ────────────────────────────────────────────────────────
   return (
@@ -350,71 +368,24 @@ export default function AdminCoursesPage() {
                 </div>
               </div>
 
-              {/* Cover Image URL */}
+              {/* Cover Image Upload */}
               <div>
-                <label className="block text-xs font-bold text-text-muted mb-1.5 flex items-center gap-1"><IconBrush size={13} /> رابط صورة الغلاف (اختياري)</label>
+                <label className="block text-xs font-bold text-text-muted mb-1.5 flex items-center gap-1"><IconBrush size={13} /> صورة الغلاف</label>
                 <input
-                  value={form.coverImageUrl || ""}
-                  onChange={e => setForm(f => ({ ...f, coverImageUrl: e.target.value }))}
-                  placeholder="https://.../cover.jpg"
-                  dir="ltr"
-                  className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleCoverUpload}
+                  disabled={isUploading}
+                  className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm focus:border-primary focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
                 />
-                <p className="mt-1 text-[11px] text-text-muted">إن تركته فارغاً سيُستخدم تدرج اللون بالأسفل.</p>
-              </div>
-
-              {/* Cover Gradient (fallback) */}
-              <div>
-                <label className="block text-xs font-bold text-text-muted mb-2 flex items-center gap-1"><IconBrush size={13} /> لون الغلاف (بديل عند غياب الصورة)</label>
-                <div className="flex flex-wrap gap-2">
-                  {GRADIENT_OPTIONS.map(g => (
-                    <button
-                      key={g.value}
-                      onClick={() => setForm(f => ({ ...f, coverGradient: g.value }))}
-                      className={`h-9 w-16 rounded-lg bg-gradient-to-br ${g.value} ring-2 transition-all ${form.coverGradient === g.value ? "ring-accent-amber scale-110" : "ring-transparent"}`}
-                      title={g.label}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              {/* Tracks */}
-              <div>
-                <label className="block text-xs font-bold text-text-muted mb-2">المسارات المضمنة في الدورة</label>
-                <div className="flex flex-wrap gap-2">
-                  {TRACK_OPTIONS.map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => toggleTrack(t.id)}
-                      className={`rounded-xl px-3 py-2 text-xs font-bold border transition-colors ${form.trackIds.includes(t.id) ? "bg-primary text-white border-primary" : "border-border text-text-muted hover:border-primary"}`}
-                    >
-                      {form.trackIds.includes(t.id) ? <IconCheck size={12} className="inline ml-1" /> : null}
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
+                {isUploading && <p className="mt-2 text-xs text-accent-amber font-bold animate-pulse">جاري رفع الصورة...</p>}
+                {form.coverImageUrl && !isUploading && <p className="mt-2 text-xs text-green-500 font-bold">تم إرفاق الصورة بنجاح</p>}
               </div>
 
               {/* Extra Info */}
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-text-muted mb-1">اسم المدرب</label>
-                  <input value={form.instructorName}
-                    onChange={e => setForm(f => ({ ...f, instructorName: e.target.value }))}
-                    placeholder="فريق الأوس الماسية"
-                    className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-text-muted mb-1">مجموع الساعات</label>
-                  <input value={form.totalHours}
-                    onChange={e => setForm(f => ({ ...f, totalHours: e.target.value }))}
-                    placeholder="80 ساعة"
-                    className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-text-muted mb-1">عدد الطلاب</label>
+                  <label className="block text-xs font-bold text-text-muted mb-1">عدد الطلاب (وهمي للعرض)</label>
                   <input type="number" min={0} value={form.studentsCount}
                     onChange={e => setForm(f => ({ ...f, studentsCount: +e.target.value }))}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none"
@@ -429,49 +400,6 @@ export default function AdminCoursesPage() {
                 </div>
               </div>
 
-              {/* Features */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-text-muted">مزايا الدورة (كل سطر ميزة)</label>
-                  <button onClick={addFeature} className="text-xs font-bold text-primary hover:underline flex items-center gap-1"><IconPlus size={12} /> إضافة</button>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {form.features.map((feat, i) => (
-                    <div key={i} className="flex gap-2">
-                      <input value={feat}
-                        onChange={e => updateFeature(i, e.target.value)}
-                        placeholder={`ميزة ${i + 1}...`}
-                        className="flex-1 rounded-xl border border-border bg-bg px-3 py-2 text-sm focus:border-primary focus:outline-none"
-                      />
-                      <button onClick={() => removeFeature(i)} className="rounded-lg p-2 text-text-muted hover:text-red-500 hover:bg-red-50">
-                        <IconX size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-bold text-text-muted">التاجات (للبحث والتصنيف)</label>
-                  <button onClick={addTag} className="text-xs font-bold text-primary hover:underline flex items-center gap-1"><IconPlus size={12} /> إضافة</button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {form.tags.map((tag, i) => (
-                    <div key={i} className="flex items-center gap-1 rounded-full border border-border bg-bg px-3 py-1">
-                      <input value={tag}
-                        onChange={e => updateTag(i, e.target.value)}
-                        placeholder="تاج..."
-                        className="w-20 bg-transparent text-xs font-semibold focus:outline-none"
-                      />
-                      <button onClick={() => removeTag(i)} className="text-text-muted hover:text-red-500">
-                        <IconX size={11} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
               {/* Toggles */}
               <div className="flex gap-4">
@@ -492,6 +420,15 @@ export default function AdminCoursesPage() {
                     <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${form.isFeatured ? "right-0.5" : "left-0.5"}`} />
                   </div>
                   <span className="text-sm font-bold">تمييزها في الأعلى</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <div
+                    onClick={() => setForm(f => ({ ...f, requireWhatsappActivation: !f.requireWhatsappActivation }))}
+                    className={`w-11 h-6 rounded-full transition-colors ${form.requireWhatsappActivation ? "bg-accent-blue" : "bg-border"} relative`}
+                  >
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${form.requireWhatsappActivation ? "right-0.5" : "left-0.5"}`} />
+                  </div>
+                  <span className="text-sm font-bold">يتطلب تفعيل واتساب</span>
                 </label>
               </div>
             </div>

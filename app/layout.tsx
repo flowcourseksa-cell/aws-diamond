@@ -1,12 +1,28 @@
 import type { Metadata } from "next";
+import { Cairo, Tajawal } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { OfflineWarning } from "@/components/ui/offline-warning";
 
+const cairo = Cairo({ 
+  subsets: ["arabic", "latin"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  variable: "--font-cairo",
+  display: "swap"
+});
+
+const tajawal = Tajawal({ 
+  subsets: ["arabic", "latin"],
+  weight: ["200", "300", "400", "500", "700", "800", "900"],
+  variable: "--font-tajawal",
+  display: "swap"
+});
+
 export const metadata: Metadata = {
   title: "الأوس الماسية — منصة تعليمية",
   description: "منصة الأوس الماسية التعليمية للطلاب المقبلين على اختبار القدرات والتحصيلي",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -15,16 +31,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className={`${cairo.variable} ${tajawal.variable}`}>
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&family=Tajawal:wght@400;500;700;800;900&display=swap"
-          rel="stylesheet"
-        />
       </head>
-      <body className="antialiased">
+      <body className="antialiased font-sans bg-bg text-text">
         <OfflineWarning />
         <ThemeProvider>
           <ToastProvider>{children}</ToastProvider>

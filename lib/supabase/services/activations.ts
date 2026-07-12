@@ -10,10 +10,10 @@ export async function fetchPendingActivations() {
   const { data, error } = await supabase
     .from("enrollments")
     .select(`
-      id, enrolled_at,
+      id, enrolled_at, payment_status, discount_code, final_price,
       student_id, course_id,
       profiles ( full_name ),
-      courses ( title )
+      courses ( title, price )
     `)
     .eq("is_active", false);
 
@@ -29,6 +29,10 @@ export async function fetchPendingActivations() {
     student_name: e.profiles?.full_name || "طالب غير معروف",
     student_code: `TKH-${e.student_id.split('-')[0].toUpperCase()}`,
     course_title: e.courses?.title || "دورة محذوفة",
+    course_price: e.courses?.price || 0,
+    payment_status: e.payment_status || 'free',
+    discount_code: e.discount_code,
+    final_price: e.final_price,
     created_at: e.enrolled_at,
   }));
 }
@@ -46,21 +50,51 @@ export async function fetchPendingCount() {
   return count || 0;
 }
 
-export async function requestCourseActivation(studentId: string, courseId: string, studentName: string, courseTitle: string) {
+export async function requestCourseActivation(
+  studentId: string, 
+  courseId: string, 
+  studentName: string, 
+  courseTitle: string,
+  isPaid: boolean = false,
+  finalPrice?: number,
+  discountCode?: string,
+  activateImmediately: boolean = false
+) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);
 
-  // Insert pending enrollment
+  // 1. Ensure profile exists (to prevent foreign key constraint violations)
+  const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', studentId).single();
+  if (!existingProfile) {
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: studentId,
+      full_name: studentName || 'طالب جديد',
+      role: 'student'
+    });
+    if (profileError) {
+      console.error("Failed to create missing profile:", profileError);
+    }
+  }
+
+  // Insert pending (or active) enrollment
   const { error: insertError } = await supabase.from('enrollments').insert({
     student_id: studentId,
     course_id: courseId,
-    is_active: false
+    is_active: activateImmediately, // ✅ Activates immediately if requested
+    payment_status: isPaid ? 'pending' : 'free',
+    final_price: finalPrice,
+    discount_code: discountCode
   });
 
   if (insertError) {
     console.error("Enrollment failed:", insertError);
     return { success: false, error: insertError.message };
+  }
+
+  if (activateImmediately) {
+    // No need to notify admins if activated immediately (or we can optionally notify them, but let's skip)
+    return { success: true };
   }
 
   // Notify admins

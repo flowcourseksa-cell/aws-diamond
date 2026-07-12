@@ -59,6 +59,7 @@ export default function AdminPricingPage() {
   const [newDiscount, setNewDiscount] = useState(10);
   const [newMaxUses, setNewMaxUses] = useState(100);
   const [newExpiry, setNewExpiry] = useState("");
+  const [newIsPublic, setNewIsPublic] = useState(false);
 
   // Content items (paid only)
   const items = [
@@ -88,11 +89,12 @@ export default function AdminPricingPage() {
       discountPercent: newDiscount,
       maxUses: newMaxUses,
       expiryDate: newExpiry || null,
+      isPublic: newIsPublic,
     });
     if (created) {
       setCodes(prev => [created, ...prev]);
       setShowAddCode(false);
-      setNewCode(""); setNewDiscount(10); setNewMaxUses(100); setNewExpiry("");
+      setNewCode(""); setNewDiscount(10); setNewMaxUses(100); setNewExpiry(""); setNewIsPublic(false);
     } else {
       alert("تعذّر إضافة الكود. ربما الكود مكرّر أو لا تملك صلاحية الأدمن.");
     }
@@ -216,6 +218,12 @@ export default function AdminPricingPage() {
                     <input type="date" value={newExpiry} onChange={e => setNewExpiry(e.target.value)}
                       className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm font-bold outline-none focus:border-primary" />
                   </div>
+                  <div className="col-span-2 flex items-center gap-2 mt-2 bg-primary/5 p-3 rounded-xl border border-primary/20">
+                    <input type="checkbox" id="isPublic" checked={newIsPublic} onChange={e => setNewIsPublic(e.target.checked)} className="w-4 h-4 accent-primary" />
+                    <label htmlFor="isPublic" className="text-sm font-black text-text cursor-pointer select-none">
+                      كود عام (Public) - سيظهر كـ (كارت عائم) للطلاب في نافذة الدفع لزيادة المبيعات
+                    </label>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-2">
                   <button onClick={() => setShowAddCode(false)} className="px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text">إلغاء</button>
@@ -243,7 +251,10 @@ export default function AdminPricingPage() {
                     const isExhausted = c.maxUses > 0 && c.uses >= c.maxUses;
                     return (
                       <tr key={c.id} className="border-b border-border last:border-none hover:bg-bg/40">
-                        <td className="px-4 py-3 font-black text-text"><span className="bg-bg border border-border px-2 py-1 rounded text-primary">{c.code}</span></td>
+                        <td className="px-4 py-3 font-black text-text">
+                          <span className="bg-bg border border-border px-2 py-1 rounded text-primary">{c.code}</span>
+                          {c.isPublic && <span className="mr-2 text-[10px] bg-accent-amber/20 text-accent-amber font-black px-1.5 py-0.5 rounded">عام</span>}
+                        </td>
                         <td className="px-4 py-3 font-black text-accent-teal">{c.discountPercent}%</td>
                         <td className="px-4 py-3 font-semibold text-text-muted">
                           {c.uses} / {c.maxUses > 0 ? c.maxUses : "∞"}

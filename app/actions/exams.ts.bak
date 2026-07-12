@@ -1,0 +1,191 @@
+"use server";
+
+import { createClient } from "@supabase/supabase-js";
+
+export async function submitSecureExamAttempt(
+  userId: string,
+  examId: string,
+  rawAnswers: { question_id: string; selected_option_id: string | null; micro_skill_id: string }[]
+) {
+  // Use Admin Client to bypass RLS for fetching correct answers and inserting securely
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    const questionIds = rawAnswers.map(a => a.question_id);
+    
+    if (questionIds.length === 0) return false;
+
+    const { data: dbOptions, error: dbError } = await supabaseAdmin
+      .from("question_options")
+      .select("id, question_id, is_correct")
+      .in("question_id", questionIds)
+      .eq("is_correct", true);
+
+    if (dbError) throw dbError;
+
+    // Create a map of question_id -> correct_option_id
+    const correctMap = new Map<string, string>();
+    dbOptions?.forEach(opt => {
+      correctMap.set(opt.question_id, opt.id);
+    });
+
+    // 2. Evaluate answers securely on the server
+    const evaluatedAnswers = rawAnswers.map(ans => {
+      const correctOptionId = correctMap.get(ans.question_id);
+      const isCorrect = ans.selected_option_id !== null && ans.selected_option_id === correctOptionId;
+      return {
+        ...ans,
+        is_correct: isCorrect
+      };
+    });
+
+    const total = evaluatedAnswers.length;
+    const correct = evaluatedAnswers.filter((a) => a.is_correct).length;
+    const scorePct = total > 0 ? (correct / total) * 100 : 0;
+
+    // 3. Fetch attempts count to determine if this is an official attempt
+    const { count } = await supabaseAdmin
+      .from("exam_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("student_id", userId)
+      .eq("exam_id", examId);
+
+    // Fetch granted attempts
+    const { count: grantedCount } = await supabaseAdmin
+      .from("granted_exam_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("student_id", userId)
+      .eq("exam_id", examId);
+
+    const isOfficialAttempt = (count || 0) < (5 + (grantedCount || 0));
+
+    // 4. Insert attempt
+    const { data: attempt, error: attemptError } = await supabaseAdmin
+      .from("exam_attempts")
+      .insert([{
+        student_id: userId,
+        exam_id: examId,
+        score_pct: scorePct,
+        submitted_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (attemptError || !attempt) throw attemptError;
+
+    // 5. Insert answers
+    const answersData = evaluatedAnswers.map((ans) => ({
+      attempt_id: attempt.id,
+      question_id: ans.question_id,
+      selected_option_id: ans.selected_option_id,
+      is_correct: ans.is_correct,
+      micro_skill_id: ans.micro_skill_id
+    }));
+
+    const { error: answersError } = await supabaseAdmin
+      .from("attempt_answers")
+      .insert(answersData);
+
+    if (answersError) throw answersError;
+
+    // 6. Call RPC to update skill progress ONLY if this is within the first 5 attempts
+    if (isOfficialAttempt) {
+      const { error: rpcError } = await supabaseAdmin.rpc("calculate_skill_gap", {
+        p_student_id: userId,
+        p_attempt_id: attempt.id
+      });
+      if (rpcError) console.error("Error calculating skill gap via RPC:", rpcError);
+    }
+          }
+          const s = skillStats.get(ans.micro_skill_id)!;
+          s.total += 1;
+          if (ans.is_correct) s.correct += 1;
+        });
+      }
+    }
+      } catch (autoErr) {
+        console.error("Auto-remediation failed:", autoErr);
+        // Do not throw, since the exam was still successfully submitted
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Server Action submitSecureExamAttempt failed:", error);
+    return false;
+  }
+}
+
+export async function submitSkillChallenge(
+  userId: string,
+  skillId: string,
+  examId: string,
+  passed: boolean
+) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    if (passed) {export async function submitSkillChallenge(
+  userId: string,
+  passedSkillIds: string[],
+  examId: string,
+  shouldUnlockExam: boolean
+) {
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    if (passedSkillIds.length > 0) {
+      for (const skillId of passedSkillIds) {
+        // 1. Force mastery to 100% by setting correct_answers = total_questions_seen
+        const { data: existing } = await supabaseAdmin
+          .from("skill_progress")
+          .select("total_questions_seen")
+          .eq("student_id", userId)
+          .eq("micro_skill_id", skillId)
+          .single();
+
+        if (existing) {
+          await supabaseAdmin.from("skill_progress").update({
+            correct_answers: existing.total_questions_seen,
+            mastery_score: 100,
+            last_updated: new Date().toISOString()
+          }).eq("student_id", userId).eq("micro_skill_id", skillId);
+        } else {
+          await supabaseAdmin.from("skill_progress").insert({
+            student_id: userId,
+            micro_skill_id: skillId,
+            total_questions_seen: 3,
+            correct_answers: 3,
+            mastery_score: 100,
+            last_updated: new Date().toISOString()
+          });
+        }
+      }
+
+      // 2. Grant an extra attempt for the exam if all weak skills are mastered
+      // BUG-20: use upsert to prevent duplicate rows on double-submit
+      if (examId && shouldUnlockExam) {
+        await supabaseAdmin.from("granted_exam_attempts").upsert({
+          student_id: userId,
+          exam_id: examId,
+          granted_at: new Date().toISOString()
+        }, { onConflict: 'student_id,exam_id', ignoreDuplicates: false });
+      }
+
+      return { success: true };
+    }
+    return { success: false };
+  } catch (err) {
+    console.error("submitSkillChallenge error:", err);
+    return { success: false };
+  }
+}

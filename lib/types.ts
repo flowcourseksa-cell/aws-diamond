@@ -1,5 +1,5 @@
 // ============================================
-// أنواع البيانات المشتركة — منصة النخبة
+// أنواع البيانات المشتركة — منصة الأوس الماسية
 // ملاحظة: هذه الأنواع تطابق مخطط قاعدة بيانات Supabase
 // المقترح في ملف مواصفات المشروع (نسخة Multi-tenant)،
 // لتسهيل الربط لاحقاً. حقل centerId موجود تمهيداً لذلك
@@ -70,7 +70,6 @@ export type ExamQuestion = {
   id: string;
   questionText: string;
   options: string[];
-  correctIndex: number;
   explanation: string;
 };
 

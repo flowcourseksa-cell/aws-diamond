@@ -212,10 +212,9 @@ begin
     )
     on conflict (student_id, micro_skill_id) 
     do update set 
-      total_questions_seen = public.skill_progress.total_questions_seen + excluded.total_questions_seen,
-      correct_answers = public.skill_progress.correct_answers + excluded.correct_answers,
-      mastery_score = ((public.skill_progress.correct_answers + excluded.correct_answers)::numeric / 
-                      (public.skill_progress.total_questions_seen + excluded.total_questions_seen)::numeric) * 100,
+      total_questions_seen = skill_progress.total_questions_seen + excluded.total_questions_seen,
+      correct_answers = skill_progress.correct_answers + excluded.correct_answers,
+      mastery_score = GREATEST(skill_progress.mastery_score, (excluded.correct_answers::numeric / excluded.total_questions_seen::numeric) * 100),
       last_updated = now();
   end loop;
 end;

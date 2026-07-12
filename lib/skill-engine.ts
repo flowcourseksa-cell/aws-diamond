@@ -1,11 +1,14 @@
 // @ts-nocheck
-// NOTE: Supabase table types will resolve once schema.sql is applied.
 // ============================================================
-// محرك تتبع المهارات — منصة الأوس الماسية
+// محرك تتبع المهارات — الأوس الماسية
 // Skill Tracking Engine
 // ============================================================
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// NOTE: Supabase table types will resolve once schema.sql is applied.
+// Until then, we cast to `any` to avoid build failures.
 import { supabase } from "@/lib/supabase";
 import type { ExamResult, SkillStatus, StudentSkillScore } from "@/lib/database.types";
+
 
 
 // ── Constants ────────────────────────────────────────────────
@@ -225,7 +228,7 @@ function buildWhatsAppMessage({
   const weakList   = weakSkills.length   > 0 ? weakSkills.join("، ")   : "لا يوجد";
   const strongList = strongSkills.length > 0 ? strongSkills.join("، ") : "لا يوجد";
 
-  return `📊 تقرير منصة الأوس الماسية التعليمية
+  return `📊 تقرير الأوس الماسية التعليمية
 
 ${emoji} أنهى ابنكم/ابنتكم اختبار *${examTitle}*
 
@@ -243,7 +246,7 @@ ${strongList}
 لمتابعة التقدم الكامل وخطة الدراسة المخصصة:
 👉 flow-platform.com/dashboard
 
-منصة الأوس الماسية التعليمية 💙`;
+الأوس الماسية التعليمية 💙`;
 }
 
 /**
@@ -279,4 +282,3 @@ export const SKILL_STATUS_META: Record<SkillStatus, { label: string; color: stri
   average:     { label: "متوسط",    color: "text-amber-600",   bg: "bg-amber-50",    icon: "🟡" },
   strong:      { label: "ممتاز",    color: "text-emerald-600", bg: "bg-emerald-50",  icon: "🟢" },
 };
-

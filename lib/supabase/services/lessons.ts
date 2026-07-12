@@ -15,6 +15,8 @@ export type DbLesson = {
   access_type: "free" | "paid";
   price: number | null;
   status: "new" | "normal" | "completed" | null;
+  cover_image?: string | null;
+  comments_enabled?: boolean;
   created_at: string;
 };
 
@@ -32,6 +34,7 @@ export async function fetchLessonsByTracks(trackIds: string[]): Promise<DbLesson
   if (error) {
     if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       console.warn("Network offline, cannot fetch lessons.");
+      throw new Error("offline");
     } else {
       console.warn("Error fetching lessons:", error);
     }

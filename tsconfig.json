@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2017",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -19,7 +23,12 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ],
+      "canvas": [
+        "./empty-module.js"
+      ]
     }
   },
   "include": [
@@ -30,5 +39,17 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "test_notifs.ts",
+    "test_policies.ts",
+    "test_tables.ts",
+    "test_tables2.ts",
+    "restore_checkpoint.py",
+    "fix_duplicates.py",
+    "check_enroll.ts",
+    "check_fake.ts",
+    "fix_all.py",
+    "fix_final.py"
+  ]
 }

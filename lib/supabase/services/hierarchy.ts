@@ -43,29 +43,6 @@ export type DbTrack = {
 
 // Fetch the entire tree for a given course
 export async function fetchHierarchyByCourse(courseId: string): Promise<DbTrack[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("tracks")
-    .select(`
-      *,
-      sections (
-        *,
-        micro_skills (*)
-      )
-    `)
-    .eq("course_id", courseId)
-    .order("order_index", { ascending: true })
-    .order("order_index", { ascending: true, foreignTable: "sections" })
-    .order("created_at", { ascending: true, foreignTable: "sections.micro_skills" });
-
-  if (error) {
-    if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
-      console.warn("Network offline, cannot fetch hierarchy.");
-    } else {
-      console.warn("Error fetching hierarchy:", error);
-    }
-    return [];
-  }
-
-  return data as unknown as DbTrack[];
+  const { fetchHierarchyByCourseServer } = await import("./hierarchy-actions");
+  return fetchHierarchyByCourseServer(courseId);
 }

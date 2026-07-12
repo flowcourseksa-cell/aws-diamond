@@ -1,5 +1,5 @@
 // ============================================================
-// Supabase Client — منصة الأوس الماسية
+// Supabase Client — الأوس الماسية
 // ============================================================
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
@@ -23,4 +23,3 @@ export function createServerClient() {
     { auth: { persistSession: false } }
   );
 }
-

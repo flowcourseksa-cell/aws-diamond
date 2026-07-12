@@ -45,22 +45,24 @@ export async function fetchAdminStats(): Promise<AdminStats> {
     progressRes,
   ] = await Promise.all([
     supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "student"),
-    supabase.from("enrollments").select("student_id"),
+    supabase.from("enrollments").select("student_id, profiles!inner(role)").eq("profiles.role", "student"),
     supabase.from("courses").select("id, is_active"),
     supabase.from("exams").select("id, access_type"),
     supabase.from("lessons").select("id, status"),
     supabase.from("micro_skills").select("id", { count: "exact", head: true }),
     supabase
       .from("exam_attempts")
-      .select("submitted_at")
+      .select("submitted_at, profiles!inner(role)")
       .not("submitted_at", "is", null)
-      .gte("submitted_at", startOfWeek.toISOString()),
+      .gte("submitted_at", startOfWeek.toISOString())
+      .eq("profiles.role", "student"),
     supabase
       .from("skill_progress")
-      .select("micro_skill_id, mastery_score, micro_skills(name, sections(tracks(name, color)))")
+      .select("micro_skill_id, mastery_score, micro_skills(name, sections(tracks(name, color))), profiles!inner(role)")
       .lt("mastery_score", 50)
+      .eq("profiles.role", "student")
       .order("mastery_score", { ascending: true })
-      .limit(5),
+      .limit(100),
   ]);
 
   const courses = coursesRes.data || [];
@@ -84,13 +86,36 @@ export async function fetchAdminStats(): Promise<AdminStats> {
     count: weeklyCounts[i],
   }));
 
-  const weakSkills: WeakSkillStat[] = (progressRes.data || []).map((row: any) => ({
-    micro_skill_id: row.micro_skill_id,
-    name: row.micro_skills?.name || "مهارة",
-    track_name: row.micro_skills?.sections?.tracks?.name || "",
-    track_color: row.micro_skills?.sections?.tracks?.color || "#ef4444",
-    mastery_score: Math.round(row.mastery_score ?? 0),
-  }));
+  // Group by micro_skill_id to deduplicate (same skill may appear for multiple students)
+  const skillMap = new Map<string, { name: string; track_name: string; track_color: string; total: number; count: number }>();
+  (progressRes.data || []).forEach((row: any) => {
+    const id = row.micro_skill_id;
+    const score = row.mastery_score ?? 0;
+    if (skillMap.has(id)) {
+      const entry = skillMap.get(id)!;
+      entry.total += score;
+      entry.count += 1;
+    } else {
+      skillMap.set(id, {
+        name: row.micro_skills?.name || "مهارة",
+        track_name: row.micro_skills?.sections?.tracks?.name || "",
+        track_color: row.micro_skills?.sections?.tracks?.color || "#ef4444",
+        total: score,
+        count: 1,
+      });
+    }
+  });
+
+  const weakSkills: WeakSkillStat[] = Array.from(skillMap.entries())
+    .map(([micro_skill_id, v]) => ({
+      micro_skill_id,
+      name: v.name,
+      track_name: v.track_name,
+      track_color: v.track_color,
+      mastery_score: Math.round(v.total / v.count),
+    }))
+    .sort((a, b) => a.mastery_score - b.mastery_score)
+    .slice(0, 5);
 
   return {
     totalStudents: studentsRes.count ?? 0,

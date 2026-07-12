@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 
 // Admin write operations live in a server-only module ("use server").
-export { createFile, updateFile, deleteFile } from "./library-actions";
+export { createFile, updateFile, deleteFile, incrementFileDownload } from "./library-actions";
 
 export type DbLibraryFile = {
   id: string;
@@ -10,6 +10,11 @@ export type DbLibraryFile = {
   title: string;
   file_url: string;
   file_type: "pdf" | "video" | "image" | "summary" | null;
+  category: "ملازم وتأسيس" | "ملخصات سريعة" | "بنك أسئلة وتجميعات" | "أوراق عمل" | null;
+  cover_image: string | null;
+  pages_count: number | null;
+  downloads_count: number | null;
+  size_label: string | null;
   access_type: "free" | "paid";
   created_at: string;
 };

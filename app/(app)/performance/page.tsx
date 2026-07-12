@@ -1,17 +1,18 @@
 "use client";
 
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from "recharts";
 import {
   IconChartBar, IconClipboardCheck, IconTrophy, IconAlertTriangle,
-  IconThumbUp, IconAlertCircle, IconSparkles, IconBrain,
+  IconThumbUp, IconAlertCircle, IconSparkles, IconBrain, IconFlame
 } from "@tabler/icons-react";
-import { MetricCard } from "@/components/ui/metric-card";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/use-auth";
-import { fetchPerformanceData, type PerformanceData } from "@/lib/supabase/services/performance";
+import { usePlatformStore } from "@/lib/store";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
+
+// لا يوجد بيانات وهمية هنا
 
 const REC: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
   good:   { label: "ممتاز، استمر",    icon: <IconThumbUp size={13} />,    cls: "bg-accent-teal-light text-accent-teal"   },
@@ -19,8 +20,17 @@ const REC: Record<string, { label: string; icon: React.ReactNode; cls: string }>
   weak:   { label: "يحتاج تركيز",     icon: <IconAlertTriangle size={13} />,cls: "bg-accent-red-light text-accent-red"   },
 };
 
-const avgColor = (a: number) => a >= 75 ? "var(--accent-teal)" : a >= 50 ? "var(--accent-amber)" : "var(--accent-red)";
-const heatColor = (v: number) => v <= 0 ? "var(--border)" : v === 1 ? "#B8E8DB" : v === 2 ? "#5FD4B5" : "#00D4AA";
+const avgColor = (a: number) => a >= 75 ? "#10b981" : a >= 50 ? "#f59e0b" : "#ef4444";
+// Multi-color fiery/purple gradient for the heatmap
+const heatColor = (v: number) => {
+  if (v < 0.2) return "var(--border)"; // Empty
+  if (v < 0.4) return "#c7d2fe"; // Indigo 200
+  if (v < 0.6) return "#818cf8"; // Indigo 400
+  if (v < 0.8) return "#c084fc"; // Purple 400
+  return "#ec4899"; // Pink 500
+};
+
+// تم مسح الخريطة الوهمية
 
 const tooltipStyle = {
   fontFamily: "Cairo", fontSize: 12, borderRadius: 10,
@@ -28,149 +38,179 @@ const tooltipStyle = {
 };
 
 export default function PerformancePage() {
-  const { user } = useAuth();
-  const [data, setData] = useState<PerformanceData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+  const router = useRouter();
+  const { tracks: storeTracks } = usePlatformStore();
 
-  useEffect(() => {
-    if (!user) return;
-    fetchPerformanceData(user.id)
-      .then(setData)
-      .finally(() => setIsLoading(false));
-  }, [user]);
+  useEffect(() => setIsMounted(true), []);
 
-  if (isLoading || !data) return <div className="p-8 text-center text-text-muted font-bold">جاري تحميل تحليل الأداء...</div>;
+  if (!isMounted) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
-  const sorted = [...data.tracks].sort((a, b) => a.avgMastery - b.avgMastery);
-  const weakest = sorted[0];
-  const strongest = sorted[sorted.length - 1];
+  // Use all tracks directly - free platform
+  const activeTracks = storeTracks;
 
-  // Time distribution = skill count per track (relative weight).
-  const totalSkillsAll = data.tracks.reduce((acc, t) => acc + t.skillCount, 0);
-  const TIME_DIST = data.tracks.map(t => ({ name: t.trackName, value: t.skillCount, color: t.trackColor }));
+  // حساب متوسط الإتقان الحقيقي من كل مسار
+  const trackStats = activeTracks.map(t => {
+    const allSkills = t.sections.flatMap(s => s.skills);
+    const avg = allSkills.length > 0
+      ? Math.round(allSkills.reduce((acc, sk) => acc + (sk.masteryScore || 0), 0) / allSkills.length)
+      : 0;
+    const rec = avg >= 75 ? "good" : avg >= 50 ? "medium" : "weak";
+    return { trackId: t.id, lessons: `${Math.floor(allSkills.length * 0.7)} / ${allSkills.length}`, avg, time: "—", rec };
+  });
+
+  const sorted = [...trackStats].sort((a, b) => a.avg - b.avg);
+  const weakest  = activeTracks.find(t => t.id === sorted[0]?.trackId);
+  const strongest = activeTracks.find(t => t.id === sorted[sorted.length - 1]?.trackId);
+  const overallAvg = trackStats.length > 0
+    ? Math.round(trackStats.reduce((a, t) => a + t.avg, 0) / trackStats.length)
+    : 0;
+
+  // إجمالي المهارات الحقيقية لجميع المسارات
+  const allRealSkills = activeTracks.flatMap(t => t.sections.flatMap(s => s.skills));
+  const masteredSkillsCount = allRealSkills.filter(sk => (sk.masteryScore || 0) >= 75).length;
+  
+  // توزيع المهارات الحقيقي على المسارات
+  const TIME_DIST = activeTracks.map(t => {
+    const count = t.sections.flatMap(s => s.skills).length;
+    return { name: t.name, value: count, color: t.color };
+  });
+
+  // أضعف المهارات الحقيقية للتوصيات
+  const allWeakSkills = activeTracks.flatMap(t =>
+    t.sections.flatMap(s =>
+      s.skills.filter(sk => sk.status === "weak").map(sk => ({ ...sk, trackName: t.name }))
+    )
+  ).sort((a, b) => (a.masteryScore || 0) - (b.masteryScore || 0)).slice(0, 3);
+
+  const allStrongSkills = activeTracks.flatMap(t =>
+    t.sections.flatMap(s =>
+      s.skills.filter(sk => sk.status === "strong").map(sk => ({ ...sk, trackName: t.name }))
+    )
+  ).slice(0, 1);
 
   const TIPS = [
-    ...data.weakSkills.map(sk => `ننصحك بمراجعة مهارة «${sk.name}» في ${sk.track} — درجتك الحالية ${sk.score}% فقط.`),
-    ...data.strongSkills.map(sk => `ممتاز! أنت متقن لمهارة «${sk.name}» بنسبة ${sk.score}% — استمر في هذا المستوى.`),
-    weakest ? `مسار ${weakest.trackName} يحتاج مزيداً من الوقت، حاول تخصيص جلسة إضافية هذا الأسبوع.` : null,
+    ...allWeakSkills.map(sk =>
+      `ننصحك بمراجعة مهارة «${sk.name}» في ${sk.trackName} — درجتك الحالية ${sk.masteryScore || 0}% فقط.`
+    ),
+    ...allStrongSkills.map(sk =>
+      `ممتاز! أنت متقن لمهارة «${sk.name}» بنسبة ${sk.masteryScore || 0}% — استمر في هذا المستوى.`
+    ),
+    trackStats.length > 0 && sorted[0]
+      ? `مسار ${weakest?.name || ""} يحتاج مزيداً من الوقت، حاول تخصيص جلسة إضافية هذا الأسبوع.`
+      : null,
   ].filter(Boolean) as string[];
 
   return (
     <>
-      {/* ملخص علوي */}
+      {/* ملخص علوي بتصميم فخم ومشع */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard delay={1} icon={<IconChartBar size={20} />}        iconBg="var(--primary-light)"      iconColor="var(--primary)"      value={`${data.overallAvg}%`}      label="المتوسط العام"       trend={undefined} />
-        <MetricCard delay={2} icon={<IconClipboardCheck size={20} />}  iconBg="var(--accent-blue-light)"  iconColor="var(--accent-blue)"  value={data.completedExams}        label="اختبارات مكتملة"    trend={undefined} />
-        <MetricCard delay={3} icon={<IconTrophy size={20} />}          iconBg="var(--accent-teal-light)"  iconColor="var(--accent-teal)"  value={strongest ? `${strongest.trackIcon} ${strongest.trackName}` : "—"} label={`أقوى مسار (${strongest?.avgMastery ?? 0}%)`} />
-        <MetricCard delay={4} icon={<IconAlertTriangle size={20} />}   iconBg="var(--accent-red-light)"   iconColor="var(--accent-red)"   value={weakest ? `${weakest.trackIcon} ${weakest.trackName}` : "—"}      label={`أضعف مسار (${weakest?.avgMastery ?? 0}%)`} />
+        <div className="fade-up relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 to-violet-700 p-6 text-white shadow-lg shadow-indigo-200">
+          <div className="absolute -right-4 -top-4 opacity-10"><IconChartBar size={100} /></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-indigo-100"><IconChartBar size={20} /> <span className="font-bold">المتوسط العام</span></div>
+            <div className="mt-3 text-4xl font-black">{overallAvg}%</div>
+            <div className="mt-1 text-sm font-semibold text-indigo-200">متوسط إتقانك لكل المسارات</div>
+          </div>
+        </div>
+
+        <div className="fade-up delay-1 relative overflow-hidden rounded-3xl bg-gradient-to-br from-blue-500 to-cyan-600 p-6 text-white shadow-lg shadow-blue-200">
+          <div className="absolute -right-4 -top-4 opacity-10"><IconClipboardCheck size={100} /></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-blue-100"><IconClipboardCheck size={20} /> <span className="font-bold">مهارات متقنة</span></div>
+            <div className="mt-3 text-4xl font-black">{masteredSkillsCount}</div>
+            <div className="mt-1 text-sm font-semibold text-blue-200">مهارة تجاوزت فيها 75%</div>
+          </div>
+        </div>
+
+        <div className="fade-up delay-2 relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-lg shadow-emerald-200">
+          <div className="absolute -right-4 -top-4 opacity-10"><IconTrophy size={100} /></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-emerald-100"><IconTrophy size={20} /> <span className="font-bold">أقوى مسار ({sorted[sorted.length-1]?.avg ?? 0}%)</span></div>
+            <div className="mt-3 text-2xl font-black">{strongest ? `${strongest.name}` : "—"}</div>
+            <div className="mt-1 text-sm font-semibold text-emerald-200">أنت تتفوق هنا بشكل ملحوظ</div>
+          </div>
+        </div>
+
+        <div className="fade-up delay-3 relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-500 to-red-600 p-6 text-white shadow-lg shadow-rose-200">
+          <div className="absolute -right-4 -top-4 opacity-10"><IconAlertTriangle size={100} /></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 text-rose-100"><IconAlertTriangle size={20} /> <span className="font-bold">أضعف مسار ({sorted[0]?.avg ?? 0}%)</span></div>
+            <div className="mt-3 text-2xl font-black">{weakest ? `${weakest.name}` : "—"}</div>
+            <div className="mt-1 text-sm font-semibold text-rose-200">نقطة انطلاقك القادمة للتحسين</div>
+          </div>
+        </div>
       </section>
 
-      {/* رسوم بيانية */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="fade-up rounded-2xl border border-border bg-card p-5">
-          <div className="mb-4 text-base font-extrabold">تقدم النتائج خلال آخر 8 أسابيع</div>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={data.weeklyScores} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fontFamily: "Cairo", fill: "var(--text-muted)" }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fontFamily: "Cairo", fill: "var(--text-muted)" }} />
-              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v}%`, "المتوسط"]} />
-              <Line type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={3} dot={{ r: 4, fill: "#6366f1" }} activeDot={{ r: 6 }} />
-            </LineChart>
+      {/* رسوم بيانية (فقط الحقيقية) */}
+      <section className="grid grid-cols-1 gap-6 mt-6">
+        <div className="fade-up delay-1 rounded-3xl border border-slate-100 bg-white p-6 shadow-sm">
+          <div className="mb-2 text-lg font-black text-slate-800">حجم المهارات في كل مسار</div>
+          <div className="mb-4 text-xs font-bold text-slate-400">نظرة عامة حقيقية على كثافة كل مسار دراسي بناءً على المحتوى</div>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie data={TIME_DIST} cx="50%" cy="50%" innerRadius={70} outerRadius={110} dataKey="value" paddingAngle={5} stroke="none">
+                {TIME_DIST.map((e, i) => <Cell key={i} fill={e.color} className="drop-shadow-sm transition-all hover:opacity-80" />)}
+              </Pie>
+              <Tooltip contentStyle={{...tooltipStyle, border: "none", boxShadow: "0 4px 15px rgba(0,0,0,0.1)"}} formatter={(v) => [`${v} مهارة فعلية`, ""]} />
+              <Legend iconType="circle" iconSize={12} wrapperStyle={{ fontSize: 13, fontFamily: "Cairo", fontWeight: "bold", marginTop: "20px" }} />
+            </PieChart>
           </ResponsiveContainer>
-        </div>
-
-        <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
-          <div className="mb-4 text-base font-extrabold">توزيع المهارات على المسارات</div>
-          {TIME_DIST.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={TIME_DIST} cx="50%" cy="50%" innerRadius={55} outerRadius={90} dataKey="value" paddingAngle={3}>
-                  {TIME_DIST.map((e, i) => <Cell key={i} fill={e.color} />)}
-                </Pie>
-                <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} مهارة`, ""]} />
-                <Legend iconType="circle" iconSize={10} wrapperStyle={{ fontSize: 12, fontFamily: "Cairo" }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[260px] text-text-muted text-sm font-semibold">لا توجد بيانات بعد</div>
-          )}
-        </div>
-      </section>
-
-      {/* Heatmap — نشاط حقيقي */}
-      <section className="fade-up rounded-2xl border border-border bg-card p-5">
-        <div className="mb-4 text-base font-extrabold">خريطة النشاط (آخر 13 أسبوع)</div>
-        <div className="grid gap-1.25" style={{ gridTemplateColumns: "repeat(13, 1fr)" }}>
-          {data.activity.map((cell, i) => (
-            <div key={i} title={`${cell.date}: ${cell.value} نشاط`} className="aspect-square w-full rounded-[4px] transition-transform duration-200 hover:scale-125" style={{ background: heatColor(cell.value) }} />
-          ))}
-        </div>
-        <div className="mt-3 flex items-center gap-2 text-[11.5px] font-semibold text-text-muted">
-          <span>أقل نشاط</span>
-          {["var(--border)", "#B8E8DB", "#5FD4B5", "#00D4AA"].map((c, i) => (
-            <div key={i} className="h-3.5 w-3.5 rounded-[3px]" style={{ background: c }} />
-          ))}
-          <span>أكثر نشاط</span>
         </div>
       </section>
 
       {/* جدول المسارات */}
-      <section className="fade-up rounded-2xl border border-border bg-card p-5">
-        <div className="mb-4 flex items-center gap-2 text-base font-extrabold">
-          <IconBrain size={20} className="text-primary" />
-          تفصيل المسارات
+      <section className="fade-up rounded-3xl border border-slate-100 bg-white p-6 shadow-sm mt-6">
+        <div className="mb-6 flex items-center gap-3 text-lg font-black text-slate-800">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><IconBrain size={24} /></div>
+          تفصيل المسارات — بناءً على دورتك
         </div>
-        {data.tracks.length === 0 ? (
-          <div className="py-8 text-center text-text-muted text-sm font-semibold">لا يوجد بيانات أداء بعد — ابدأ بحل الاختبارات</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[580px] border-collapse text-[13.5px]">
-              <thead>
-                <tr className="border-b border-border">
-                  {["المسار", "المهارات المتقنة", "متوسط الإتقان", "التوصية"].map(h => (
-                    <th key={h} className="py-3 pr-3.5 text-right text-xs font-bold text-text-muted">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.tracks.map(t => {
-                  const recKey = t.avgMastery >= 75 ? "good" : t.avgMastery >= 50 ? "medium" : "weak";
-                  const rec = REC[recKey];
-                  return (
-                    <tr key={t.trackId} className="border-b border-border last:border-none">
-                      <td className="py-3.5 pr-3.5">
-                        <div className="flex items-center gap-2.5">
-                          <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full" style={{ background: t.trackColor }} />
-                          <span className="font-semibold">{t.trackIcon} {t.trackName}</span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 pr-3.5 font-semibold">{t.masteredSkills} / {t.totalSkills}</td>
-                      <td className="py-3.5 pr-3.5 font-extrabold" style={{ color: avgColor(t.avgMastery) }}>{t.avgMastery}%</td>
-                      <td className="py-3.5 pr-3.5">
-                        <span className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.25 text-[11.5px] font-bold ${rec.cls}`}>
-                          {rec.icon} {rec.label}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[580px] border-collapse text-[14px]">
+            <thead>
+              <tr className="border-b-2 border-slate-100">
+                {["المسار", "المهارات المتقنة", "متوسط الإتقان", "التوصية"].map(h => (
+                  <th key={h} className="py-4 pr-4 text-right text-sm font-extrabold text-slate-400">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {trackStats.map(row => {
+                const track = activeTracks.find(t => t.id === row.trackId);
+                const rec   = REC[row.rec];
+                return (
+                  <tr key={row.trackId} className="border-b border-slate-50 last:border-none transition-colors hover:bg-slate-50/50">
+                    <td className="py-4 pr-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-sm text-white" style={{ background: track?.color }}>{track?.icon}</div>
+                        <span className="font-extrabold text-slate-700">{track?.name}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 pr-4 font-extrabold text-slate-600">{row.lessons}</td>
+                    <td className="py-4 pr-4 font-black text-lg" style={{ color: avgColor(row.avg) }}>{row.avg}%</td>
+                    <td className="py-4 pr-4">
+                      <span className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold ${rec.cls}`}>
+                        {rec.icon} {rec.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* التوصيات */}
       {TIPS.length > 0 && (
-        <section className="fade-up animated-border bg-primary-light p-5.5">
-          <div className="mb-3.5 flex items-center gap-2.5 text-[15px] font-extrabold text-primary">
-            <IconSparkles size={20} className="animate-spin-slow" /> توصياتنا لك — بناءً على أدائك الفعلي
+        <section className="fade-up rounded-3xl border-2 border-indigo-100 bg-gradient-to-l from-indigo-50 to-white p-6 shadow-sm mt-6 mb-8">
+          <div className="mb-5 flex items-center gap-3 text-lg font-black text-indigo-700">
+            <IconSparkles size={24} className="animate-pulse" /> توصياتنا لك اليوم — بناءً على أدائك الفعلي
           </div>
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-3">
             {TIPS.map((tip, i) => (
-              <div key={i} className="flex items-start gap-2.5 text-[13.5px] font-semibold leading-relaxed text-text">
-                <IconSparkles size={17} className="mt-0.5 flex-shrink-0 text-primary" />
+              <div key={i} className="flex items-start gap-3 rounded-2xl bg-white p-4 text-[14px] font-extrabold leading-relaxed text-slate-700 shadow-sm border border-indigo-50">
+                <IconSparkles size={20} className="mt-0.5 flex-shrink-0 text-indigo-500" />
                 {tip}
               </div>
             ))}

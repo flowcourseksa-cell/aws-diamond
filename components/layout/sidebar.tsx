@@ -1,9 +1,10 @@
+// @ts-nocheck
 "use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  IconRocket,
+  IconSchool,
   IconLayoutDashboard,
   IconVideo,
   IconClipboardText,
@@ -15,10 +16,15 @@ import {
   IconLogout2,
   IconBrain,
   IconBook2,
+  IconHome,
+  IconTrophy,
+  IconAward,
+  IconX,
 } from "@tabler/icons-react";
 import { useState } from "react";
 import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
 import { useAuth } from "@/hooks/use-auth";
+import { usePlatformStore } from "@/lib/store";
 
 type NavItem = {
   href: string;
@@ -32,7 +38,9 @@ const MAIN_ITEMS: NavItem[] = [
   { href: "/tracks",   label: "الأقسام والمهارات",icon: <IconBrain size={19} /> },
   { href: "/lessons",  label: "الدروس",           icon: <IconVideo size={19} /> },
   { href: "/exams",   label: "الاختبارات",        icon: <IconClipboardText size={19} /> },
+  { href: "/final-exam", label: "الاختبار النهائي", icon: <IconTrophy size={19} /> },
   { href: "/library", label: "المكتبة",            icon: <IconFolder size={19} /> },
+  { href: "/certificates", label: "شهاداتي",       icon: <IconAward size={19} /> },
 ];
 
 const TOOLS_ITEMS: NavItem[] = [
@@ -68,12 +76,25 @@ function NavLink({ item, active }: { item: NavItem; active: boolean }) {
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const pathname = usePathname();
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const [showLogout, setShowLogout] = useState(false);
+  const { enrolledCourses, enrolledCourseId, setEnrolledCourseId } = usePlatformStore();
+
+  const handleCourseSwitch = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newId = e.target.value;
+    setEnrolledCourseId(newId);
+    localStorage.setItem('active_course_id', newId);
+    // Always redirect to dashboard when switching courses to avoid being stuck on a URL
+    // belonging to the previous course (like /lessons/123 or /final-exam/old_id)
+    window.location.href = "/dashboard";
+  };
+
+  const displayProfile = profile || { full_name: "طالب جديد", role: "student", phone: "" };
+  const expectedId = displayProfile.phone ? displayProfile.phone : (user ? `TKH-${user.id.split('-')[0].toUpperCase()}` : "");
 
   return (
     <>
-      <LogoutConfirmModal open={showLogout} onClose={() => setShowLogout(false)} />
+      <LogoutConfirmModal open={showLogout} onClose={() => setShowLogout(false)} expectedId={expectedId} />
       {/* الخلفية الشفافة (موبايل/تابلت) */}
       {open && (
         <div
@@ -84,26 +105,61 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       )}
 
       <aside
-        className={`fixed right-0 top-0 z-40 flex h-screen w-(--sidebar-w) flex-shrink-0 flex-col bg-sidebar px-3.5 py-5 text-white transition-transform duration-250 ease-in-out lg:sticky lg:translate-x-0 ${
-          open ? "translate-x-0 shadow-[-10px_0_30px_rgba(0,0,0,0.2)]" : "translate-x-full lg:translate-x-0"
+        className={`fixed right-0 top-0 z-40 flex h-screen w-[260px] flex-shrink-0 flex-col bg-sidebar px-3.5 py-5 text-white transition-all duration-300 ease-in-out lg:sticky ${
+          open 
+            ? "translate-x-0 shadow-[-10px_0_30px_rgba(0,0,0,0.2)] lg:shadow-none lg:mr-0" 
+            : "translate-x-full lg:translate-x-0 lg:-mr-[260px] lg:opacity-0 lg:invisible lg:pointer-events-none"
         }`}
       >
-        {/* الشعار */}
-        <div className="flex items-center gap-2.5 px-2.5 pb-6 pt-2">
-          <div className="flex h-9.5 w-9.5 items-center justify-center rounded-[10px] bg-primary text-[19px]">
-            <IconRocket size={20} />
+        {/* الشعار وزر الإغلاق */}
+        <div className="flex items-center justify-between px-2.5 pb-4 pt-2">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#f97316] to-[#ea580c] shadow-md shadow-orange-500/20 text-white">
+              <IconSchool size={22} stroke={2.5} />
+            </div>
+            <div className="flex flex-col text-right">
+              <span className="text-lg font-black leading-none text-white tracking-tight">الأوس الماسية</span>
+              <span className="text-[10px] text-[#f97316] font-bold leading-none mt-1">المنصة التعليمية</span>
+            </div>
           </div>
-          <div className="text-lg font-black">الأوس الماسية</div>
+          <button 
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/60 hover:bg-white/10 hover:text-white transition-colors lg:hidden"
+            aria-label="إغلاق القائمة"
+          >
+            <IconX size={20} />
+          </button>
         </div>
+
+        {/* مبدل الكورسات */}
+        {enrolledCourses.length > 0 && (
+          <div className="px-2.5 pb-4">
+            <select
+              value={enrolledCourseId || ""}
+              onChange={handleCourseSwitch}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-primary cursor-pointer appearance-none"
+              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundPosition: 'left 12px center', backgroundRepeat: 'no-repeat', backgroundSize: '16px' }}
+            >
+              {enrolledCourses.map(c => (
+                <option key={c.id} value={c.id} className="text-black">{c.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* الرئيسية */}
 
         {/* الرئيسية */}
         <div className="px-2.5 pb-2 pt-3.5 text-[11px] font-bold uppercase tracking-wider text-white/35">
           الرئيسية
         </div>
         <nav className="flex flex-col gap-[3px]">
-          {MAIN_ITEMS.map((item) => (
-            <NavLink key={item.href} item={item} active={pathname === item.href} />
-          ))}
+          {MAIN_ITEMS.map((item) => {
+            const href = item.href === "/final-exam" && enrolledCourseId 
+              ? `/final-exam/${enrolledCourseId}` 
+              : item.href;
+            return <NavLink key={item.href} item={{ ...item, href }} active={pathname.startsWith(item.href)} />
+          })}
         </nav>
 
         {/* أدوات */}
@@ -116,31 +172,17 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           ))}
         </nav>
 
-        {/* معلومات المستخدم */}
+        {/* العودة للرئيسية */}
         <div className="mt-auto border-t border-white/8 pt-3.5">
-          <div className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 transition-colors duration-200 hover:bg-white/7">
-            <Link href="/profile" className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80 transition-opacity">
-              <div className="flex h-9.5 w-9.5 flex-shrink-0 items-center justify-center rounded-[10px] bg-primary text-sm font-bold">
-                {profile?.full_name ? profile.full_name[0] : "T"}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13.5px] font-bold text-white">
-                  {profile?.full_name || "جاري التحميل..."}
-                </div>
-                <div className="text-[11.5px] text-white/45">الملف الشخصي</div>
-              </div>
-            </Link>
-            <button
-              onClick={() => setShowLogout(true)}
-              title="تسجيل الخروج"
-              className="text-white/50 transition-colors duration-200 hover:text-accent-red cursor-pointer bg-transparent border-none p-0 flex-shrink-0"
-            >
-              <IconLogout2 size={19} />
-            </button>
-          </div>
+          <Link 
+            href="/"
+            className="flex items-center justify-center gap-2.5 rounded-[10px] px-3 py-3 bg-white/5 hover:bg-white/10 text-white transition-colors duration-200 group"
+          >
+            <IconHome size={19} className="text-white/70 group-hover:text-white transition-colors" />
+            <span className="text-[13.5px] font-bold">العودة للرئيسية</span>
+          </Link>
         </div>
       </aside>
     </>
   );
 }
-

@@ -2,7 +2,6 @@
 
 import HeroSection from "@/components/landing/hero-section";
 import CoursesSection from "@/components/landing/courses-section";
-import MainBannersSection from "@/components/landing/main-banners-section";
 import CommunitySection from "@/components/landing/community-section";
 import AboutSection from "@/components/landing/about-section";
 import FeaturesSection from "@/components/landing/features-section";
@@ -22,7 +21,6 @@ export default function Home() {
         <FeaturesSection />
         <TestimonialsSection />
       </main>
-
       <PremiumFooter />
       <FloatingButtons />
 
@@ -30,4 +28,3 @@ export default function Home() {
     </div>
   );
 }
-

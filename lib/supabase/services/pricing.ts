@@ -17,6 +17,7 @@ export interface DiscountCode {
   maxUses: number;
   expiryDate: string | null;
   createdAt: string;
+  isPublic?: boolean;
 }
 
 // A single subscription price tier (e.g. monthly / quarterly / yearly).
@@ -58,6 +59,7 @@ export async function fetchDiscountCodes(): Promise<DiscountCode[]> {
     maxUses: d.max_uses ?? 0,
     expiryDate: d.expiry_date,
     createdAt: d.created_at,
+    isPublic: d.is_public ?? false,
   }));
 }
 

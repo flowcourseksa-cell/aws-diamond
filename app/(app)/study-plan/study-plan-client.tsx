@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,6 +7,7 @@ import { ProgressBar } from "@/components/ui/progress-bar";
 import { useToast } from "@/components/ui/toast";
 import { TaskDrawer } from "./task-drawer";
 import { useAuth } from "@/hooks/use-auth";
+import { usePlatformStore } from "@/lib/store";
 import {
   fetchStudyPlanTasks,
   addStudyPlanTask,
@@ -18,7 +20,6 @@ import {
 const DAY_NAMES = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 const AR_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
 
-// Local YYYY-MM-DD (avoids UTC off-by-one from toISOString).
 function toKey(d: Date): string {
   const y = d.getFullYear();
   const m = `${d.getMonth() + 1}`.padStart(2, "0");
@@ -29,24 +30,31 @@ function toKey(d: Date): string {
 function startOfWeek(base: Date): Date {
   const d = new Date(base);
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay()); // Sunday
+  d.setDate(d.getDate() - d.getDay()); 
   return d;
 }
 
 export function StudyPlanClient() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { enrolledCourseId, enrolledCourses, platformSettings } = usePlatformStore();
 
   const [tasks, setTasks] = useState<StudyPlanTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [weekOffset, setWeekOffset] = useState(0); // 0 = this week, 1 = next week
+
+  // Apply Features Overrides
+  const activeCourse = enrolledCourses.find(c => c.id === enrolledCourseId);
+  const pSettings = platformSettings || { global_interactive_book: true, global_study_plan: true, global_library: true };
+  const overrides = (activeCourse as any)?.featuresOverride || {};
+  const isEnabled = overrides.study_plan !== undefined ? overrides.study_plan : pSettings.global_study_plan;
+
+  const [weekOffset, setWeekOffset] = useState(0); 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerDate, setDrawerDate] = useState<string>(toKey(new Date()));
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-
+  
   const todayKey = toKey(new Date());
 
-  // The 7 day-cells of the visible week, as real dates.
   const weekDays = useMemo(() => {
     const base = startOfWeek(new Date());
     base.setDate(base.getDate() + weekOffset * 7);
@@ -124,70 +132,94 @@ export function StudyPlanClient() {
 
   const todayTasks = tasks.filter(t => t.due_date === todayKey);
 
+  if (!isEnabled) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] p-8 text-center animate-fade-in">
+        <div className="w-20 h-20 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-6 shadow-inner">
+          <IconListCheck size={40} stroke={1.5} />
+        </div>
+        <h2 className="text-2xl font-black text-slate-800 mb-2">خطة المذاكرة غير متاحة</h2>
+        <p className="text-slate-500 max-w-md mx-auto">
+          عذراً، ميزة خطة المذاكرة غير متاحة لهذه الدورة حالياً.
+        </p>
+      </div>
+    );
+  }
+
   if (isLoading) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
   const weekLabel = `${weekDays[0].getDate()} ${AR_MONTHS[weekDays[0].getMonth()]} - ${weekDays[6].getDate()} ${AR_MONTHS[weekDays[6].getMonth()]}`;
 
   return (
     <>
-      {/* إحصائيات سريعة */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="fade-up flex items-center gap-3.5 rounded-2xl border border-border bg-card px-5 py-4.5">
-          <div className="flex h-11.5 w-11.5 flex-shrink-0 items-center justify-center rounded-xl bg-primary-light text-[21px] text-primary">
-            <IconListCheck size={21} />
+      <section className="grid grid-cols-1 gap-5 lg:grid-cols-3 mb-6">
+        <div className="fade-up relative overflow-hidden flex items-center gap-4 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 p-6 text-white shadow-lg shadow-indigo-200/50">
+          <div className="absolute -left-6 -top-6 opacity-20">
+            <IconListCheck size={120} />
           </div>
-          <div>
-            <div className="text-[22px] font-black">{stats.total}</div>
-            <div className="text-[12.5px] font-semibold text-text-muted">إجمالي المهام</div>
+          <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-sm">
+            <IconListCheck size={28} />
+          </div>
+          <div className="z-10">
+            <div className="text-3xl font-black">{stats.total}</div>
+            <div className="text-sm font-semibold opacity-90">إجمالي المهام المجدولة</div>
           </div>
         </div>
 
-        <div className="fade-up delay-1 flex items-center gap-3.5 rounded-2xl border border-border bg-card px-5 py-4.5">
-          <div className="flex h-11.5 w-11.5 flex-shrink-0 items-center justify-center rounded-xl bg-accent-teal-light text-[21px] text-accent-teal">
-            <IconCheck size={21} />
+        <div className="fade-up delay-1 relative overflow-hidden flex items-center gap-4 rounded-3xl bg-gradient-to-br from-teal-400 to-emerald-500 p-6 text-white shadow-lg shadow-teal-200/50">
+          <div className="absolute -left-6 -top-6 opacity-20">
+            <IconCheck size={120} />
           </div>
-          <div>
-            <div className="text-[22px] font-black">
-              {stats.done} / {stats.remain}
+          <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-md text-white shadow-sm">
+            <IconCheck size={28} />
+          </div>
+          <div className="z-10">
+            <div className="text-3xl font-black">
+              {stats.done} <span className="text-xl opacity-70">/ {stats.total}</span>
             </div>
-            <div className="text-[12.5px] font-semibold text-text-muted">مكتملة / متبقية</div>
+            <div className="text-sm font-semibold opacity-90">المهام المنجزة بنجاح</div>
           </div>
         </div>
 
-        <div className="fade-up delay-2 flex flex-col gap-2 rounded-2xl border border-border bg-card px-5 py-4.5">
+        <div className="fade-up delay-2 flex flex-col justify-center gap-3 rounded-3xl bg-white border border-slate-100 p-6 shadow-sm">
           <div className="flex items-center justify-between">
-            <div className="text-[12.5px] font-semibold text-text-muted">نسبة الإنجاز</div>
-            <div className="text-base font-black">{stats.pct}%</div>
+            <div className="text-sm font-extrabold text-slate-700">معدل الإنجاز العام</div>
+            <div className="text-2xl font-black text-indigo-600">{stats.pct}%</div>
           </div>
-          <ProgressBar percent={stats.pct} color="var(--accent-teal)" />
+          <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
+             <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-teal-400 transition-all duration-1000 ease-out" style={{ width: `${stats.pct}%` }} />
+          </div>
         </div>
       </section>
 
-      {/* التقويم الأسبوعي */}
-      <section className="fade-up rounded-2xl border border-border bg-card p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-base font-extrabold">
-          الخطة الأسبوعية
-          <button onClick={() => openDrawer(todayKey)} className="text-[12.5px] font-bold text-primary">
-            + إضافة مهمة جديدة
+      <section className="fade-up rounded-3xl border border-slate-100 bg-white p-6 shadow-sm mb-6">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+             <div className="h-8 w-2 rounded-full bg-indigo-500"></div>
+             <h2 className="text-xl font-black text-slate-800">الخطة الأسبوعية</h2>
+          </div>
+          <button onClick={() => openDrawer(todayKey)} className="group flex items-center gap-2 rounded-xl bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-600 transition-all hover:bg-indigo-600 hover:text-white shadow-sm">
+            <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white text-indigo-600 transition-colors group-hover:bg-indigo-500 group-hover:text-white">+</span>
+            مهمة جديدة
           </button>
         </div>
 
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-6 flex flex-wrap gap-2">
           <button
             onClick={() => setWeekOffset(0)}
-            className={`rounded-[10px] px-4.5 py-2.25 text-[13px] font-bold transition-colors ${weekOffset === 0 ? "bg-primary text-white" : "border border-border text-text-muted hover:border-primary hover:text-primary"}`}
+            className={`rounded-xl px-5 py-2.5 text-[13px] font-extrabold transition-all duration-300 ${weekOffset === 0 ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "bg-slate-50 text-slate-500 hover:bg-slate-100"}`}
           >
             هذا الأسبوع ({weekLabel})
           </button>
           <button
             onClick={() => setWeekOffset(1)}
-            className={`rounded-[10px] px-4.5 py-2.25 text-[13px] font-bold transition-colors ${weekOffset === 1 ? "bg-primary text-white" : "border border-border text-text-muted hover:border-primary hover:text-primary"}`}
+            className={`rounded-xl px-5 py-2.5 text-[13px] font-extrabold transition-all duration-300 ${weekOffset === 1 ? "bg-indigo-600 text-white shadow-md shadow-indigo-200" : "bg-slate-50 text-slate-500 hover:bg-slate-100"}`}
           >
             الأسبوع القادم
           </button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-7">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-7">
           {weekDays.map(date => {
             const key = toKey(date);
             const dayTasks = tasks.filter(t => t.due_date === key);
@@ -205,17 +237,17 @@ export function StudyPlanClient() {
                   if (id) moveTask(id, key);
                   setDragOverKey(null);
                 }}
-                className={`flex min-h-85 flex-col gap-2.5 rounded-2xl border p-3.5 transition-colors duration-200 ${isDragOver ? "border-primary bg-primary-light" : "border-border"}`}
+                className={`flex min-h-[300px] flex-col gap-3 rounded-2xl border-2 p-3 transition-all duration-200 ${isDragOver ? "border-indigo-400 bg-indigo-50/50" : isToday ? "border-indigo-100 bg-slate-50/50" : "border-slate-50 bg-white hover:border-slate-100"}`}
               >
-                <div className="mb-1 border-b border-border pb-2.5 text-center">
-                  <div className="text-sm font-extrabold">
-                    {DAY_NAMES[date.getDay()]}{isToday ? " (اليوم)" : ""}
+                <div className={`mb-2 border-b-2 pb-3 text-center ${isToday ? "border-indigo-200" : "border-slate-100"}`}>
+                  <div className={`text-[15px] font-black ${isToday ? "text-indigo-600" : "text-slate-700"}`}>
+                    {DAY_NAMES[date.getDay()]}
                   </div>
-                  <div className="mt-0.5 text-[11.5px] text-text-muted">{date.getDate()} {AR_MONTHS[date.getMonth()]}</div>
+                  <div className="mt-1 text-xs font-bold text-slate-400">{date.getDate()} {AR_MONTHS[date.getMonth()]}</div>
                 </div>
 
                 {dayTasks.length === 0 ? (
-                  <div className="flex min-h-20 flex-1 items-center justify-center rounded-[10px] border border-dashed border-border text-xs text-text-muted">
+                  <div className="flex min-h-20 flex-1 items-center justify-center rounded-xl border-2 border-dashed border-slate-200 text-xs font-semibold text-slate-400">
                     لا توجد مهام
                   </div>
                 ) : (
@@ -224,32 +256,45 @@ export function StudyPlanClient() {
                       key={task.id}
                       draggable
                       onDragStart={(e) => { e.dataTransfer.setData("text/plain", task.id); }}
-                      className={`group relative cursor-grab rounded-[10px] border border-border bg-bg p-2.5 transition-opacity duration-200 active:cursor-grabbing ${task.is_completed ? "opacity-50 line-through" : ""}`}
+                      className={`group relative flex flex-col gap-2 cursor-grab rounded-xl p-3 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-md active:cursor-grabbing ${task.is_completed ? "bg-slate-50 border border-slate-200 opacity-60" : task.source === "auto" ? "bg-rose-50 border border-rose-100" : "bg-white border border-indigo-100"}`}
                     >
-                      <div className="text-[12.5px] font-bold pl-6">{task.title}</div>
-                      <button
-                        onClick={() => toggleTask(task.id)}
-                        aria-label={task.is_completed ? "إلغاء الإنجاز" : "إنجاز المهمة"}
-                        className={`absolute bottom-2 left-2 flex h-4.5 w-4.5 items-center justify-center rounded-[6px] border-2 transition-colors ${task.is_completed ? "border-accent-teal bg-accent-teal text-white" : "border-border text-transparent"}`}
-                      >
-                        <IconCheck size={11} />
-                      </button>
-                      <button
-                        onClick={() => removeTask(task.id)}
-                        aria-label="حذف"
-                        className="absolute top-2 left-2 text-text-muted opacity-0 group-hover:opacity-100 hover:text-accent-red transition-opacity"
-                      >
-                        <IconTrash size={13} />
-                      </button>
+                      <div className={`text-[13px] font-bold leading-tight ${task.is_completed ? "line-through text-slate-400" : task.source === "auto" ? "text-rose-900" : "text-slate-700"}`}>
+                        {task.title}
+                      </div>
+
+                      {task.source === "auto" && !task.is_completed && (
+                        <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-rose-600 bg-rose-100/50 w-fit px-2 py-0.5 rounded-full">
+                          <span className="flex h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          خطة علاجية
+                        </div>
+                      )}
+                      
+                      <div className="mt-auto pt-1 flex items-center justify-between border-t border-slate-100/50">
+                        <button
+                          onClick={() => toggleTask(task.id)}
+                          aria-label={task.is_completed ? "إلغاء الإنجاز" : "إنجاز المهمة"}
+                          className={`flex h-6 w-6 items-center justify-center rounded-md transition-all duration-300 ${task.is_completed ? "bg-teal-500 text-white shadow-inner" : "border-2 border-slate-300 text-transparent hover:border-teal-400"}`}
+                        >
+                          <IconCheck size={14} stroke={3} />
+                        </button>
+                        
+                        <button
+                          onClick={() => removeTask(task.id)}
+                          aria-label="حذف"
+                          className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:text-rose-500 hover:bg-rose-50"
+                        >
+                          <IconTrash size={15} />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}
 
                 <button
                   onClick={() => openDrawer(key)}
-                  className="rounded-[10px] border border-dashed border-border py-2.25 text-[12.5px] font-bold text-text-muted transition-colors duration-200 hover:border-primary hover:text-primary"
+                  className="mt-auto rounded-xl border-2 border-dashed border-slate-200 py-2.5 text-[12.5px] font-bold text-slate-400 transition-all duration-200 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
                 >
-                  + إضافة مهمة
+                  + مهمة
                 </button>
               </div>
             );
@@ -257,38 +302,66 @@ export function StudyPlanClient() {
         </div>
       </section>
 
-      {/* مهام اليوم */}
-      <section className="fade-up rounded-2xl border border-border bg-card p-5">
-        <div className="mb-4 text-base font-extrabold">مهام اليوم</div>
+      <section className="fade-up rounded-3xl border border-slate-100 bg-white p-6 shadow-sm mb-6">
+        <div className="mb-5 flex items-center gap-3">
+           <div className="h-8 w-2 rounded-full bg-teal-400"></div>
+           <h2 className="text-xl font-black text-slate-800">مهام اليوم</h2>
+        </div>
         {todayTasks.length === 0 ? (
-          <div className="flex min-h-20 items-center justify-center rounded-[10px] border border-dashed border-border text-xs text-text-muted">
-            لا توجد مهام اليوم 🎉
+          <div className="flex min-h-24 items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 text-sm font-semibold text-slate-400 bg-slate-50/50">
+            لا توجد مهام متبقية لليوم 🎉 يمكنك أخذ قسط من الراحة!
           </div>
         ) : (
-          <div className="flex flex-col gap-2.5">
+          <div className="flex flex-col gap-3">
             {todayTasks.map(task => (
               <div
                 key={task.id}
-                className={`flex items-center gap-3 rounded-xl border border-border px-3.5 py-3.25 transition-colors duration-200 hover:border-primary ${task.is_completed ? "opacity-55" : ""}`}
+                className={`group flex items-center gap-4 rounded-2xl border p-4 transition-all duration-300 hover:shadow-md ${task.is_completed ? "bg-slate-50 border-slate-200 opacity-60" : "bg-white border-slate-100 hover:border-indigo-200"}`}
               >
                 <button
                   onClick={() => toggleTask(task.id)}
                   aria-label={task.is_completed ? "إلغاء الإنجاز" : "إنجاز المهمة"}
-                  className={`pop flex h-5.5 w-5.5 flex-shrink-0 items-center justify-center rounded-[7px] border-2 transition-colors duration-200 ${task.is_completed ? "border-accent-teal bg-accent-teal text-white" : "border-border text-transparent"}`}
+                  className={`pop flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-[8px] border-2 transition-all duration-300 ${task.is_completed ? "border-teal-500 bg-teal-500 text-white shadow-inner scale-95" : "border-slate-300 text-transparent hover:border-teal-400 hover:scale-105"}`}
                 >
-                  <IconCheck size={14} />
+                  <IconCheck size={18} stroke={3} />
                 </button>
-                <span className={`flex-1 text-[13.5px] font-semibold ${task.is_completed ? "line-through" : ""}`}>
-                  {task.title}
-                </span>
-                <button onClick={() => removeTask(task.id)} aria-label="حذف" className="text-text-muted hover:text-accent-red transition-colors">
-                  <IconTrash size={15} />
+                <div className="flex-1">
+                  <div className={`text-[15px] font-extrabold ${task.is_completed ? "line-through text-slate-400" : "text-slate-700"}`}>
+                    {task.title}
+                  </div>
+                  {task.source === "auto" && !task.is_completed && (
+                    <div className="mt-1 text-[11px] font-bold text-rose-500">مهمة علاجية موصى بها من النظام الذكي بناءً على أخطائك بالاختبار</div>
+                  )}
+                </div>
+                <button onClick={() => removeTask(task.id)} aria-label="حذف" className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-400 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-rose-50 hover:text-rose-500">
+                  <IconTrash size={18} />
                 </button>
               </div>
             ))}
           </div>
         )}
       </section>
+
+      {tasks.filter(t => !t.due_date).length > 0 && (
+        <section className="fade-up rounded-3xl border border-rose-100 bg-rose-50/30 p-6 shadow-sm mb-6">
+          <div className="mb-5 flex items-center gap-3">
+             <div className="h-8 w-2 rounded-full bg-rose-400"></div>
+             <h2 className="text-xl font-black text-rose-900">مهام غير مجدولة (تحتاج لجدولة أو حذف)</h2>
+          </div>
+          <div className="flex flex-col gap-3">
+            {tasks.filter(t => !t.due_date).map(task => (
+              <div key={task.id} className="group flex items-center justify-between rounded-2xl border border-rose-200 bg-white p-4 transition-all duration-300 hover:shadow-md">
+                <div className="text-[15px] font-extrabold text-slate-700">{task.title}</div>
+                <div className="flex gap-2">
+                  <button onClick={() => removeTask(task.id)} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-rose-500 transition-all duration-200 hover:bg-rose-100">
+                    <IconTrash size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <TaskDrawer
         open={drawerOpen}

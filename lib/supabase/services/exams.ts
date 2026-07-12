@@ -49,13 +49,21 @@ export async function fetchExamsByTracks(trackIds: string[]): Promise<DbExam[]> 
   const supabase = createClient();
   const { data, error } = await supabase
     .from("exams")
-    .select("*")
+    .select(`
+      *,
+      questions (
+        *,
+        micro_skills(name),
+        question_options (id, question_id, text, created_at)
+      )
+    `)
     .in("track_id", trackIds)
     .order("created_at", { ascending: false });
 
   if (error) {
     if (error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
       console.warn("Network offline, cannot fetch exams.");
+      throw new Error("offline");
     } else {
       console.warn("Error fetching exams:", error);
     }

@@ -71,8 +71,8 @@
   --color-text-muted: var(--text-muted);
   --color-border: var(--border);
 
-  --font-sans: "Cairo", sans-serif;
-  --font-display: "Tajawal", "Cairo", sans-serif;
+  --font-sans: var(--font-cairo), sans-serif;
+  --font-display: var(--font-tajawal), var(--font-cairo), sans-serif;
 }
 
 /* خط العناوين الفخم */

@@ -37,6 +37,50 @@ export async function fetchBestScores(userId: string): Promise<Record<string, nu
   return best;
 }
 
+// Returns stats for all exams taken by the student
+export async function fetchAllExamsStatsMap(
+  userId: string
+): Promise<Record<string, { bestScore: number; attemptsCount: number; maxAttempts: number }>> {
+  const supabase = createClient();
+  const [attemptsRes, grantedRes] = await Promise.all([
+    supabase.from("exam_attempts").select("exam_id, score_pct, submitted_at").eq("student_id", userId).order("submitted_at", { ascending: true }),
+    supabase.from("granted_exam_attempts").select("exam_id").eq("student_id", userId)
+  ]);
+
+  if (attemptsRes.error) {
+    if (attemptsRes.error.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      throw new Error("offline");
+    }
+    console.error("Error fetching exams stats:", attemptsRes.error);
+    return {};
+  }
+
+  const grantedCountMap: Record<string, number> = {};
+  if (grantedRes.data) {
+    grantedRes.data.forEach((row: any) => {
+      grantedCountMap[row.exam_id] = (grantedCountMap[row.exam_id] || 0) + 1;
+    });
+  }
+
+  const map: Record<string, { bestScore: number; attemptsCount: number; maxAttempts: number }> = {};
+  (attemptsRes.data || []).forEach((row: any) => {
+    if (!map[row.exam_id]) {
+      const granted = grantedCountMap[row.exam_id] || 0;
+      map[row.exam_id] = { bestScore: 0, attemptsCount: 0, maxAttempts: 5 + granted };
+    }
+    map[row.exam_id].attemptsCount += 1;
+    const pct = Math.round(row.score_pct || 0);
+    // Only update best score if it's within the official allowed attempts and we haven't hit 100% yet
+    if (map[row.exam_id].attemptsCount <= map[row.exam_id].maxAttempts && map[row.exam_id].bestScore < 100) {
+      if (pct > map[row.exam_id].bestScore) {
+        map[row.exam_id].bestScore = pct;
+      }
+    }
+  });
+
+  return map;
+}
+
 export async function fetchUserProgress(userId: string) {
   const supabase = createClient();
   
@@ -47,7 +91,10 @@ export async function fetchUserProgress(userId: string) {
     .eq("student_id", userId);
 
   if (skillsError) {
-    console.error("Error fetching skill progress:", skillsError);
+    if (skillsError.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      throw new Error("offline");
+    }
+    console.error("Error fetching skill progress:", skillsError?.message || skillsError);
   }
 
   // Fetch lesson progress
@@ -57,7 +104,10 @@ export async function fetchUserProgress(userId: string) {
     .eq("student_id", userId);
 
   if (lessonsError) {
-    console.error("Error fetching lesson progress:", lessonsError);
+    if (lessonsError.message === 'Failed to fetch' || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+      throw new Error("offline");
+    }
+    console.error("Error fetching lesson progress:", lessonsError?.message || lessonsError);
   }
 
   return {

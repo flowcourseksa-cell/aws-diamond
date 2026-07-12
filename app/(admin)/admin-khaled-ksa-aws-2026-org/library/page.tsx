@@ -10,6 +10,7 @@ import { fetchCourses } from "@/lib/supabase/services/courses";
 import { fetchHierarchyByCourse, type DbTrack } from "@/lib/supabase/services/hierarchy";
 import { fetchFilesByTracks, createFile, updateFile, deleteFile, type DbLibraryFile } from "@/lib/supabase/services/library";
 import { type Course } from "@/lib/store";
+import { createClient } from "@/lib/supabase/client";
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
@@ -76,34 +77,119 @@ export default function AdminLibraryPage() {
   const [trackId, setTrackId] = useState("");
   const [url, setUrl] = useState("");
   const [sizeLabel, setSizeLabel] = useState("");
-  const [isFree, setIsFree] = useState(true);
+  const [coverImage, setCoverImage] = useState("");
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [pagesCount, setPagesCount] = useState<number | "">("");
+  const [category, setCategory] = useState<DbLibraryFile["category"]>("ملازم وتأسيس");
   const [uploadMode, setUploadMode] = useState<"url" | "file">("url");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   function openAdd() {
     setEditingFile(null);
     setTitle(""); setType("pdf"); setTrackId(tracks[0]?.id ?? "");
-    setUrl(""); setSizeLabel("1 MB"); setIsFree(true);
+    setCategory("ملازم وتأسيس");
+    setUrl(""); setSizeLabel(""); setCoverImage(""); setCoverFile(null); setPagesCount("");
     setUploadMode("url");
+    setSelectedFile(null);
     setShowForm(true);
   }
 
   function openEdit(file: DbLibraryFile) {
     setEditingFile(file);
     setTitle(file.title); setType(file.file_type || "pdf"); setTrackId(file.track_id);
+    setCategory(file.category || "ملازم وتأسيس");
     setUrl(file.file_url); 
-    setSizeLabel("—"); // In a real DB we would store and fetch this
-    setIsFree(file.access_type === "free");
-    setUploadMode(file.file_url.startsWith("تم رفع") ? "file" : "url");
+    setSizeLabel(file.size_label || "");
+    setCoverImage(file.cover_image || "");
+    setCoverFile(null);
+    setPagesCount(file.pages_count || "");
+    setUploadMode(file.file_url.includes("supabase.co") ? "file" : "url");
+    setSelectedFile(null);
     setShowForm(true);
   }
 
   async function saveFile() {
+    if (!title.trim() || !trackId) return;
+    
+    setIsUploading(true);
+    let finalUrl = url;
+
+    // Handle real file upload
+    if (uploadMode === "file" && selectedFile) {
+      const supabase = createClient();
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('library_files')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (uploadError) {
+        alert("فشل رفع الملف: " + uploadError.message);
+        setIsUploading(false);
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('library_files')
+        .getPublicUrl(filePath);
+
+      finalUrl = publicUrl;
+    }
+
+    // URL Validation and conversion for external links
+    if (uploadMode === "url") {
+      if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        alert("يرجى إدخال رابط صحيح يبدأ بـ http أو https");
+        setIsUploading(false);
+        return;
+      }
+      
+      // Auto-convert Google Drive links to direct download links
+      if (finalUrl.includes("drive.google.com/file/d/")) {
+        const match = finalUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          finalUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+        }
+      } else if (finalUrl.includes("drive.google.com/open?id=")) {
+        const match = finalUrl.match(/id=([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+          finalUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+        }
+      }
+    }
+
+    let finalCoverUrl = coverImage;
+    if (coverFile) {
+      const supabase = createClient();
+      const ext = coverFile.name.split('.').pop();
+      const fileName = `cover-${Date.now()}-${Math.random().toString(36).substring(2)}.${ext}`;
+      const { data, error } = await supabase.storage
+        .from('library_files')
+        .upload(fileName, coverFile, { cacheControl: '3600', upsert: false });
+        
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from('library_files').getPublicUrl(fileName);
+        finalCoverUrl = publicUrl;
+      }
+    }
+
     const payload: Partial<DbLibraryFile> = {
       title, 
       file_type: type, 
       track_id: trackId, 
-      file_url: url,
-      access_type: isFree ? "free" : "paid",
+      file_url: finalUrl,
+      category,
+      cover_image: finalCoverUrl || null,
+      pages_count: pagesCount ? Number(pagesCount) : null,
+      size_label: sizeLabel || null,
+      access_type: "free",
     };
 
     if (editingFile) {
@@ -117,10 +203,21 @@ export default function AdminLibraryPage() {
         setFiles(prev => [newFile, ...prev]);
       }
     }
+    setIsUploading(false);
     setShowForm(false);
   }
 
   async function handleDeleteFile(id: string) {
+    const file = files.find(f => f.id === id);
+    if (file && file.file_url.includes("library_files/")) {
+       const urlParts = file.file_url.split("library_files/");
+       if (urlParts.length === 2) {
+         const path = urlParts[1];
+         const supabase = createClient();
+         await supabase.storage.from("library_files").remove([path]);
+       }
+    }
+
     const success = await deleteFile(id);
     if (success) {
       setFiles(prev => prev.filter(f => f.id !== id));
@@ -183,7 +280,6 @@ export default function AdminLibraryPage() {
               className="rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary">
               <option value="all">جميع الأنواع</option>
               <option value="pdf">PDF</option>
-              <option value="video">فيديو</option>
               <option value="image">صورة</option>
               <option value="summary">ملخص</option>
             </select>
@@ -276,7 +372,7 @@ export default function AdminLibraryPage() {
             <div className="flex flex-col gap-4">
               <div>
                 <label className="text-xs font-black text-text-muted mb-1.5 block">عنوان الملف</label>
-                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="مثال: ملخص الجبر..."
+                <input value={title || ""} onChange={e => setTitle(e.target.value)} placeholder="مثال: ملخص الجبر..."
                   className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-sm font-semibold outline-none focus:border-primary" />
               </div>
               
@@ -286,18 +382,28 @@ export default function AdminLibraryPage() {
                   <select value={type || "pdf"} onChange={e => setType(e.target.value as DbLibraryFile["file_type"])}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
                     <option value="pdf">PDF</option>
-                    <option value="video">فيديو</option>
                     <option value="image">صورة</option>
                     <option value="summary">ملخص</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-black text-text-muted mb-1.5 block">المسار</label>
-                  <select value={trackId} onChange={e => setTrackId(e.target.value)}
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">التصنيف</label>
+                  <select value={category || "ملازم وتأسيس"} onChange={e => setCategory(e.target.value as any)}
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
-                    {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    <option value="ملازم وتأسيس">ملازم وتأسيس</option>
+                    <option value="ملخصات سريعة">ملخصات سريعة</option>
+                    <option value="بنك أسئلة وتجميعات">بنك أسئلة وتجميعات</option>
+                    <option value="أوراق عمل">أوراق عمل</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-text-muted mb-1.5 block">المسار</label>
+                <select value={trackId} onChange={e => setTrackId(e.target.value)}
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary">
+                  {tracks.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
               </div>
 
               <div>
@@ -307,14 +413,15 @@ export default function AdminLibraryPage() {
                   <button onClick={() => setUploadMode("file")} className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition-colors ${uploadMode === "file" ? "border-primary bg-primary text-white" : "border-border text-text-muted"}`}>رفع من الجهاز</button>
                 </div>
                 {uploadMode === "url" ? (
-                  <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..."
+                  <input value={url || ""} onChange={e => setUrl(e.target.value)} placeholder="https://..."
                     className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary text-left" dir="ltr" />
                 ) : (
                   <div className="relative">
                     <input type="file" onChange={e => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        setUrl(`تم رفع: ${file.name}`);
+                        setSelectedFile(file);
+                        setUrl(`تم اختيار: ${file.name}`);
                         setSizeLabel(`${(file.size / (1024 * 1024)).toFixed(1)} MB`);
                       }
                     }} className="w-full text-sm text-text-muted file:mr-0 file:ml-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
@@ -322,27 +429,30 @@ export default function AdminLibraryPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="text-xs font-black text-text-muted mb-1.5 block">النوع (الوصول)</label>
-                  <div className="flex gap-2 mt-0.5">
-                    {(["free", "paid"] as const).map(t => (
-                      <button key={t} onClick={() => setIsFree(t === "free")}
-                        className={`flex-1 rounded-xl border py-2 text-xs font-bold transition-colors ${(isFree ? t === "free" : t === "paid") ? "border-primary bg-primary text-white" : "border-border text-text-muted"}`}>
-                        {t === "free" ? "مجاني" : "مدفوع"}
-                      </button>
-                    ))}
-                  </div>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">صورة الغلاف (اختياري)</label>
+                  <input type="file" accept="image/*" onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file) setCoverFile(file);
+                  }} className="w-full text-sm text-text-muted file:mr-0 file:ml-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
+                  {coverImage && !coverFile && (
+                    <div className="mt-2 text-xs text-primary font-bold">يوجد غلاف حالي</div>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-black text-text-muted mb-1.5 block">عدد الصفحات</label>
+                  <input type="number" value={pagesCount || ""} onChange={e => setPagesCount(e.target.value ? Number(e.target.value) : "")} placeholder="مثال: 15"
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary text-center" />
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-border">
-                <button onClick={() => setShowForm(false)} className="px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text transition-colors">
+                <button onClick={() => setShowForm(false)} disabled={isUploading} className="px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text transition-colors">
                   إلغاء
                 </button>
-                <button onClick={saveFile} disabled={!title.trim() || !trackId}
-                  className="flex items-center gap-2 rounded-xl bg-accent-amber px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-amber/90 disabled:opacity-50">
-                  <IconCheck size={16} /> حفظ الملف
+                <button onClick={saveFile} disabled={isUploading} className="rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark transition-colors disabled:opacity-50">
+                  {isUploading ? "جاري الرفع..." : (editingFile ? "حفظ التعديلات" : "إضافة الملف")}
                 </button>
               </div>
             </div>

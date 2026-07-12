@@ -32,20 +32,34 @@ function toKey(d: Date): string {
 }
 
 // All analytics are real, per-student, from Supabase (isolated by RLS).
-export async function fetchPerformanceData(userId: string): Promise<PerformanceData> {
+export async function fetchPerformanceData(userId: string, courseId: string | null): Promise<PerformanceData> {
   const supabase = createClient();
+
+  const zeros: PerformanceData = {
+    overallAvg: 0, completedExams: 0, weeklyScores: [], activity: [], tracks: [], weakSkills: [], strongSkills: []
+  };
+
+  if (!courseId) return zeros;
+
+  // 1. Get track IDs for this course
+  const { data: tracksData } = await supabase.from('tracks').select('id').eq('course_id', courseId);
+  const trackIds = tracksData?.map((t: any) => t.id) || [];
+
+  if (trackIds.length === 0) return zeros;
 
   const [attemptsRes, progressRes] = await Promise.all([
     supabase
       .from("exam_attempts")
-      .select("score_pct, submitted_at")
+      .select("score_pct, submitted_at, exams!inner(track_id)")
       .eq("student_id", userId)
       .not("submitted_at", "is", null)
+      .in("exams.track_id", trackIds)
       .order("submitted_at", { ascending: true }),
     supabase
       .from("skill_progress")
-      .select("micro_skill_id, mastery_score, micro_skills(name, sections(tracks(id, name, icon, color)))")
-      .eq("student_id", userId),
+      .select("micro_skill_id, mastery_score, micro_skills!inner(name, sections!inner(track_id, tracks(id, name, icon, color)))")
+      .eq("student_id", userId)
+      .in("micro_skills.sections.track_id", trackIds),
   ]);
 
   const attempts = (attemptsRes.data || []) as { score_pct: number; submitted_at: string }[];
@@ -114,7 +128,7 @@ export async function fetchPerformanceData(userId: string): Promise<PerformanceD
     if (score >= 80) strongSkills.push({ id: row.micro_skill_id, name: skillName, track: trackName, score });
   });
 
-  const tracks = Array.from(trackMap.values()).map(t => ({
+  const tracks = Array.from(trackMap.values()).map((t: any) => ({
     ...t,
     avgMastery: t.skillCount > 0 ? Math.round(t.avgMastery / t.skillCount) : 0,
   }));

@@ -2,11 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { IconMenu2, IconMoon, IconSun, IconBell } from "@tabler/icons-react";
+import { IconMenu2, IconMoon, IconSun, IconBell, IconX } from "@tabler/icons-react";
 import Link from "next/link";
 import { fetchPendingCount } from "@/lib/supabase/services/activations";
 
-export function AdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
+export function AdminHeader({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; sidebarOpen?: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
@@ -25,8 +25,12 @@ export function AdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
   return (
     <header className="sticky top-0 z-30 flex h-[58px] items-center justify-between gap-4 border-b border-border bg-card px-6">
       <div className="flex items-center gap-3">
-        <button onClick={onMenuClick} className="flex h-9.5 w-9.5 items-center justify-center rounded-[10px] border border-border bg-card text-text lg:hidden">
-          <IconMenu2 size={19} />
+        <button
+          onClick={onMenuClick}
+          className="flex h-9.5 w-9.5 items-center justify-center rounded-[10px] border border-border bg-card text-text transition-colors hover:border-primary hover:text-primary"
+          aria-label={sidebarOpen ? "إغلاق القائمة" : "فتح القائمة"}
+        >
+          {sidebarOpen ? <IconX size={19} /> : <IconMenu2 size={19} />}
         </button>
         <div className="text-base font-extrabold text-text">لوحة تحكم المركز</div>
       </div>
@@ -43,7 +47,6 @@ export function AdminHeader({ onMenuClick }: { onMenuClick: () => void }) {
             </span>
           )}
         </Link>
-        <div className="flex h-9.5 w-9.5 items-center justify-center rounded-[10px] bg-accent-amber text-sm font-bold text-white">م.ن</div>
       </div>
     </header>
   );

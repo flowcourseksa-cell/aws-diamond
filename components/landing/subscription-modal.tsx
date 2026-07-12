@@ -131,4 +131,3 @@ export default function SubscriptionModal({ isOpen, onClose, itemName }: Subscri
     </div>
   );
 }
-

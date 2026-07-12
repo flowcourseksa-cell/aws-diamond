@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { IconBell, IconCheck, IconTrash, IconX } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -13,28 +14,38 @@ type Notification = {
   created_at: string;
 };
 
-export function NotificationsDropdown() {
+export function NotificationsDropdown({ customTrigger }: { customTrigger?: React.ReactNode } = {}) {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchNotifications = async () => {
-    const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return;
+    try {
+      const supabase = createClient();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (!session || sessionError) return;
 
-    // Fetch latest 10 notifications
-    const { data, error } = await supabase
-      .from("notifications")
-      .select("*")
-      .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
+      // Fetch latest 10 notifications
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
 
-    if (data && !error) {
-      setNotifications(data);
-      setUnreadCount(data.filter((n) => !n.is_read).length);
+      if (data && !error) {
+        setNotifications(data);
+        setUnreadCount(data.filter((n) => !n.is_read).length);
+      }
+    } catch (err) {
+      // Ignore network failures for background polling
+      console.warn("Failed to fetch notifications:", err);
     }
   };
 
@@ -98,37 +109,52 @@ export function NotificationsDropdown() {
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={handleToggle}
-        title="الإشعارات"
-        className="relative flex h-9.5 w-9.5 items-center justify-center rounded-[10px] border border-border bg-card text-text transition-transform duration-200 hover:-translate-y-0.5"
-        aria-label="الإشعارات"
-      >
-        <IconBell size={18} />
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-red text-[10px] font-bold text-white shadow-sm border-2 border-card">
-            {unreadCount > 9 ? "+9" : unreadCount}
-          </span>
-        )}
-      </button>
+      {customTrigger ? (
+        <div onClick={handleToggle} className="cursor-pointer">
+          {customTrigger}
+          {unreadCount > 0 && (
+            <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white animate-pulse"></span>
+          )}
+        </div>
+      ) : (
+        <button
+          onClick={handleToggle}
+          title="الإشعارات"
+          className="relative flex h-9.5 w-9.5 items-center justify-center rounded-[10px] border border-border bg-card text-text transition-transform duration-200 hover:-translate-y-0.5"
+          aria-label="الإشعارات"
+        >
+          <IconBell size={18} />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent-red text-[10px] font-bold text-white shadow-sm border-2 border-card">
+              {unreadCount > 9 ? "+9" : unreadCount}
+            </span>
+          )}
+        </button>
+      )}
 
-      {isOpen && (
-        <div className="absolute left-0 mt-2 w-80 sm:w-96 rounded-2xl border border-border bg-card shadow-2xl z-50 overflow-hidden fade-in" dir="rtl">
-          <div className="flex items-center justify-between border-b border-border p-4 bg-bg">
-            <h3 className="font-black text-text flex items-center gap-2">
-              <IconBell size={18} className="text-primary" /> الإشعارات
-            </h3>
-            {notifications.length > 0 && (
-              <button 
-                onClick={deleteAll}
-                className="text-xs font-bold text-accent-red hover:underline flex items-center gap-1"
-              >
-                <IconTrash size={14} /> حذف الكل
-              </button>
-            )}
-          </div>
+      {isOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl" onMouseDown={() => setIsOpen(false)}>
+          <div className="bg-card border border-border shadow-2xl rounded-2xl w-full max-w-md relative animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[85vh]" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-border p-4 bg-bg shrink-0">
+              <h3 className="font-black text-text flex items-center gap-2">
+                <IconBell size={18} className="text-primary" /> الإشعارات
+              </h3>
+              <div className="flex items-center gap-4">
+                {notifications.length > 0 && (
+                  <button 
+                    onClick={deleteAll}
+                    className="text-xs font-bold text-accent-red hover:underline flex items-center gap-1"
+                  >
+                    <IconTrash size={14} /> حذف الكل
+                  </button>
+                )}
+                <button onClick={() => setIsOpen(false)} className="text-text-muted hover:text-accent-red transition-colors bg-white/50 rounded-full p-1">
+                  <IconX size={18} />
+                </button>
+              </div>
+            </div>
           
-          <div className="max-h-80 overflow-y-auto p-2 scrollbar-thin">
+          <div className="overflow-y-auto p-2 scrollbar-thin">
             {notifications.length === 0 ? (
               <div className="p-8 text-center text-text-muted text-sm font-bold flex flex-col items-center gap-2">
                 <div className="w-16 h-16 bg-bg rounded-full flex items-center justify-center mb-2">
@@ -172,7 +198,8 @@ export function NotificationsDropdown() {
             )}
           </div>
         </div>
-      )}
+        </div>
+      , document.body)}
     </div>
   );
 }

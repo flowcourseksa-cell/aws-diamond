@@ -14,21 +14,36 @@ export type StudentStats = {
 };
 
 // All numbers are real, per-student data from Supabase (isolated by RLS).
-export async function fetchStudentStats(userId: string): Promise<StudentStats> {
-  const supabase = createClient();
+export async function fetchStudentStats(userId: string, courseId: string | null, customSupabase?: any): Promise<StudentStats> {
+  const supabase = customSupabase || createClient();
+
+  const zeros: StudentStats = {
+    avgMastery: 0, totalSkills: 0, masteredSkills: 0, averageSkills: 0, weakSkills: 0,
+    completedLessons: 0, totalLessons: 0, availableExams: 0, studyHours: 0, topWeakSkills: []
+  };
+
+  if (!courseId) return zeros;
+
+  // 1. Get track IDs for this course
+  const { data: tracksData } = await supabase.from('tracks').select('id').eq('course_id', courseId);
+  const trackIds = tracksData?.map((t: any) => t.id) || [];
+
+  if (trackIds.length === 0) return zeros;
 
   const [progressRes, lessonsCountRes, completedRes, examsCountRes] = await Promise.all([
     supabase
       .from("skill_progress")
-      .select("micro_skill_id, mastery_score, micro_skills(name, sections(tracks(name)))")
-      .eq("student_id", userId),
-    supabase.from("lessons").select("id", { count: "exact", head: true }),
+      .select("micro_skill_id, mastery_score, micro_skills!inner(name, sections!inner(track_id, tracks(name)))")
+      .eq("student_id", userId)
+      .in("micro_skills.sections.track_id", trackIds),
+    supabase.from("lessons").select("id", { count: "exact", head: true }).in("track_id", trackIds),
     supabase
       .from("lesson_progress")
-      .select("lesson_id, progress_seconds")
+      .select("lesson_id, progress_seconds, lessons!inner(track_id)")
       .eq("student_id", userId)
-      .eq("is_completed", true),
-    supabase.from("exams").select("id", { count: "exact", head: true }).eq("is_published", true),
+      .eq("is_completed", true)
+      .in("lessons.track_id", trackIds),
+    supabase.from("exams").select("id", { count: "exact", head: true }).eq("is_published", true).in("track_id", trackIds),
   ]);
 
   const progress = progressRes.data || [];

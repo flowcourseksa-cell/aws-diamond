@@ -1,9 +1,12 @@
 "use server";
+import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
+
 
 import { createAdminClient } from "@/lib/supabase/client";
 import type { DbExam, DbQuestion, DbQuestionOption } from "./exams";
 
 export async function createExam(exam: Partial<DbExam>): Promise<DbExam | null> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("exams")
@@ -27,6 +30,7 @@ export async function createExam(exam: Partial<DbExam>): Promise<DbExam | null> 
 }
 
 export async function updateExam(id: string, exam: Partial<DbExam>): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("exams")
@@ -49,6 +53,7 @@ export async function updateExam(id: string, exam: Partial<DbExam>): Promise<boo
 }
 
 export async function deleteExam(id: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase.from("exams").delete().eq("id", id);
   return !error;
@@ -58,6 +63,7 @@ export async function saveQuestionWithOptions(
   question: Partial<DbQuestion>,
   options: Partial<DbQuestionOption>[]
 ): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
 
   let questionId = question.id;
@@ -111,7 +117,75 @@ export async function saveQuestionWithOptions(
 }
 
 export async function deleteQuestion(questionId: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase.from("questions").delete().eq("id", questionId);
   return !error;
+}
+
+export async function bulkSaveExamQuestions(
+  examId: string,
+  microSkillId: string,
+  questions: {
+    text: string;
+    difficulty: string;
+    options: { text: string; is_correct: boolean }[];
+  }[]
+): Promise<{ success: number; failed: number }> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  let success = 0;
+  let failed = 0;
+
+  // Get current max order_index to append
+  const { data: existing } = await supabase
+    .from("questions")
+    .select("order_index")
+    .eq("exam_id", examId)
+    .order("order_index", { ascending: false })
+    .limit(1);
+    
+  let nextIndex = existing && existing.length > 0 ? (existing[0].order_index || 0) + 1 : 0;
+
+  for (const q of questions) {
+    try {
+      const { data: newQ, error: qError } = await supabase
+        .from("questions")
+        .insert([{
+          exam_id: examId,
+          micro_skill_id: microSkillId,
+          text: q.text,
+          explanation: null,
+          difficulty: q.difficulty,
+          order_index: nextIndex++
+        }])
+        .select()
+        .single();
+
+      if (qError || !newQ) {
+        failed++;
+        continue;
+      }
+
+      if (q.options && q.options.length > 0) {
+        const optsToInsert = q.options.map((o) => ({
+          question_id: newQ.id,
+          text: o.text,
+          is_correct: o.is_correct || false,
+        }));
+
+        const { error: optsError } = await supabase
+          .from("question_options")
+          .insert(optsToInsert);
+
+        if (optsError) { console.error("Error inserting options:", optsError.message); return { success, failed }; }
+      }
+      
+      success++;
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  return { success, failed };
 }

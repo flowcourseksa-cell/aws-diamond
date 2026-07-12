@@ -61,9 +61,31 @@ BEGIN
     INSERT INTO exams (track_id, section_id, title, time_limit_seconds, access_type, price)
     VALUES (v_track_komi, v_sec_komi_1, 'اختبار قياس مستوى - الجبر', 1800, 'free', 0) RETURNING id INTO v_exam_id;
 
-    INSERT INTO exam_questions (exam_id, skill_id, question_text, options, correct_index, explanation)
-    VALUES 
-    (v_exam_id, v_skill_komi_1, 'نصف العدد 2 أس 10 هو؟', '["2 أس 9", "2 أس 5", "1 أس 10", "4 أس 5"]'::jsonb, 0, 'نقسم على 2 فتنقص الأسس 1'),
-    (v_exam_id, v_skill_komi_2, 'قيمة س في المعادلة 2س + 4 = 10', '["2", "3", "4", "5"]'::jsonb, 1, 'بطرح 4 وقسمة الطرفين على 2');
+    -- Question 1
+    DECLARE
+        v_q1_id uuid;
+        v_q2_id uuid;
+    BEGIN
+        INSERT INTO questions (exam_id, micro_skill_id, text, explanation, order_index)
+        VALUES (v_exam_id, v_skill_komi_1, 'نصف العدد 2 أس 10 هو؟', 'نقسم على 2 فتنقص الأسس 1', 1)
+        RETURNING id INTO v_q1_id;
+
+        INSERT INTO question_options (question_id, text, is_correct) VALUES
+        (v_q1_id, '2 أس 9', true),
+        (v_q1_id, '2 أس 5', false),
+        (v_q1_id, '1 أس 10', false),
+        (v_q1_id, '4 أس 5', false);
+
+        -- Question 2
+        INSERT INTO questions (exam_id, micro_skill_id, text, explanation, order_index)
+        VALUES (v_exam_id, v_skill_komi_2, 'قيمة س في المعادلة 2س + 4 = 10', 'بطرح 4 وقسمة الطرفين على 2', 2)
+        RETURNING id INTO v_q2_id;
+
+        INSERT INTO question_options (question_id, text, is_correct) VALUES
+        (v_q2_id, '2', false),
+        (v_q2_id, '3', true),
+        (v_q2_id, '4', false),
+        (v_q2_id, '5', false);
+    END;
 
 END $$;

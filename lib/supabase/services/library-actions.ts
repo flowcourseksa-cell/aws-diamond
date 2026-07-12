@@ -13,6 +13,11 @@ export async function createFile(file: Partial<DbLibraryFile>): Promise<DbLibrar
       title: file.title,
       file_url: file.file_url,
       file_type: file.file_type,
+      category: file.category,
+      cover_image: file.cover_image,
+      pages_count: file.pages_count || 0,
+      downloads_count: file.downloads_count || 0,
+      size_label: file.size_label,
       access_type: file.access_type || 'paid',
     }])
     .select()
@@ -35,6 +40,10 @@ export async function updateFile(id: string, file: Partial<DbLibraryFile>): Prom
       title: file.title,
       file_url: file.file_url,
       file_type: file.file_type,
+      category: file.category,
+      cover_image: file.cover_image,
+      pages_count: file.pages_count,
+      size_label: file.size_label,
       access_type: file.access_type,
     })
     .eq("id", id);
@@ -54,4 +63,14 @@ export async function deleteFile(id: string): Promise<boolean> {
     return false;
   }
   return true;
+}
+
+export async function incrementFileDownload(id: string): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data } = await supabase.from("library_files").select("downloads_count").eq("id", id).single();
+  if (data) {
+    const { error } = await supabase.from("library_files").update({ downloads_count: (data.downloads_count || 0) + 1 }).eq("id", id);
+    return !error;
+  }
+  return false;
 }

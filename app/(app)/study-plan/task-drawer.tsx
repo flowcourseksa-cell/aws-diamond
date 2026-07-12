@@ -2,48 +2,29 @@
 
 import { useEffect, useState } from "react";
 import { IconX } from "@tabler/icons-react";
-import { usePlatformStore } from "@/lib/store";
-
-type NewTaskPayload = {
-  title: string;
-  due_date: string | null;
-  micro_skill_id?: string | null;
-};
 
 type Props = {
   open: boolean;
-  defaultDate: string; // YYYY-MM-DD
+  defaultDate: string;
   onClose: () => void;
-  onSave: (task: NewTaskPayload) => void;
+  onSave: (payload: { title: string; due_date: string }) => void;
 };
 
 export function TaskDrawer({ open, defaultDate, onClose, onSave }: Props) {
-  const tracks = usePlatformStore(s => s.tracks);
-
-  // Flatten all micro-skills so a task can optionally target a real skill.
-  const skills = tracks.flatMap(t =>
-    t.sections.flatMap(s => s.skills.map(sk => ({ id: sk.id, name: `${t.name} — ${sk.name}` })))
-  );
-
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState(defaultDate);
-  const [skillId, setSkillId] = useState<string>("");
+  const [dateStr, setDateStr] = useState(defaultDate);
 
+  // Update internal date state when defaultDate prop changes
   useEffect(() => {
-    if (open) setDate(defaultDate);
-  }, [open, defaultDate]);
+    setDateStr(defaultDate);
+  }, [defaultDate]);
 
   const inputCls = "h-11 rounded-[10px] border border-border bg-bg px-3.5 text-[13.5px] text-text outline-none transition-colors duration-200 focus:border-primary focus:shadow-[0_0_0_3px_rgba(108,99,255,0.1)]";
 
   function handleSave() {
-    if (!title.trim()) return;
-    onSave({
-      title: title.trim(),
-      due_date: date || null,
-      micro_skill_id: skillId || null,
-    });
+    if (!title.trim() || !dateStr) return;
+    onSave({ title: title.trim(), due_date: dateStr });
     setTitle("");
-    setSkillId("");
   }
 
   return (
@@ -70,27 +51,16 @@ export function TaskDrawer({ open, defaultDate, onClose, onSave }: Props) {
             className={inputCls} />
         </div>
 
-        {/* المهارة (اختياري) */}
-        {skills.length > 0 && (
-          <div className="flex flex-col gap-1.75">
-            <label className="text-[13px] font-bold">المهارة المرتبطة (اختياري)</label>
-            <select value={skillId} onChange={e => setSkillId(e.target.value)} className={inputCls}>
-              <option value="">بدون ربط</option>
-              {skills.map(sk => (
-                <option key={sk.id} value={sk.id}>{sk.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* التاريخ */}
+        {/* اليوم */}
         <div className="flex flex-col gap-1.75">
           <label className="text-[13px] font-bold">تاريخ المهمة</label>
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+          <input type="date" value={dateStr} onChange={e => setDateStr(e.target.value)} className={inputCls} />
         </div>
 
-        <button onClick={handleSave}
-          className="h-12 rounded-[10px] bg-primary text-sm font-bold text-white transition-colors hover:bg-primary-dark">
+        <button
+          onClick={handleSave}
+          className="mt-4 flex h-11 items-center justify-center rounded-[10px] bg-primary text-[14px] font-bold text-white transition-opacity hover:opacity-90"
+        >
           حفظ المهمة
         </button>
       </div>

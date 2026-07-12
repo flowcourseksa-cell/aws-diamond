@@ -1,5 +1,5 @@
 // ============================================================
-// WhatsApp Service — منصة الأوس الماسية
+// WhatsApp Service — الأوس الماسية
 // يُستخدم هذا الملف من Supabase Edge Function أو API Route
 // ============================================================
 
@@ -119,4 +119,3 @@ export async function processWhatsAppQueue(): Promise<{
 
   return { processed: pending.length, sent, failed };
 }
-

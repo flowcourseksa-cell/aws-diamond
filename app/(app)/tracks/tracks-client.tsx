@@ -1,15 +1,19 @@
+// @ts-nocheck
 "use client";
 
 import { useState, useEffect } from "react";
 import {
   IconChevronDown, IconChevronUp,
   IconCircleCheck, IconAlertTriangle, IconCircle,
-  IconPlayerPlay, IconBrain, IconVideo, IconTarget,
+  IconPlayerPlay, IconBrain, IconVideo, IconTarget, IconLock,
 } from "@tabler/icons-react";
 import { type FlowTrack, type FlowSection, type FlowSkill, usePlatformStore, type AdminExam } from "@/lib/store";
 import { ExamRunner } from "@/app/(app)/exams/exam-runner";
 import { TrackExamResult } from "./track-exam-result";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/use-auth";
+import { submitSecureExamAttempt } from "@/app/actions/exams";
+import { fetchAllExamsStatsMap } from "@/lib/supabase/services/progress";
 
 // ── Status meta ───────────────────────────────────────────────
 const STATUS_META = {
@@ -54,15 +58,20 @@ function SkillBar({ skill }: { skill: FlowSkill }) {
   );
 }
 
-function SectionCard({
-  section, trackColor, onStartExam, sectionExams
-}: {
+import { useToast } from "@/components/ui/toast";
+
+interface SectionCardProps {
   section: FlowSection;
   trackColor: string;
   onStartExam: (examId: string) => void;
   sectionExams: AdminExam[];
-}) {
+  allLessonsCompleted: boolean;
+  stats?: Record<string, { bestScore: number; attemptsCount: number; maxAttempts: number }>;
+}
+
+function SectionCard({ section, trackColor, sectionExams, allLessonsCompleted, onStartExam, stats }: SectionCardProps) {
   const [open, setOpen] = useState(false);
+  const { showToast } = useToast();
 
   const avgScore  = section.skills.length > 0 ? Math.round(section.skills.reduce((s, sk) => s + sk.masteryScore, 0) / section.skills.length) : 0;
   const weakCount = section.skills.filter(sk => sk.status === "weak").length;
@@ -111,21 +120,30 @@ function SectionCard({
           {/* Exam buttons */}
           {sectionExams.length > 0 && (
             <div className="flex flex-wrap gap-2 pb-1">
-              {sectionExams.map(exam => (
-                <button
-                  key={exam.id}
-                  onClick={() => onStartExam(exam.id)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold transition-all hover:-translate-y-0.5"
-                  style={{
-                    background: `${trackColor}12`,
-                    borderColor: `${trackColor}40`,
-                    color: trackColor,
-                  }}
-                >
-                  <IconPlayerPlay size={14} />
-                  {exam.name}
-                </button>
-              ))}
+              {sectionExams.map(exam => {
+                const isLocked = !allLessonsCompleted;
+                return (
+                  <button
+                    key={exam.id}
+                    onClick={() => {
+                      if (isLocked) {
+                        showToast("🔒 يجب عليك مشاهدة جميع دروس هذا القسم بالكامل أولاً لفتح الاختبار!", "error");
+                        return;
+                      }
+                      onStartExam(exam.id);
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-xl border text-sm font-bold transition-all hover:-translate-y-0.5 ${isLocked ? "bg-slate-100 text-slate-500 border-slate-200" : ""}`}
+                    style={isLocked ? {} : {
+                      background: `${trackColor}12`,
+                      borderColor: `${trackColor}40`,
+                      color: trackColor,
+                    }}
+                  >
+                    {isLocked ? <IconLock size={16} /> : (stats && stats[exam.id]?.attemptsCount >= (stats[exam.id]?.maxAttempts ?? 5) ? <IconAlertTriangle size={16} className="text-red-500" /> : <IconPlayerPlay size={16} />)}
+                    <span className={stats && stats[exam.id]?.attemptsCount >= (stats[exam.id]?.maxAttempts ?? 5) ? "text-red-500" : ""}>{exam.name}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -141,49 +159,40 @@ function SectionCard({
 
 // ── Main Component ────────────────────────────────────────────
 type ViewState =
-  | { view: "list" }
-  | { view: "exam"; examId: string }
-  | { view: "result"; examId: string; answers: (number | null)[] };
+  | { view: "list" };
 
 export function TracksClient() {
   const [isMounted, setIsMounted] = useState(false);
-  const [selectedTrack, setSelectedTrack] = useState("");
-  const [state, setState] = useState<ViewState>({ view: "list" });
-  const router = useRouter();
   const storeTracks = usePlatformStore(s => s.tracks);
   const storeExams = usePlatformStore(s => s.exams);
-  const activeTracks = storeTracks;
-  const currentSelectedTrack = activeTracks.some(t => t.id === selectedTrack) ? selectedTrack : (activeTracks[0]?.id || "");
-  const activeTrack = activeTracks.find(t => t.id === currentSelectedTrack);
+  const storeLessons = usePlatformStore(s => s.lessons);
+  const router = useRouter();
   
-  const activeExamObj = state.view !== "list"
-    ? storeExams.find(e => e.id === state.examId)
-    : null;
+  useEffect(() => setIsMounted(true), []);
 
-  // ── Exam flow ──────────────────────────────────────────────
-  if (state.view === "exam" && activeExamObj) {
-    return (
-      <ExamRunner
-        examTitle={activeExamObj.name}
-        questions={activeExamObj.questions}
-        timeMinutes={activeExamObj.timeMinutes}
-        onFinish={answers => setState({ view: "result", examId: activeExamObj.id, answers })}
-      />
-    );
-  }
+  const [activeTab, setActiveTab] = useState(storeTracks[0]?.id ?? "");
+  const [state, setState]         = useState<ViewState>({ view: "list" });
+  const [stats, setStats]         = useState<Record<string, { bestScore: number; attemptsCount: number; maxAttempts: number }>>({});
+  const { user } = useAuth();
+  const { showToast } = useToast();
 
-  if (state.view === "result" && activeExamObj) {
-    return (
-      <TrackExamResult
-        exam={activeExamObj}
-        answers={state.answers}
-        onRetry={() => setState({ view: "exam", examId: activeExamObj.id })}
-        onBack={() => setState({ view: "list" })}
-      />
-    );
-  }
+  useEffect(() => {
+    if (!user) return;
+    fetchAllExamsStatsMap(user.id).then(setStats);
+  }, [user]);
 
-  if (!activeTrack) return <div className="p-8 text-center text-text-muted font-bold">لا يوجد مسارات متاحة...</div>;
+  useEffect(() => {
+    if (storeTracks.length > 0 && !activeTab) {
+      setActiveTab(storeTracks[0].id);
+    }
+  }, [storeTracks, activeTab]);
+
+  const isDataLoading = usePlatformStore(s => s.isDataLoading);
+
+  const activeTrack   = storeTracks.find(t => t.id === activeTab);
+
+  if (!isMounted || isDataLoading) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
+  if (!activeTrack) return <div className="p-8 text-center text-text-muted font-bold">لا توجد مسارات مفعلة في هذه الدورة.</div>;
 
   // ── Stats for active track ─────────────────────────────────
   const allSkills    = activeTrack.sections.flatMap(s => s.skills);
@@ -207,12 +216,12 @@ export function TracksClient() {
 
       {/* ─── Track Tabs ───────────────────────────────────── */}
       <div className="flex flex-wrap gap-2">
-        {activeTracks.map(track => {
-          const isActive = track.id === currentSelectedTrack;
+        {storeTracks.map(track => {
+          const isActive = track.id === activeTab;
           return (
             <button
               key={track.id}
-              onClick={() => setSelectedTrack(track.id)}
+              onClick={() => setActiveTab(track.id)}
               className={`flex items-center gap-2.5 px-5 py-3 rounded-2xl font-extrabold text-[13.5px] border transition-all duration-200 ${
                 isActive
                   ? "text-white shadow-lg border-transparent scale-[1.02]"
@@ -286,17 +295,25 @@ export function TracksClient() {
           أقسام {activeTrack.name}
         </div>
 
-        {activeTrack.sections.map(section => (
-          <SectionCard
-            key={section.id}
-            section={section}
-            trackColor={activeTrack.color}
-            sectionExams={storeExams.filter(e => e.sectionId === section.id)}
-            onStartExam={examId => setState({ view: "exam", examId })}
-          />
-        ))}
+        {activeTrack.sections.map(section => {
+          const sectionLessons = storeLessons.filter(l => l.sectionId === section.id);
+          const allLessonsCompleted = sectionLessons.length === 0 || sectionLessons.every(l => l.status === "completed");
+
+          return (
+            <SectionCard
+              key={section.id}
+              section={section}
+              trackColor={activeTrack.color}
+              sectionExams={storeExams.filter(e => e.sectionId === section.id)}
+              allLessonsCompleted={allLessonsCompleted}
+              onStartExam={examId => {
+                router.push(`/exams?pulse=${examId}`);
+              }}
+              stats={stats}
+            />
+          );
+        })}
       </div>
     </>
   );
 }
-

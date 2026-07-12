@@ -1,30 +1,26 @@
 "use client";
 
 import React from "react";
-import { IconBrandWhatsapp, IconMessageCircle2 } from "@tabler/icons-react";
+import { IconBrandWhatsapp, IconArrowLeft } from "@tabler/icons-react";
 
 export default function FloatingButtons() {
   return (
-    <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-4">
-      {/* Support Button */}
-      <a 
-        href="#"
-        className="bg-white text-text px-4 py-2 rounded-full shadow-lg border border-border flex items-center gap-2 font-bold hover:bg-bg transition-colors fade-up"
-      >
+    <div className="fixed bottom-3 left-3 z-50 flex items-center gap-2" dir="rtl">
+      {/* Support Label */}
+      <div className="bg-white text-text px-3 py-1.5 rounded-xl shadow-lg border border-border flex items-center gap-1.5 font-bold text-sm animate-pulse-slow">
         <span>للدعم الفني</span>
-        <IconMessageCircle2 size={20} className="text-accent-amber" />
-      </a>
+        <IconArrowLeft size={16} className="text-[#25D366]" />
+      </div>
       
       {/* WhatsApp Button */}
       <a 
         href="https://wa.me/966507806516"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-16 h-16 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform fade-up delay-1"
+        className="w-10 h-10 bg-[#25D366] text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
       >
-        <IconBrandWhatsapp size={36} />
+        <IconBrandWhatsapp size={24} />
       </a>
     </div>
   );
 }
-

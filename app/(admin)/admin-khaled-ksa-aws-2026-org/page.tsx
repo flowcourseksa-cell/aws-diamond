@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { useEffect, useState } from "react";
 import { fetchAdminStats, type AdminStats } from "@/lib/supabase/services/admin-stats";
+import { createClient } from "@/lib/supabase/client";
 
 const tooltipStyle = {
   fontFamily: "Cairo", fontSize: 12, borderRadius: 10,
@@ -20,8 +21,18 @@ const tooltipStyle = {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [adminLevel, setAdminLevel] = useState("super");
 
   useEffect(() => {
+    const fetchLevel = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase.from("profiles").select("admin_level").eq("id", user.id).single();
+        if (profile?.admin_level) setAdminLevel(profile.admin_level);
+      }
+    };
+    fetchLevel();
     fetchAdminStats()
       .then(setStats)
       .finally(() => setIsLoading(false));
@@ -138,8 +149,8 @@ export default function AdminDashboard() {
           <div className="flex flex-col gap-2.5">
             {stats.weakSkills.length === 0 ? (
               <p className="text-sm text-text-muted font-semibold">لا توجد مهارات ضعيفة حالياً ✓</p>
-            ) : stats.weakSkills.map((sk) => (
-              <div key={sk.micro_skill_id} className="flex items-center gap-3">
+            ) : stats.weakSkills.map((sk, idx) => (
+              <div key={`${sk.micro_skill_id}-${idx}`} className="flex items-center gap-3">
                 <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: sk.track_color }} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-1">
@@ -168,9 +179,11 @@ export default function AdminDashboard() {
               { href: "/admin-khaled-ksa-aws-2026-org/exams",    label: "إضافة اختبار",        icon: <IconClipboardText size={20}/>,  color: "#f59e0b" },
               { href: "/admin-khaled-ksa-aws-2026-org/lessons",  label: "رفع درس جديد",         icon: <IconBook size={20}/>,           color: "#10b981" },
               { href: "/admin-khaled-ksa-aws-2026-org/tracks",   label: "تعديل المهارات",       icon: <IconBrain size={20}/>,          color: "#8b5cf6" },
-              { href: "/admin-khaled-ksa-aws-2026-org/whatsapp", label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366" },
-              { href: "/admin-khaled-ksa-aws-2026-org/pricing",  label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444" },
-            ].map((action, i) => (
+              { href: "/admin-khaled-ksa-aws-2026-org/whatsapp", label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366", restricted: true },
+              { href: "/admin-khaled-ksa-aws-2026-org/pricing",  label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444", restricted: true },
+            ]
+            .filter(action => !(adminLevel === "content" && action.restricted))
+            .map((action, i) => (
               <a
                 key={i}
                 href={action.href}

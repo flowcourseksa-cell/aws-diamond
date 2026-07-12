@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { IconUser, IconLogout, IconCopy, IconCheck, IconSettings, IconX, IconArrowRight, IconLock, IconEye, IconEyeOff } from "@tabler/icons-react";
+import { IconUser, IconLogout, IconCopy, IconCheck, IconSettings, IconX, IconArrowRight, IconLock, IconEye, IconEyeOff, IconAward, IconBook2, IconFlame } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/use-auth";
 import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
 import Link from "next/link";
@@ -113,10 +113,10 @@ export function ProfileDropdown({ customTrigger, loginClassName }: { customTrigg
   if (!mounted) return null;
 
   const displayProfile = isLoading 
-    ? { full_name: "جاري التحميل...", role: "student" } 
-    : (profile || { full_name: "طالب جديد", role: "student" });
+    ? { full_name: "جاري التحميل...", role: "student", phone: "" } 
+    : (profile || { full_name: "طالب جديد", role: "student", phone: "" });
     
-  const studentCode = user ? `TKH-${user.id.split('-')[0].toUpperCase()}` : "";
+  const studentCode = displayProfile.phone ? displayProfile.phone : (user ? `TKH-${user.id.split('-')[0].toUpperCase()}` : "");
 
   const copyId = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -144,60 +144,89 @@ export function ProfileDropdown({ customTrigger, loginClassName }: { customTrigg
       )}
 
       {isOpen && mounted && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200" dir="rtl" onClick={() => setIsOpen(false)}>
-          <div className="bg-white/90 backdrop-blur-xl border border-slate-100 shadow-2xl rounded-3xl p-6 w-full max-w-sm relative animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" dir="rtl" onClick={() => setIsOpen(false)}>
+          <div className="bg-white backdrop-blur-xl border border-slate-100 shadow-2xl rounded-3xl p-6 w-full max-w-sm relative animate-in slide-in-from-bottom-8 zoom-in-95 duration-300 ease-out overflow-hidden" onClick={(e) => e.stopPropagation()}>
             
             {view === 'profile' ? (
               <>
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition-colors"
-                >
-                  <IconX size={16} />
-                </button>
-                <div className="flex items-center gap-4 mb-6 mt-2">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-indigo-500/30 shrink-0">
-                    {displayProfile.full_name[0]}
-                  </div>
-                  <div>
-                    <h3 className="font-black text-slate-800 text-lg leading-tight">{displayProfile.full_name}</h3>
-                    <p className="text-slate-500 text-sm font-semibold">طالب ماسي</p>
+                {/* Premium Header Profile Area */}
+                <div className="relative -mx-6 -mt-6 p-6 mb-5 overflow-hidden rounded-t-3xl border-b border-slate-50">
+                  {/* Background Accents */}
+                  <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-b from-indigo-50/80 to-white pointer-events-none" />
+                  
+                  <button 
+                    onClick={() => setIsOpen(false)}
+                    className="absolute top-4 left-4 w-8 h-8 flex items-center justify-center rounded-full bg-white border border-slate-100 hover:bg-rose-50 hover:border-rose-100 text-slate-400 hover:text-rose-600 transition-all z-50 shadow-sm"
+                  >
+                    <IconX size={16} stroke={2.5} />
+                  </button>
+
+                  <div className="relative z-10 flex flex-col items-center text-center mt-2">
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-3xl font-black shadow-lg shadow-indigo-500/30 mb-3 ring-4 ring-white relative">
+                      {displayProfile.full_name[0]}
+                      <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-sm">
+                        <IconCheck size={14} className="text-emerald-500" stroke={3} />
+                      </div>
+                    </div>
+                    <h3 className="font-black text-slate-800 text-xl leading-tight mb-1.5">{displayProfile.full_name}</h3>
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border mt-1 ${
+                      displayProfile.role === 'admin' 
+                        ? 'bg-rose-50 border-rose-100' 
+                        : 'bg-indigo-50 border-indigo-100'
+                    }`}>
+                      {displayProfile.role === 'admin' ? (
+                        <IconAward size={14} className="text-rose-500" />
+                      ) : (
+                        <IconUser size={14} className="text-indigo-500" />
+                      )}
+                      <span className={`text-xs font-bold tracking-wide ${
+                        displayProfile.role === 'admin' ? 'text-rose-600' : 'text-indigo-600'
+                      }`}>
+                        {displayProfile.role === 'admin' ? 'إدارة المنصة' : 'طالب'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-2xl p-4 mb-6 border border-slate-100 group cursor-pointer hover:bg-slate-100 transition-colors flex items-center justify-between" onClick={copyId}>
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 mb-1">الرقم التعريفي (ID)</p>
-                    <p className="font-mono font-black text-indigo-600 text-base md:text-lg tracking-wider" dir="ltr">{studentCode}</p>
+                <div className="bg-white rounded-2xl p-4 mb-4 border border-slate-100 hover:border-indigo-200 hover:shadow-md shadow-sm transition-all flex items-center justify-between cursor-pointer group" onClick={copyId}>
+                  <div className="flex flex-col gap-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">الرقم التعريفي (ID)</p>
+                    <p className="font-mono font-black text-slate-700 text-base md:text-lg tracking-wider group-hover:text-indigo-600 transition-colors" dir="ltr">{studentCode}</p>
                   </div>
-                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-400 group-hover:text-indigo-500 group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all shrink-0">
-                    {copied ? <IconCheck size={20} className="text-emerald-500" /> : <IconCopy size={20} />}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${copied ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-50 border border-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 group-hover:border-indigo-100'}`}>
+                    {copied ? <IconCheck size={20} stroke={2.5} /> : <IconCopy size={20} stroke={2} />}
                   </div>
                 </div>
 
-                <div className="mb-6 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-50/50">
-                  <div className="flex justify-between items-end mb-2">
-                    <span className="text-sm font-bold text-slate-600">الدورات المشترك بها: {stats.courses}</span>
-                    <span className="text-xs font-black text-indigo-600">{stats.progress}%</span>
+                <div className="mb-5 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
+                  <div className="flex justify-between items-end mb-3 relative z-10">
+                    <span className="text-sm font-bold text-slate-600 flex items-center gap-1.5">
+                      <IconBook2 size={16} className="text-indigo-500" />
+                      الدورات المشترك بها: <span className="font-black text-indigo-600">{stats.courses}</span>
+                    </span>
+                    <span className="text-xs font-black text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg shadow-sm">{stats.progress}%</span>
                   </div>
-                  <div className="h-2 w-full bg-slate-200/50 rounded-full overflow-hidden">
+                  <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden relative z-10 shadow-inner">
                     <div 
-                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000 ease-out" 
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000 ease-out relative" 
                       style={{ width: `${stats.progress}%` }}
                     />
                   </div>
-                  <p className="text-xs text-slate-500 mt-2 font-semibold">استمر في التعلم لزيادة تقدمك!</p>
+                  <p className="text-[11px] text-slate-500 mt-2.5 font-semibold relative z-10 flex items-center gap-1">
+                    <IconFlame size={13} className="text-orange-500" />
+                    استمر في التعلم لزيادة تقدمك!
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 mt-2">
+                <div className="grid grid-cols-2 gap-3 pt-1">
                   <button 
                     onClick={() => {
                       setView('settings');
                       setMessage('');
                     }}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 py-3 text-sm font-bold text-slate-600 transition-colors"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 py-3 text-sm font-bold text-slate-600 transition-all active:scale-95 shadow-sm hover:shadow"
                   >
-                    <IconSettings size={18} />
+                    <IconSettings size={18} stroke={2} />
                     الإعدادات
                   </button>
                   <button 
@@ -205,9 +234,9 @@ export function ProfileDropdown({ customTrigger, loginClassName }: { customTrigg
                       setIsOpen(false);
                       setShowLogout(true);
                     }}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 py-3 text-sm font-bold transition-colors"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 py-3 text-sm font-bold transition-all active:scale-95 shadow-sm hover:shadow"
                   >
-                    <IconLogout size={18} />
+                    <IconLogout size={18} stroke={2} />
                     تسجيل الخروج
                   </button>
                 </div>

@@ -6,9 +6,12 @@ import Link from "next/link";
 import {
   IconArrowRight, IconPlus, IconTrash, IconCheck,
   IconGripVertical, IconAlertCircle, IconDeviceFloppy,
+  IconFileSpreadsheet, IconDownload, IconUpload, IconX
 } from "@tabler/icons-react";
+import * as XLSX from "xlsx";
 
 import { fetchExamBuilderData, saveQuestionWithOptions, deleteQuestion, type ExamWithDetails, type DbQuestion, type DbQuestionOption } from "@/lib/supabase/services/exams";
+import { bulkSaveExamQuestions } from "@/lib/supabase/services/exams-actions";
 import { fetchHierarchyByCourse, type DbTrack } from "@/lib/supabase/services/hierarchy";
 
 // Local types for the builder UI state
@@ -39,6 +42,12 @@ export default function ExamBuilderPage() {
   const [questions, setQuestions] = useState<QuestionState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Excel Import state
+  const [showImport, setShowImport] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+  const [importMicroSkillId, setImportMicroSkillId] = useState("");
 
   useEffect(() => {
     setIsMounted(true);
@@ -157,6 +166,79 @@ export default function ExamBuilderPage() {
     ));
   }
 
+  // --- EXCEL IMPORT LOGIC ---
+  const downloadTemplate = () => {
+    const data = [
+      {
+        "نص السؤال": "ما هي عاصمة السعودية؟",
+        "الخيار أ (صحيح)": "الرياض",
+        "الخيار ب": "جدة",
+        "الخيار ج": "مكة",
+        "الخيار د": "الدمام",
+        "الصعوبة (easy/medium/hard)": "easy"
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "الأسئلة");
+    XLSX.writeFile(wb, "قالب_أسئلة_الاختبار.xlsx");
+  };
+
+  const parseExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!exam || !importMicroSkillId) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportLoading(true);
+    setImportResult(null);
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: "binary" });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json<any>(ws);
+
+        const toImport = rawData.map(row => {
+          // Shuffle options, keeping track of which one is correct (the first one initially)
+          let opts = [
+            { text: String(row["الخيار أ (صحيح)"] || ""), is_correct: true },
+            { text: String(row["الخيار ب"] || ""), is_correct: false },
+            { text: String(row["الخيار ج"] || ""), is_correct: false },
+            { text: String(row["الخيار د"] || ""), is_correct: false },
+          ];
+          opts = opts.filter(o => o.text.trim().length > 0);
+          opts.sort(() => Math.random() - 0.5); // Randomize positions
+
+          return {
+            text: String(row["نص السؤال"] || ""),
+            difficulty: String(row["الصعوبة (easy/medium/hard)"] || "medium"),
+            options: opts
+          };
+        }).filter(q => q.text.trim().length > 0 && q.options.length >= 2);
+
+        if (toImport.length > 0) {
+          const res = await bulkSaveExamQuestions(exam.id, importMicroSkillId, toImport);
+          setImportResult(res);
+          // Reload the page to fetch the new questions correctly with their IDs
+          if (res.success > 0) {
+            window.location.reload();
+          }
+        } else {
+          alert("الملف فارغ أو لا يطابق القالب.");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("حدث خطأ أثناء قراءة الملف.");
+      }
+      setImportLoading(false);
+      if (e.target) e.target.value = "";
+    };
+    reader.readAsBinaryString(file);
+  };
+
   async function handleSaveAll() {
     setIsSaving(true);
     
@@ -217,7 +299,7 @@ export default function ExamBuilderPage() {
     <div className="flex flex-col gap-6 max-w-5xl mx-auto pb-20" dir="rtl">
       
       {/* Header bar */}
-      <div className="flex items-center justify-between bg-card border border-border rounded-2xl p-4 shadow-sm sticky top-4 z-10">
+      <div className="flex items-center justify-between bg-card border border-border rounded-2xl p-4 shadow-sm sticky top-4 z-10 flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Link href="/admin-khaled-ksa-aws-2026-org/exams" className="flex h-10 w-10 items-center justify-center rounded-xl bg-bg hover:bg-border transition-colors">
             <IconArrowRight size={20} className="text-text-muted" />
@@ -229,14 +311,91 @@ export default function ExamBuilderPage() {
             </p>
           </div>
         </div>
-        <button 
-          onClick={handleSaveAll} 
-          disabled={isSaving || questions.length === 0}
-          className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
-        >
-          {isSaving ? "جاري الحفظ..." : <><IconDeviceFloppy size={18} /> حفظ جميع التغييرات</>}
-        </button>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(v => !v)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold border transition-colors ${showImport ? "border-emerald-500/40 text-emerald-600 bg-emerald-500/5" : "border-border text-text-muted hover:border-emerald-500/40 hover:text-emerald-600 bg-card"}`}
+          >
+            <IconFileSpreadsheet size={16} /> رفع بإكسيل
+          </button>
+
+          <button 
+            onClick={handleSaveAll} 
+            disabled={isSaving || questions.length === 0}
+            className="flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark transition-colors disabled:opacity-50"
+          >
+            {isSaving ? "جاري الحفظ..." : <><IconDeviceFloppy size={18} /> حفظ جميع التغييرات</>}
+          </button>
+        </div>
       </div>
+
+      {/* Import Panel */}
+      {showImport && (
+        <div className="bg-card border-2 border-dashed border-emerald-500/30 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-black text-text text-sm flex items-center gap-2">
+              <IconFileSpreadsheet size={18} className="text-emerald-500" /> استيراد الأسئلة من ملف Excel
+            </h3>
+            <button onClick={() => { setShowImport(false); setImportResult(null); }} className="p-1 rounded-lg hover:bg-bg text-text-muted">
+              <IconX size={16} />
+            </button>
+          </div>
+
+          <div className="text-sm font-bold text-text-muted bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 mb-5">
+            <p className="mb-2">خطوات الاستيراد:</p>
+            <ol className="list-decimal list-inside space-y-1.5 text-xs text-text-muted">
+              <li>قم بتحميل القالب المخصص للأسئلة.</li>
+              <li>قم بتعبئة الأسئلة، وضع <b>الإجابة الصحيحة دائماً في (الخيار أ)</b>.</li>
+              <li>النظام سيقوم <b>بخلط ترتيب الإجابات عشوائياً</b> لكل سؤال عند رفعه.</li>
+              <li>اختر <b>المهارة (Micro-Skill)</b> التي ترغب بربط جميع الأسئلة المستوردة بها.</li>
+              <li>ارفع الملف وسيتم حفظ الأسئلة فوراً.</li>
+            </ol>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 space-y-2">
+              <label className="text-xs font-black text-text-muted block">المهارة المرتبطة لجميع الأسئلة المستوردة <span className="text-red-500">*</span></label>
+              <select 
+                value={importMicroSkillId} 
+                onChange={(e) => setImportMicroSkillId(e.target.value)}
+                className="w-full rounded-xl border border-primary/30 bg-primary/5 px-3 py-3 text-sm font-semibold outline-none focus:border-primary text-primary"
+              >
+                <option value="">-- اختر المهارة --</option>
+                {allSkills.map(s => (
+                  <option key={s.id} value={s.id}>
+                    [{s.path}] — {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex items-end gap-2 flex-1">
+              <button
+                onClick={downloadTemplate}
+                className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-card border border-border text-text-muted font-bold hover:bg-bg transition-colors"
+              >
+                <IconDownload size={18} /> تحميل القالب
+              </button>
+              
+              <div className="relative flex-1">
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={parseExcelFile}
+                  disabled={importLoading || !importMicroSkillId}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                />
+                <div className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold transition-colors ${
+                  !importMicroSkillId ? "bg-bg text-text-muted border border-border opacity-50" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"
+                }`}>
+                  {importLoading ? <span className="animate-pulse">جاري الاستيراد...</span> : <><IconUpload size={18} /> رفع الملف</>}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Questions List */}
       <div className="flex flex-col gap-4">

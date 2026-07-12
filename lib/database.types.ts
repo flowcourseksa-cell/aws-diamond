@@ -1,5 +1,5 @@
 // ============================================================
-// منصة الأوس الماسية — TypeScript Types (مطابق لـ Supabase Schema)
+// الأوس الماسية — TypeScript Types (مطابق لـ Supabase Schema)
 // ============================================================
 
 export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
@@ -212,4 +212,3 @@ export interface Database {
     };
   };
 }
-

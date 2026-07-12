@@ -1,4 +1,6 @@
 "use server";
+import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
+
 
 import { createAdminClient } from "@/lib/supabase/client";
 import type { DiscountCode, SubscriptionPrice } from "./pricing";
@@ -6,6 +8,7 @@ import type { DiscountCode, SubscriptionPrice } from "./pricing";
 const PRICES_KEY = "subscription_prices";
 
 export async function createDiscountCode(code: Partial<DiscountCode>): Promise<DiscountCode | null> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("discount_codes")
@@ -14,6 +17,7 @@ export async function createDiscountCode(code: Partial<DiscountCode>): Promise<D
       discount_percent: code.discountPercent ?? 0,
       max_uses: code.maxUses ?? 0,
       expiry_date: code.expiryDate || null,
+      is_public: code.isPublic ?? false,
     }])
     .select()
     .single();
@@ -35,6 +39,7 @@ export async function createDiscountCode(code: Partial<DiscountCode>): Promise<D
 }
 
 export async function updateDiscountCode(id: string, code: Partial<DiscountCode>): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
 
   const colMap: Record<string, any> = {
@@ -43,6 +48,7 @@ export async function updateDiscountCode(id: string, code: Partial<DiscountCode>
     uses: code.uses,
     max_uses: code.maxUses,
     expiry_date: code.expiryDate === undefined ? undefined : (code.expiryDate || null),
+    is_public: code.isPublic,
   };
   const payload: Record<string, any> = {};
   for (const [k, v] of Object.entries(colMap)) {
@@ -62,6 +68,7 @@ export async function updateDiscountCode(id: string, code: Partial<DiscountCode>
 }
 
 export async function deleteDiscountCode(id: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase.from("discount_codes").delete().eq("id", id);
   if (error) {
@@ -72,14 +79,15 @@ export async function deleteDiscountCode(id: string): Promise<boolean> {
 }
 
 export async function saveSubscriptionPrices(prices: SubscriptionPrice[]): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase.from("platform_settings").upsert(
     {
-      key: PRICES_KEY,
-      value: prices,
+      id: PRICES_KEY,
+      settings: prices as any,
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "key" }
+    { onConflict: "id" }
   );
 
   if (error) {

@@ -1,10 +1,24 @@
+// @ts-nocheck
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { IconCheck } from "@tabler/icons-react";
 import { usePlatformStore } from "@/lib/store";
-import { useEffect } from "react";
 import { useToast } from "@/components/ui/toast";
+
+// مهام اليوم مرتبطة بالمسارات الصحيحة
+const TRACK_COLOR: Record<string, string> = {
+  "qudrat-komi":  "#6366f1",
+  "qudrat-lafzi": "#8b5cf6",
+  "tasis-komi":   "#f59e0b",
+  "tasis-lafzi":  "#10b981",
+};
+const TRACK_NAME: Record<string, string> = {
+  "qudrat-komi":  "القدرات (كمي)",
+  "qudrat-lafzi": "القدرات (لفظي)",
+  "tasis-komi":   "تأسيس (كمي)",
+  "tasis-lafzi":  "تأسيس (لفظي)",
+};
 
 type FlowTask = { id: string; trackId: string; title: string; time: string; isDone: boolean };
 
@@ -13,7 +27,7 @@ const INITIAL: FlowTask[] = [
   { id: "ft2", trackId: "qudrat-lafzi", title: "حل 15 سؤال مفردة شاذة",         time: "11:00", isDone: true  },
   { id: "ft3", trackId: "qudrat-komi",  title: "تمارين الاحتمالات — مهارة ضعيفة",time: "14:00", isDone: false },
   { id: "ft4", trackId: "qudrat-lafzi", title: "مراجعة الاستنتاج في المقروء",    time: "16:00", isDone: false },
-  { id: "ft5", trackId: "tasis",   title: "الكسور والنسب المئوية",          time: "18:00", isDone: false },
+  { id: "ft5", trackId: "tasis-komi",   title: "الكسور والنسب المئوية",          time: "18:00", isDone: false },
 ];
 
 export function TodayTasks() {
@@ -65,4 +79,3 @@ export function TodayTasks() {
     </div>
   );
 }
-

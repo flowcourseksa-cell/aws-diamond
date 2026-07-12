@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import {
-  IconRocket,
+  IconSchool,
   IconMoon,
   IconSun,
   IconEye,
@@ -15,7 +15,9 @@ import {
   IconUser,
   IconDeviceMobile,
   IconPhone,
+  IconArrowRight,
 } from "@tabler/icons-react";
+import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
 
 function isValidEmailOrPhone(value: string) {
@@ -155,7 +157,7 @@ export default function LoginPage() {
     const nameValid = !isRegistering || fullName.trim().length >= 2;
     const confirmValid = !isRegistering || confirmPassword === password;
     const saudiPhoneRegex = /^05[0-9]{8}$/;
-    const phoneValid = !isRegistering || saudiPhoneRegex.test(phone.trim());
+    const phoneValid = !isRegistering || phone.trim() === "" || saudiPhoneRegex.test(phone.trim());
     const parentPhoneValid = !isRegistering || saudiPhoneRegex.test(parentPhone.trim());
 
     setEmailError(!emailValid);
@@ -188,6 +190,9 @@ export default function LoginPage() {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/auth/callback`,
+            data: {
+              full_name: fullName.trim(),
+            }
           },
         });
 
@@ -284,13 +289,22 @@ export default function LoginPage() {
         {isDark ? <IconSun size={20} /> : <IconMoon size={20} />}
       </button>
 
+      {/* زر العودة للرئيسية */}
+      <Link
+        href="/"
+        className="absolute right-6 top-6 z-2 flex items-center gap-2 h-10.5 px-4 rounded-[10px] border border-border bg-card text-text transition-transform duration-200 hover:-translate-y-0.5 text-sm font-bold"
+      >
+        العودة للرئيسية
+        <IconArrowRight size={18} />
+      </Link>
+
       {/* البطاقة */}
       <div className="fade-up relative z-1 w-[420px] max-w-[92vw] rounded-[20px] border border-border bg-card p-10 shadow-[0_10px_40px_rgba(15,17,23,0.06)] sm:p-9">
-        <div className="mb-7 flex flex-col items-center gap-2.5">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white">
-            <IconRocket size={28} />
+        <div className="mb-7 flex flex-col items-center gap-3">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#f97316] to-[#ea580c] shadow-lg shadow-orange-500/20 text-white">
+            <IconSchool size={34} stroke={2.5} />
           </div>
-          <div className="text-[22px] font-black tracking-wide">الأوس الماسية</div>
+          <div className="text-[24px] font-black tracking-tight text-text">الأوس الماسية</div>
           <div className="text-xs font-semibold tracking-widest text-text-muted">
             EDUCATION PLATFORM
           </div>
@@ -392,7 +406,7 @@ export default function LoginPage() {
           {/* رقم جوال الطالب — يظهر فقط عند التسجيل */}
           {isRegistering && (
             <div className="flex flex-col gap-2">
-              <label htmlFor="phone" className="text-[13px] font-semibold">رقم جوال الطالب</label>
+              <label htmlFor="phone" className="text-[13px] font-semibold">رقم جوال الطالب <span className="text-[11px] font-normal text-text-muted">(اختياري)</span></label>
               <div className="relative">
                 <input
                   id="phone"

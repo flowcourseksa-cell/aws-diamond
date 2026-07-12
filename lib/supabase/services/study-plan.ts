@@ -22,7 +22,7 @@ export async function fetchStudyPlanTasks(studentId: string): Promise<StudyPlanT
   const supabase = createClient();
   const { data, error } = await supabase
     .from("study_plan_tasks")
-    .select("*")
+    .select("id, student_id, micro_skill_id, title, due_date, is_completed, source, created_at, exam_id")
     .eq("student_id", studentId)
     .order("due_date", { ascending: true })
     .order("created_at", { ascending: true });

@@ -4,12 +4,17 @@ import { useState, useEffect } from "react";
 import {
   IconPlus, IconEdit, IconTrash, IconCheck, IconX,
   IconBook, IconPlayerPlay, IconLock, IconFilter,
-  IconBrandYoutube,
+  IconBrandYoutube, IconMessageCircle, IconAlertTriangle,
 } from "@tabler/icons-react";
+import dynamic from "next/dynamic";
 import { fetchCourses } from "@/lib/supabase/services/courses";
 import { fetchHierarchyByCourse, type DbTrack } from "@/lib/supabase/services/hierarchy";
-import { fetchLessonsByTracks, createLesson, updateLesson, deleteLesson, type DbLesson } from "@/lib/supabase/services/lessons";
+import { fetchLessonsByTracks, type DbLesson } from "@/lib/supabase/services/lessons";
+import { createLesson, updateLesson, deleteLesson, getVideoUploadUrl, getPublicVideoUrl, uploadLessonCoverImage } from "@/lib/supabase/services/lessons-actions";
 import { type Course } from "@/lib/store";
+import { AdminCommentsModal } from "./AdminCommentsModal";
+
+const ReactPlayer = dynamic(() => import("react-player"), { ssr: false });
 
 function Badge({ label, color }: { label: string; color: string }) {
   return (
@@ -27,6 +32,7 @@ export default function AdminLessonsPage() {
   const [tracks, setTracks] = useState<DbTrack[]>([]);
   const [lessons, setLessons] = useState<DbLesson[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [commentsLesson, setCommentsLesson] = useState<DbLesson | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -72,6 +78,8 @@ export default function AdminLessonsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [commentsEnabled, setCommentsEnabled] = useState(true);
 
   const activeTrack = tracks.find(t => t.id === trackId);
   const trackSections = activeTrack?.sections ?? [];
@@ -84,6 +92,8 @@ export default function AdminLessonsPage() {
     setDuration(""); setIsFree(true); setPrice(0); setStatus("normal");
     setUploadMode("url");
     setFileToUpload(null);
+    setCoverImageFile(null);
+    setCommentsEnabled(true);
     setUploadProgress(0);
     setIsUploading(false);
     setShowForm(true);
@@ -105,8 +115,10 @@ export default function AdminLessonsPage() {
 
     setIsFree(lesson.access_type === "free");
     setPrice(lesson.price || 0); setStatus(lesson.status || "normal");
-    setUploadMode(lesson.video_url.startsWith("ملف محلي") ? "file" : "url");
+    setUploadMode(lesson.video_url.startsWith("ملف محلي") || lesson.video_url.startsWith("http") && !lesson.video_url.includes("youtube") ? "file" : "url");
     setFileToUpload(null);
+    setCoverImageFile(null);
+    setCommentsEnabled(lesson.comments_enabled ?? true);
     setUploadProgress(0);
     setIsUploading(false);
     setShowForm(true);
@@ -133,27 +145,64 @@ export default function AdminLessonsPage() {
     }
   }
 
-  function saveLesson() {
+  async function saveLesson() {
+    setIsUploading(true);
+    let finalVideoUrl = videoUrl;
+    let finalCoverUrl = editingLesson?.cover_image || undefined;
+
     if (uploadMode === "file" && fileToUpload) {
-      setIsUploading(true);
-      let p = 0;
-      const interval = setInterval(() => {
-        p += Math.floor(Math.random() * 20) + 10;
-        if (p >= 100) {
-          p = 100;
-          clearInterval(interval);
-          setUploadProgress(100);
-          setTimeout(finishSaving, 500);
-        } else {
-          setUploadProgress(p);
+      // Generate a unique filename to prevent "The resource already exists" errors
+      const ext = fileToUpload.name.split('.').pop();
+      const uniqueFileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+      
+      const signedUrlData = await getVideoUploadUrl(uniqueFileName);
+      if (signedUrlData && signedUrlData.signedUrl) {
+        // Upload video file directly
+        try {
+          const req = new XMLHttpRequest();
+          req.open("PUT", signedUrlData.signedUrl, true);
+          
+          await new Promise((resolve, reject) => {
+            req.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                setUploadProgress(Math.round((e.loaded / e.total) * 90));
+              }
+            };
+            req.onload = () => {
+              if (req.status >= 200 && req.status < 300) resolve(true);
+              else reject("Upload failed");
+            };
+            req.onerror = () => reject("Upload failed");
+            req.send(fileToUpload);
+          });
+          
+          finalVideoUrl = await getPublicVideoUrl(signedUrlData.path);
+          setUploadProgress(95);
+        } catch (err) {
+          console.error(err);
+          alert("حدث خطأ أثناء رفع الفيديو. يرجى المحاولة مرة أخرى.");
+          setIsUploading(false);
+          return;
         }
-      }, 400);
-    } else {
-      finishSaving();
+      } else {
+        alert("فشل في تهيئة رابط الرفع السحابي. يرجى المحاولة مرة أخرى.");
+        setIsUploading(false);
+        return;
+      }
     }
+
+    if (coverImageFile) {
+      const fd = new FormData();
+      fd.append("file", coverImageFile);
+      const url = await uploadLessonCoverImage(fd);
+      if (url) finalCoverUrl = url;
+    }
+
+    setUploadProgress(100);
+    finishSaving(finalVideoUrl, finalCoverUrl);
   }
 
-  async function finishSaving() {
+  async function finishSaving(finalVideoUrl: string = videoUrl, finalCoverUrl?: string) {
     let durationSecs = 0;
     if (duration && duration.includes(":")) {
       const [m, s] = duration.split(":");
@@ -164,7 +213,7 @@ export default function AdminLessonsPage() {
 
     const payload: Partial<DbLesson> = {
       title, 
-      video_url: videoUrl, 
+      video_url: finalVideoUrl, 
       teacher_name: teacherName, 
       track_id: trackId, 
       section_id: sectionId || null,
@@ -172,6 +221,8 @@ export default function AdminLessonsPage() {
       access_type: isFree ? "free" : "paid", 
       price: isFree ? 0 : price,
       status,
+      cover_image: finalCoverUrl,
+      comments_enabled: commentsEnabled,
     };
 
     if (editingLesson) {
@@ -195,6 +246,8 @@ export default function AdminLessonsPage() {
     const success = await deleteLesson(id);
     if (success) {
       setLessons(prev => prev.filter(l => l.id !== id));
+    } else {
+      alert("لا يمكن حذف هذا الدرس، قد يكون مرتبطاً بمهارة موجودة. يرجى إزالة الارتباط أولاً.");
     }
     setConfirmDel(null);
   }
@@ -294,7 +347,13 @@ export default function AdminLessonsPage() {
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-1.5">
+                            <button onClick={() => setCommentsLesson(lesson)}
+                              title="إدارة التعليقات"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
+                              <IconMessageCircle size={13} />
+                            </button>
                             <button onClick={() => openEdit(lesson)}
+                              title="تعديل"
                               className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted hover:border-primary hover:text-primary transition-colors">
                               <IconEdit size={13} />
                             </button>
@@ -366,7 +425,7 @@ export default function AdminLessonsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                  <div>
                   <label className="text-xs font-black text-text-muted mb-1.5 block">اسم المعلم</label>
                   <input value={teacherName} onChange={e => setTeacherName(e.target.value)} placeholder="مثال: أ. محمد..."
@@ -374,19 +433,39 @@ export default function AdminLessonsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-black text-text-muted mb-1.5 block">مصدر الفيديو</label>
-                  <div className="flex gap-2 mb-2">
-                    <button onClick={() => setUploadMode("url")} className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition-colors ${uploadMode === "url" ? "border-primary bg-primary text-white" : "border-border text-text-muted"}`}>رابط خارجي</button>
-                    <button onClick={() => setUploadMode("file")} className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition-colors ${uploadMode === "file" ? "border-primary bg-primary text-white" : "border-border text-text-muted"}`}>رفع من الجهاز</button>
+                  <div className="flex gap-4 mb-3">
+                    <button onClick={() => setUploadMode("url")} className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-colors ${uploadMode === "url" ? "bg-primary text-white" : "border border-border text-text-muted hover:border-primary"}`}>رابط خارجي</button>
+                    <button onClick={() => setUploadMode("file")} className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-colors ${uploadMode === "file" ? "bg-primary text-white" : "border border-border text-text-muted hover:border-primary"}`}>رفع من الجهاز</button>
                   </div>
                   {uploadMode === "url" ? (
-                    <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://..."
-                      className="w-full rounded-xl border border-border bg-bg px-3 py-2.5 text-sm font-semibold outline-none focus:border-primary text-left" dir="ltr" />
+                    <>
+                      <input type="text" className="w-full rounded-xl border border-border bg-bg px-4 py-2.5 text-[13.5px] font-semibold outline-none focus:border-primary" value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="رابط يوتيوب أو فيديو..." />
+                      {videoUrl && (
+                        <div className="hidden">
+                          <ReactPlayer 
+                            url={videoUrl} 
+                            onDuration={(d: number) => {
+                              const mins = Math.floor(d / 60);
+                              const secs = Math.floor(d % 60);
+                              setDuration(`${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+                            }} 
+                          />
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <div className="relative">
                       <input type="file" accept="video/*" onChange={handleFileSelect} 
                         className="w-full text-sm text-text-muted file:mr-0 file:ml-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
                     </div>
                   )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-text-muted mb-1.5 block">صورة الغلاف للدرس (اختياري)</label>
+                <div className="flex items-center gap-3 relative">
+                  <input type="file" accept="image/*" onChange={(e) => setCoverImageFile(e.target.files?.[0] || null)} className="w-full text-sm text-text-muted file:mr-0 file:ml-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-primary/10 file:text-primary hover:file:bg-primary/20" />
                 </div>
               </div>
 
@@ -428,6 +507,19 @@ export default function AdminLessonsPage() {
                  </select>
               </div>
 
+              <div className="flex items-center gap-3 bg-bg rounded-xl p-4 border border-border">
+                <input 
+                  type="checkbox" 
+                  id="commentsEnabled" 
+                  checked={commentsEnabled} 
+                  onChange={(e) => setCommentsEnabled(e.target.checked)} 
+                  className="w-5 h-5 rounded border-border text-primary focus:ring-primary"
+                />
+                <label htmlFor="commentsEnabled" className="text-sm font-bold text-text cursor-pointer">
+                  تفعيل التعليقات على هذا الدرس
+                </label>
+              </div>
+
               {isUploading && (
                 <div className="mt-2 mb-2">
                   <div className="flex justify-between text-xs font-bold text-text-muted mb-1">
@@ -444,7 +536,7 @@ export default function AdminLessonsPage() {
                 <button onClick={() => setShowForm(false)} disabled={isUploading} className="px-5 py-2.5 text-sm font-bold text-text-muted hover:text-text transition-colors disabled:opacity-50">
                   إلغاء
                 </button>
-                <button onClick={saveLesson} disabled={!title.trim() || !trackId || isUploading || (uploadMode === "file" && !fileToUpload && !videoUrl.startsWith("ملف محلي"))}
+                <button onClick={saveLesson} disabled={!title.trim() || !trackId || isUploading || (uploadMode === "file" && !fileToUpload && !videoUrl)}
                   className="flex items-center gap-2 rounded-xl bg-accent-amber px-6 py-2.5 text-sm font-bold text-white hover:bg-accent-amber/90 disabled:opacity-50">
                   <IconCheck size={16} /> حفظ الدرس
                 </button>
@@ -452,6 +544,14 @@ export default function AdminLessonsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {commentsLesson && (
+        <AdminCommentsModal 
+          lessonId={commentsLesson.id} 
+          lessonTitle={commentsLesson.title} 
+          onClose={() => setCommentsLesson(null)} 
+        />
       )}
     </div>
   );

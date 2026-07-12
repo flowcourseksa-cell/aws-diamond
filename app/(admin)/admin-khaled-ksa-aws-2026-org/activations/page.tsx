@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IconSearch, IconCheck, IconX, IconUser, IconBook, IconAlertCircle } from "@tabler/icons-react";
+import { IconSearch, IconCheck, IconX, IconUser, IconBook, IconAlertCircle, IconBell } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchPendingActivations, approveActivation, rejectActivation } from "@/lib/supabase/services/activations";
 
@@ -12,6 +12,10 @@ type ActivationRequest = {
   student_name: string;
   student_code: string;
   course_title: string;
+  course_price: number;
+  payment_status: string;
+  discount_code?: string;
+  final_price?: number;
   created_at: string;
 };
 
@@ -20,6 +24,10 @@ export default function ActivationsPage() {
   const [filteredRequests, setFilteredRequests] = useState<ActivationRequest[]>([]);
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'free' | 'paid'>('free');
+
+  const freeCount = requests.filter(r => r.course_price === 0).length;
+  const paidCount = requests.filter(r => r.course_price > 0).length;
 
   // Modals state
   const [actionModal, setActionModal] = useState<{ type: 'approve' | 'reject'; request: ActivationRequest } | null>(null);
@@ -40,10 +48,11 @@ export default function ActivationsPage() {
     const q = search.toLowerCase();
     setFilteredRequests(
       requests.filter(
-        r => r.student_name.toLowerCase().includes(q) || r.student_code.toLowerCase().includes(q)
+        r => (r.student_name.toLowerCase().includes(q) || r.student_code.toLowerCase().includes(q)) &&
+             (activeTab === 'paid' ? r.course_price > 0 : r.course_price === 0)
       )
     );
-  }, [search, requests]);
+  }, [search, requests, activeTab]);
 
   const handleApprove = async () => {
     if (!actionModal) return;
@@ -67,13 +76,44 @@ export default function ActivationsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up" dir="rtl">
-      <div>
-        <h1 className="text-2xl font-black mb-2 flex items-center gap-2">
-          <IconCheck className="text-primary" /> إشعارات التفعيل
-        </h1>
-        <p className="text-text-muted">مراجعة طلبات الانضمام للدورات والموافقة عليها أو رفضها.</p>
+      {/* Header */}
+      <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white">
+        <div className="flex items-center gap-3 mb-1">
+          <IconBell size={26} />
+          <h2 className="text-xl font-black">إشعارات تفعيل الدورات</h2>
+        </div>
+        <p className="text-white/70 font-medium text-sm">
+          مراجعة طلبات الانضمام للدورات {activeTab === 'paid' ? 'المدفوعة' : 'المجانية'} والموافقة عليها.
+        </p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex bg-sidebar/5 p-1 rounded-xl w-fit gap-1">
+        <button
+          onClick={() => setActiveTab('free')}
+          className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === 'free' ? 'bg-white shadow-sm text-primary' : 'text-text-muted hover:text-text'}`}
+        >
+          الدورات المجانية
+          {freeCount > 0 && (
+            <span className="bg-accent-red text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">
+              {freeCount}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setActiveTab('paid')}
+          className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === 'paid' ? 'bg-white shadow-sm text-primary' : 'text-text-muted hover:text-text'}`}
+        >
+          الدورات المدفوعة
+          {paidCount > 0 && (
+            <span className="bg-accent-red text-white text-[10px] px-2 py-0.5 rounded-full font-black animate-pulse">
+              {paidCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-card p-4 rounded-2xl border border-border">
         <div className="relative w-full sm:w-96">
           <IconSearch className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" size={18} />

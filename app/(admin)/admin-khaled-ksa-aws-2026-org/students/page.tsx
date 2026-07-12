@@ -4,10 +4,11 @@ import { useState, useEffect } from "react";
 import {
   IconUsers, IconSearch, IconFilter, IconChevronDown, IconChevronUp,
   IconBrandWhatsapp, IconChartPie, IconAlertTriangle, IconActivity,
-  IconCheck, IconX, IconTrendingUp, IconKey, IconTrash
+  IconCheck, IconX, IconTrendingUp, IconKey, IconTrash,
+  IconEdit, IconLock, IconShieldLock, IconUserOff
 } from "@tabler/icons-react";
 
-import { fetchStudents, enrollStudent, unenrollStudent, type StudentWithDetails } from "@/lib/supabase/services/students";
+import { fetchStudents, enrollStudent, unenrollStudent, updateStudent, toggleStudentBan, updateStudentPassword, deleteStudentCompletely, type StudentWithDetails } from "@/lib/supabase/services/students";
 import { fetchCourses } from "@/lib/supabase/services/courses";
 import { type Course } from "@/lib/store";
 
@@ -23,13 +24,19 @@ export default function AdminStudentsPage() {
   const [search, setSearch] = useState("");
   const [filterCourse, setFilterCourse] = useState("all");
   
-  // Enrollment Modal State
+  // Modals
   const [manageStudent, setManageStudent] = useState<StudentWithDetails | null>(null);
   const [selectedCourseToEnroll, setSelectedCourseToEnroll] = useState<string>("");
 
+  const [editStudent, setEditStudent] = useState<StudentWithDetails | null>(null);
+  const [editForm, setEditForm] = useState({ full_name: "", phone: "", parent_phone: "" });
+
+  const [passwordStudent, setPasswordStudent] = useState<StudentWithDetails | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+
   useEffect(() => {
     setIsMounted(true);
-    Promise.all([fetchStudents(), fetchCourses()]).then(([sData, cData]) => {
+    Promise.all([fetchStudents(), fetchCourses('all')]).then(([sData, cData]) => {
       setStudents(sData);
       setCourses(cData);
       if (cData.length > 0) {
@@ -61,7 +68,6 @@ export default function AdminStudentsPage() {
   async function handleEnroll() {
     if (!manageStudent || !selectedCourseToEnroll) return;
     
-    // Check if already enrolled
     if (manageStudent.enrollments.some(e => e.course_id === selectedCourseToEnroll)) {
       alert("الطالب مشترك بالفعل في هذه الدورة.");
       return;
@@ -69,10 +75,8 @@ export default function AdminStudentsPage() {
 
     const success = await enrollStudent(manageStudent.id, selectedCourseToEnroll);
     if (success) {
-      // Reload students silently
       const sData = await fetchStudents();
       setStudents(sData);
-      // Update modal state
       setManageStudent(sData.find(s => s.id === manageStudent.id) || null);
     }
   }
@@ -88,11 +92,65 @@ export default function AdminStudentsPage() {
     }
   }
 
+  function openEdit(student: StudentWithDetails) {
+    setEditStudent(student);
+    setEditForm({ full_name: student.full_name, phone: student.phone || "", parent_phone: student.parent_phone || "" });
+  }
+
+  async function handleSaveEdit() {
+    if (!editStudent) return;
+    const success = await updateStudent(editStudent.id, editForm);
+    if (success) {
+      setStudents(await fetchStudents());
+      setEditStudent(null);
+    }
+  }
+
+  async function handleUpdatePassword() {
+    if (!passwordStudent || newPassword.length < 6) {
+      alert("كلمة المرور يجب أن تكون 6 أحرف على الأقل.");
+      return;
+    }
+    const success = await updateStudentPassword(passwordStudent.id, newPassword);
+    if (success) {
+      alert("تم تغيير كلمة المرور بنجاح.");
+      setPasswordStudent(null);
+      setNewPassword("");
+    } else {
+      alert("حدث خطأ أثناء تغيير كلمة المرور.");
+    }
+  }
+
+  async function handleToggleBan(student: StudentWithDetails) {
+    const isBanned = student.is_banned;
+    if (!confirm(`هل أنت متأكد من ${isBanned ? 'فك حظر' : 'حظر'} الطالب ${student.full_name}؟`)) return;
+    
+    const success = await toggleStudentBan(student.id, !isBanned);
+    if (success) {
+      setStudents(await fetchStudents());
+    }
+  }
+
+  async function handleDeleteStudent(student: StudentWithDetails) {
+    const confirmName = prompt(`تحذير خطير! سيتم حذف الطالب "${student.full_name}" وكل اشتراكاته وبياناته نهائياً ولا يمكن التراجع.\n\nاكتب اسم الطالب بالكامل لتأكيد الحذف:`);
+    if (confirmName !== student.full_name) {
+      if (confirmName !== null) alert("اسم الطالب غير متطابق. تم إلغاء الحذف.");
+      return;
+    }
+    
+    const success = await deleteStudentCompletely(student.id);
+    if (success) {
+      alert("تم حذف الطالب بنجاح.");
+      setStudents(await fetchStudents());
+    } else {
+      alert("فشل في حذف الطالب.");
+    }
+  }
+
   if (!isMounted || isLoading) return <div className="p-8 text-center font-bold text-text-muted">جاري تحميل بيانات الطلاب...</div>;
 
   return (
     <div className="flex flex-col gap-6" dir="rtl">
-      {/* Header */}
       <div className="fade-up rounded-2xl bg-sidebar px-7 py-6 text-white">
         <div className="flex items-center gap-3 mb-1">
           <IconUsers size={26} />
@@ -101,7 +159,6 @@ export default function AdminStudentsPage() {
         <p className="text-white/55 text-sm">إدارة وصول الطلاب للدورات، متابعة الحسابات، وتفعيل الاشتراكات.</p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 fade-up">
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-sm font-bold text-text-muted mb-1 flex items-center gap-2"><IconUsers size={16}/> إجمالي الطلاب</div>
@@ -113,7 +170,6 @@ export default function AdminStudentsPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 fade-up">
         <div className="flex-1 min-w-[200px] relative">
           <IconSearch size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -130,7 +186,6 @@ export default function AdminStudentsPage() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse text-[13.5px]">
@@ -182,12 +237,39 @@ export default function AdminStudentsPage() {
                       )}
                     </td>
                     <td className="px-4 py-3.5">
-                      <button 
-                        onClick={() => setManageStudent(student)}
-                        className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        <IconKey size={14} /> إدارة الصلاحيات
-                      </button>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <button 
+                          onClick={() => setManageStudent(student)}
+                          className="flex items-center gap-1 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1 rounded transition-colors"
+                        >
+                          <IconKey size={14} /> الصلاحيات
+                        </button>
+                        <button 
+                          onClick={() => openEdit(student)}
+                          className="flex items-center gap-1 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1 rounded transition-colors"
+                        >
+                          <IconEdit size={14} /> تعديل
+                        </button>
+                        <button 
+                          onClick={() => { setPasswordStudent(student); setNewPassword(""); }}
+                          className="flex items-center gap-1 text-[11px] font-bold text-white bg-amber-500 hover:bg-amber-600 px-2.5 py-1 rounded transition-colors"
+                        >
+                          <IconLock size={14} /> كلمة السر
+                        </button>
+                        <button 
+                          onClick={() => handleToggleBan(student)}
+                          className={`flex items-center gap-1 text-[11px] font-bold text-white px-2.5 py-1 rounded transition-colors ${student.is_banned ? 'bg-green-600 hover:bg-green-700' : 'bg-orange-500 hover:bg-orange-600'}`}
+                        >
+                          {student.is_banned ? <IconShieldLock size={14} /> : <IconUserOff size={14} />} 
+                          {student.is_banned ? 'فك الحظر' : 'حظر'}
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteStudent(student)}
+                          className="flex items-center gap-1 text-[11px] font-bold text-red-600 bg-red-100 border border-red-200 hover:bg-red-200 px-2.5 py-1 rounded transition-colors ml-1"
+                        >
+                          <IconTrash size={14} /> حذف نهائي
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -211,7 +293,6 @@ export default function AdminStudentsPage() {
               <button onClick={() => setManageStudent(null)} className="flex h-8 w-8 items-center justify-center rounded-xl border border-border text-text-muted hover:text-text"><IconX size={16} /></button>
             </div>
 
-            {/* Current Subscriptions */}
             <div className="mb-6">
               <h4 className="text-sm font-black text-text-muted mb-3 uppercase tracking-wider">الاشتراكات الفعالة حالياً</h4>
               {manageStudent.enrollments.length === 0 ? (
@@ -240,7 +321,6 @@ export default function AdminStudentsPage() {
 
             <div className="h-px bg-border w-full mb-6" />
 
-            {/* Grant New Access */}
             <div>
               <h4 className="text-sm font-black text-text-muted mb-3 uppercase tracking-wider">منح صلاحية دورة جديدة</h4>
               <div className="flex gap-2">
@@ -268,7 +348,72 @@ export default function AdminStudentsPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Student Modal */}
+      {editStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 fade-in" onClick={e => { if (e.target === e.currentTarget) setEditStudent(null); }}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl scale-in">
+            <h3 className="text-lg font-black mb-4">تعديل بيانات: <span className="text-primary">{editStudent.full_name}</span></h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-text-muted mb-1">الاسم الكامل</label>
+                <input 
+                  type="text" 
+                  value={editForm.full_name} 
+                  onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-text-muted mb-1">رقم هاتف الطالب</label>
+                <input 
+                  type="text" 
+                  value={editForm.phone} 
+                  onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-text-muted mb-1">رقم هاتف ولي الأمر</label>
+                <input 
+                  type="text" 
+                  value={editForm.parent_phone} 
+                  onChange={e => setEditForm(f => ({ ...f, parent_phone: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button onClick={handleSaveEdit} className="flex-1 rounded-xl bg-primary py-2.5 text-white font-bold hover:bg-primary-dark">حفظ التغييرات</button>
+              <button onClick={() => setEditStudent(null)} className="flex-1 rounded-xl bg-bg border border-border py-2.5 font-bold hover:bg-border">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {passwordStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 fade-in" onClick={e => { if (e.target === e.currentTarget) setPasswordStudent(null); }}>
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl scale-in">
+            <h3 className="text-lg font-black mb-4">تغيير كلمة المرور: <span className="text-primary">{passwordStudent.full_name}</span></h3>
+            <div>
+              <label className="block text-sm font-bold text-text-muted mb-1">كلمة المرور الجديدة</label>
+              <input 
+                type="text" 
+                value={newPassword} 
+                onChange={e => setNewPassword(e.target.value)}
+                className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary"
+                placeholder="6 أحرف على الأقل"
+              />
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button onClick={handleUpdatePassword} className="flex-1 rounded-xl bg-amber-500 py-2.5 text-white font-bold hover:bg-amber-600">تحديث</button>
+              <button onClick={() => setPasswordStudent(null)} className="flex-1 rounded-xl bg-bg border border-border py-2.5 font-bold hover:bg-border">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-
