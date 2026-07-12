@@ -142,7 +142,6 @@ function buildCertificateHTML(opts: {
       font-size: 26px;
       font-weight: 900;
       color: #1A2B4C;
-      letter-spacing: 1px;
     }
     
     .cert-subtitle {
