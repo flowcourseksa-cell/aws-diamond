@@ -14,7 +14,6 @@
     "@serwist/next": "^9.5.11",
     "@serwist/precaching": "^9.5.11",
     "@serwist/sw": "^9.5.11",
-    "@sparticuz/chromium-min": "^131.0.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "@tabler/icons-react": "^3.44.0",
@@ -27,7 +26,6 @@
     "pdfjs-dist": "^3.11.174",
     "pg": "^8.22.0",
     "postgres": "^3.4.9",
-    "puppeteer-core": "^23.5.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-is": "^19.2.7",
@@ -47,8 +45,5 @@
     "@types/web-push": "^3.6.4",
     "tailwindcss": "^4",
     "typescript": "^5"
-  },
-  "engines": {
-    "node": "18.x"
   }
 }

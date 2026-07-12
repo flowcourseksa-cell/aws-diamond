@@ -27,49 +27,13 @@ export async function GET(req: NextRequest) {
     verifyUrl,
   });
 
-  try {
-    const chromium = await import("@sparticuz/chromium-min");
-    const puppeteer = await import("puppeteer-core");
-
-    // Use system Chrome on Windows (dev), chromium package on production (Vercel)
-    const executablePath =
-      process.env.NODE_ENV === "production"
-        ? await chromium.default.executablePath("https://github.com/Sparticuz/chromium/releases/download/v131.0.1/chromium-v131.0.1-pack.tar")
-        : process.platform === "win32"
-        ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
-        : "/usr/bin/google-chrome";
-
-    const browser = await puppeteer.default.launch({
-      args: process.env.NODE_ENV === "production" ? chromium.default.args : [],
-      executablePath,
-      headless: true,
-    });
-
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "load" });
-    await page.setViewport({ width: 1122, height: 794 }); // A4 landscape
-
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      landscape: true,
-      printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
-    });
-
-    await browser.close();
-
-    return new NextResponse(pdfBuffer as any, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="certificate-${cert.id.slice(0, 8)}.pdf"`,
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-      },
-    });
-  } catch (err: any) {
-    console.error("PDF generation error:", err);
-    return NextResponse.json({ error: "PDF generation failed", detail: err.message }, { status: 500 });
-  }
+  return new NextResponse(html, {
+    status: 200,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-cache, no-store, must-revalidate",
+    },
+  });
 }
 
 // ─── Certificate HTML Template ────────────────────────────────────────────────
@@ -402,6 +366,68 @@ function buildCertificateHTML(opts: {
       </div>
     </div>
   </div>
+  
+  <!-- Client-side PDF Generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script>
+    window.onload = function() {
+      // Create a loading overlay
+      var overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.inset = '0';
+      overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+      overlay.style.zIndex = '9999';
+      overlay.style.display = 'flex';
+      overlay.style.flexDirection = 'column';
+      overlay.style.alignItems = 'center';
+      overlay.style.justifyContent = 'center';
+      overlay.style.fontFamily = "'Tajawal', sans-serif";
+      
+      var spinner = document.createElement('div');
+      spinner.style.border = '4px solid #f3f3f3';
+      spinner.style.borderTop = '4px solid #C5A059';
+      spinner.style.borderRadius = '50%';
+      spinner.style.width = '50px';
+      spinner.style.height = '50px';
+      spinner.style.animation = 'spin 1s linear infinite';
+      
+      var style = document.createElement('style');
+      style.innerHTML = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+      document.head.appendChild(style);
+      
+      var text = document.createElement('h2');
+      text.innerText = 'جاري تجهيز وتحميل الشهادة...';
+      text.style.marginTop = '20px';
+      text.style.color = '#1A2B4C';
+      
+      var subText = document.createElement('p');
+      subText.innerText = 'يرجى الانتظار للحظات';
+      subText.style.color = '#64748b';
+      subText.style.marginTop = '10px';
+
+      overlay.appendChild(spinner);
+      overlay.appendChild(text);
+      overlay.appendChild(subText);
+      document.body.appendChild(overlay);
+
+      // Generate PDF
+      var element = document.querySelector('.cert-container');
+      var opt = {
+        margin:       0,
+        filename:     'certificate-${certId.slice(0, 8)}.pdf',
+        image:        { type: 'jpeg', quality: 1 },
+        html2canvas:  { scale: 3, useCORS: true, logging: false },
+        jsPDF:        { unit: 'px', format: [1122, 794], orientation: 'landscape', hotfixes: ["px_scaling"] }
+      };
+      
+      html2pdf().set(opt).from(element).save().then(function() {
+        // Remove overlay and show success
+        overlay.innerHTML = '<div style="font-size: 60px; margin-bottom: 20px;">✅</div><h2 style="color: #1A2B4C;">تم تحميل الشهادة بنجاح!</h2><p style="color: #64748b; margin-top: 10px;">يمكنك الآن إغلاق هذه النافذة أو الاحتفاظ بها كذكرى</p>';
+      }).catch(function(err) {
+        overlay.innerHTML = '<div style="font-size: 60px; margin-bottom: 20px;">❌</div><h2 style="color: #ef4444;">حدث خطأ أثناء التحميل</h2><p style="color: #64748b; margin-top: 10px;">يرجى تحديث الصفحة والمحاولة مرة أخرى</p>';
+      });
+    };
+  </script>
 </body>
 </html>`;
 }
