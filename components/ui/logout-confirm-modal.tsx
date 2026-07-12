@@ -47,9 +47,12 @@ export function LogoutConfirmModal({
     const supabase = createClient();
     await supabase.auth.signOut();
     
-    // Clear local storage
+    // Clear local storage completely to prevent data leaking between accounts
     localStorage.removeItem("flow-logged-in");
     localStorage.removeItem("flow-user-role");
+    localStorage.removeItem("platform-storage");
+    localStorage.removeItem("tkhsas-profile-cache");
+    localStorage.removeItem("active_course_id");
     
     window.location.href = "/login";
   }
