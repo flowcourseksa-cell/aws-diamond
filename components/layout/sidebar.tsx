@@ -99,14 +99,14 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       {/* الخلفية الشفافة (موبايل/تابلت) */}
       {open && (
         <div
-          className="fixed inset-0 z-39 bg-black/35 lg:hidden"
+          className="fixed inset-0 z-[55] bg-black/35 lg:hidden"
           onClick={onClose}
           aria-hidden="true"
         />
       )}
 
       <aside
-        className={`fixed right-0 top-0 z-40 flex h-screen w-[260px] flex-shrink-0 flex-col overflow-y-auto bg-sidebar px-3.5 py-5 text-white transition-all duration-300 ease-in-out lg:sticky ${
+        className={`fixed right-0 top-0 z-[60] flex h-screen w-[260px] flex-shrink-0 flex-col overflow-y-auto bg-sidebar px-3.5 py-5 text-white transition-all duration-300 ease-in-out lg:sticky ${
           open 
             ? "translate-x-0 shadow-[-10px_0_30px_rgba(0,0,0,0.2)] lg:shadow-none lg:mr-0" 
             : "translate-x-full lg:translate-x-0 lg:-mr-[260px] lg:opacity-0 lg:invisible lg:pointer-events-none"
