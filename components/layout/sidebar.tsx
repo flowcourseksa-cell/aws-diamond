@@ -49,10 +49,11 @@ const TOOLS_ITEMS: NavItem[] = [
   { href: "/book", label: "الكتاب التفاعلي", icon: <IconBook2 size={19} /> },
 ];
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {
   return (
     <Link
       href={item.href}
+      onClick={onClick}
       className={`flex items-center gap-3 rounded-[10px] px-3 py-[11px] text-sm font-semibold transition-colors duration-200 ${
         active
           ? "bg-primary text-white"
@@ -105,7 +106,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       )}
 
       <aside
-        className={`fixed right-0 top-0 z-40 flex h-screen w-[260px] flex-shrink-0 flex-col bg-sidebar px-3.5 py-5 text-white transition-all duration-300 ease-in-out lg:sticky ${
+        className={`fixed right-0 top-0 z-40 flex h-screen w-[260px] flex-shrink-0 flex-col overflow-y-auto bg-sidebar px-3.5 py-5 text-white transition-all duration-300 ease-in-out lg:sticky ${
           open 
             ? "translate-x-0 shadow-[-10px_0_30px_rgba(0,0,0,0.2)] lg:shadow-none lg:mr-0" 
             : "translate-x-full lg:translate-x-0 lg:-mr-[260px] lg:opacity-0 lg:invisible lg:pointer-events-none"
@@ -158,7 +159,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             const href = item.href === "/final-exam" && enrolledCourseId 
               ? `/final-exam/${enrolledCourseId}` 
               : item.href;
-            return <NavLink key={item.href} item={{ ...item, href }} active={pathname.startsWith(item.href)} />
+            return <NavLink key={item.href} item={{ ...item, href }} active={pathname.startsWith(item.href)} onClick={onClose} />
           })}
         </nav>
 
@@ -168,7 +169,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
         <nav className="flex flex-col gap-[3px]">
           {TOOLS_ITEMS.map((item) => (
-            <NavLink key={item.label} item={item} active={pathname === item.href} />
+            <NavLink key={item.label} item={item} active={pathname === item.href} onClick={onClose} />
           ))}
         </nav>
 
@@ -176,6 +177,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="mt-auto border-t border-white/8 pt-3.5">
           <Link 
             href="/"
+            onClick={onClose}
             className="flex items-center justify-center gap-2.5 rounded-[10px] px-3 py-3 bg-white/5 hover:bg-white/10 text-white transition-colors duration-200 group"
           >
             <IconHome size={19} className="text-white/70 group-hover:text-white transition-colors" />
