@@ -31,7 +31,7 @@ export function DashboardClient() {
   const searchParams = useSearchParams();
   const queryCourseId = searchParams?.get("courseId");
   const [isMounted, setIsMounted] = useState(false);
-  const { tracks: storeTracks, exams, lessons, enrolledCourses, enrolledCourseId, setEnrolledCourseId, platformSettings, isDataLoading } = usePlatformStore();
+  const { tracks: storeTracks, exams, lessons, enrolledCourses, enrolledCourseId, setEnrolledCourseId, platformSettings } = usePlatformStore();
 
   useEffect(() => {
     if (queryCourseId && queryCourseId !== enrolledCourseId) {
@@ -43,12 +43,7 @@ export function DashboardClient() {
     setIsMounted(true);
   }, []);
 
-  if (!isMounted || isAuthLoading || isDataLoading) return (
-    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 text-center">
-      <span className="h-10 w-10 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
-      <span className="text-sm font-bold text-text-muted">جاري تحميل الداشبورد والبيانات...</span>
-    </div>
-  );
+  if (!isMounted || isAuthLoading) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
   // Filter tracks and content based on active course
   const currentCourseId = queryCourseId || enrolledCourseId;
