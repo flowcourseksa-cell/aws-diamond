@@ -1,7 +1,7 @@
 // @ts-nocheck
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -61,6 +61,7 @@ export default function FinalExamPage() {
     scorePct: number; passed: boolean; correct: number; total: number;
   } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [isGraduated, setIsGraduated] = useState(false);
   const [isFailed, setIsFailed] = useState(false);
   const [allCerts, setAllCerts] = useState<any[]>([]);
@@ -203,7 +204,8 @@ export default function FinalExamPage() {
   };
 
   const handleSubmit = async () => {
-    if (!exam || !userId || submitting) return;
+    if (!exam || !userId || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setSubmitting(true);
     
     // Restore AppShell Nav
@@ -242,6 +244,7 @@ export default function FinalExamPage() {
     
     setStage("result");
     setSubmitting(false);
+    isSubmittingRef.current = false;
   };
 
   const handleResetCourse = async () => {

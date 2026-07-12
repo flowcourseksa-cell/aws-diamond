@@ -39,6 +39,8 @@ export function ExamRunner({
   const savedSession = useRef<ActiveExamSession | null>(null);
   const [stage, setStage] = useState<"intro" | "exam" | "exit_confirm">("intro");
   const [currentQ, setCurrentQ] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [answers, setAnswers] = useState<(number | null)[]>(
     () => new Array(questions.length).fill(null)
   );
@@ -153,6 +155,9 @@ export function ExamRunner({
 
   function handleNext() {
     if (isLast) {
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       clearExamSession();
       window.dispatchEvent(new CustomEvent("exam-ended"));
       // Exit fullscreen when exam finishes normally
@@ -446,9 +451,10 @@ export function ExamRunner({
           
           <button
             onClick={handleNext}
-            className="flex h-14 items-center justify-center rounded-2xl bg-primary px-10 text-[17px] font-black text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-1 hover:shadow-xl hover:bg-primary-dark"
+            disabled={isSubmitting}
+            className={`flex h-14 items-center justify-center rounded-2xl bg-primary px-10 text-[17px] font-black text-white shadow-lg shadow-primary/30 transition-all ${isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:shadow-xl hover:bg-primary-dark"}`}
           >
-            {isLast ? "تأكيد الإجابة وإرسال" : "التالي"}
+            {isSubmitting ? "جاري الإرسال..." : (isLast ? "تأكيد الإجابة وإرسال" : "التالي")}
           </button>
         </div>
       </footer>
