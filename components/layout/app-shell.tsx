@@ -180,7 +180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           progressRes
         ] = await Promise.all([
           import("@/lib/supabase/services/settings").then(m => m.fetchPlatformSettings()),
-          fetchHierarchyByCourse(targetCourseId),
+          fetchHierarchyByCourse(targetCourseId!),
           user ? import("@/lib/supabase/services/progress-actions").then(m => m.fetchUserProgressServer(user.id).catch(err => {
             console.warn("Could not fetch user progress (possibly offline):", err?.message);
             return { skills: [], lessons: [] };
