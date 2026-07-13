@@ -71,7 +71,8 @@ export default function CertificateClient({ cert }: { cert: Certificate }) {
       window.removeEventListener('error', errorHandler, true);
 
       // Calculate image dimensions
-      const imgProps = pdf.getImageProperties(dataUrl);
+      const tempPdf = new jsPDF();
+      const imgProps = tempPdf.getImageProperties(dataUrl);
       const isPortrait = imgProps.height > imgProps.width;
 
       // Create PDF: A4
