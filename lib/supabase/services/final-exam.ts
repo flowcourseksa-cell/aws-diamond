@@ -406,7 +406,21 @@ async function issueCertificate(
     // Send Parent Notification if enabled
     if (shouldSendCertNotif && profileRes.data?.parent_phone) {
       const parentPhone = profileRes.data.parent_phone;
-      const messageBody = `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم عرض وتحميل الشهادة (بصيغة PDF أو صورة) عبر الرابط التالي:\nhttps://aws-diamond.vercel.app/verify/${certId}`;
+      
+      // استخدام عدة صيغ للرسائل لتجنب الحظر من واتساب (Spam Filters)
+      const messageTemplates = [
+        `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم عرض وتحميل الشهادة (بصيغة PDF أو صورة) عبر الرابط التالي:\nhttps://aws-diamond.vercel.app/verify/${certId}`,
+        
+        `نبارك للطالب المتفوق ${studentName} اجتياز دورة "${courseTitle}" بتقدير ${scorePct}% 🎓\n\nشهادة الإتمام جاهزة الآن، يمكنكم الاطلاع عليها وتحميلها من هنا:\nhttps://aws-diamond.vercel.app/verify/${certId}`,
+        
+        `أخبار رائعة! 🎉 أتم الطالب ${studentName} بنجاح متطلبات دورة "${courseTitle}" وحقق نسبة ${scorePct}%.\n\nرابط التحقق من الشهادة وتحميلها (PDF):\nhttps://aws-diamond.vercel.app/verify/${certId}`,
+        
+        `إشعار إتمام دورة: نهنئ الطالب ${studentName} على اجتياز "${courseTitle}" بنسبة ${scorePct}%.\n\nلرؤية الشهادة الفخمة وتحميلها الرجاء زيارة الرابط:\nhttps://aws-diamond.vercel.app/verify/${certId}`
+      ];
+      
+      // اختيار صيغة عشوائية
+      const randomIndex = Math.floor(Math.random() * messageTemplates.length);
+      const messageBody = messageTemplates[randomIndex];
       
       let status = "sent";
       
