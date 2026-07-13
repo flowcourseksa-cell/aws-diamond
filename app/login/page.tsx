@@ -127,7 +127,9 @@ export default function LoginPage() {
         if (!profile || !profile.parent_phone) {
           window.location.href = "/onboarding";
         } else {
-          window.location.href = profile.role === "admin" ? "/admin-khaled-ksa-aws-2026-org" : "/";
+          const redirect = localStorage.getItem("flow-redirect-after-login");
+          localStorage.removeItem("flow-redirect-after-login");
+          window.location.href = profile.role === "admin" ? "/admin-khaled-ksa-aws-2026-org" : (redirect || "/");
         }
       }
     };
@@ -258,7 +260,9 @@ export default function LoginPage() {
           "success"
         );
         setTimeout(() => {
-          window.location.href = isAdmin ? "/admin-khaled-ksa-aws-2026-org" : "/";
+          const redirect = localStorage.getItem("flow-redirect-after-login");
+          localStorage.removeItem("flow-redirect-after-login");
+          window.location.href = isAdmin ? "/admin-khaled-ksa-aws-2026-org" : (redirect || "/");
         }, 600);
       }
     } catch (err: any) {
