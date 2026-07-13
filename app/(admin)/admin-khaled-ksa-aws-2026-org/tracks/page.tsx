@@ -158,31 +158,65 @@ function InlineInput({
 
 function SkillRow({
   skill,
+  sectionLessons,
   onEdit,
   onDelete,
 }: {
   skill: DbMicroSkill;
-  onEdit: (name: string) => void;
+  sectionLessons: DbLesson[];
+  onEdit: (name: string, lessonId: string) => void;
   onDelete: () => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(skill.name);
+  const [draftName, setDraftName] = useState(skill.name);
+  const [draftLessonId, setDraftLessonId] = useState(skill.lesson_id || "");
 
   return (
     <div className="group flex items-center gap-3 rounded-xl border border-border/40 bg-bg/40 px-3.5 py-2.5 transition-colors hover:bg-bg/70">
       <IconGripVertical size={14} className="flex-shrink-0 text-text-muted/30" />
 
       {editing ? (
-        <div className="flex-1">
-          <InlineInput
-            value={draft}
-            onChange={setDraft}
-            onConfirm={() => {
-              if (draft.trim()) { onEdit(draft.trim()); setEditing(false); }
-            }}
-            onCancel={() => { setDraft(skill.name); setEditing(false); }}
-            placeholder="اسم المهارة"
+        <div className="flex-1 flex flex-col gap-2 bg-bg p-2 rounded-xl border border-border">
+          <input
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            placeholder="اسم المهارة..."
+            className="h-9 w-full rounded-lg border border-indigo-500/30 bg-card px-3 text-[13px] text-text outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
           />
+          <select
+            value={draftLessonId}
+            onChange={(e) => setDraftLessonId(e.target.value)}
+            className="h-9 w-full rounded-lg border border-indigo-500/30 bg-card px-3 text-[13px] text-text outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50"
+          >
+            <option value="">اختر الدرس المرتبط (إجباري)</option>
+            {sectionLessons.map(l => (
+              <option key={l.id} value={l.id}>{l.title}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 mt-1">
+            <button
+              onClick={() => {
+                if (draftName.trim() && draftLessonId) {
+                  onEdit(draftName.trim(), draftLessonId);
+                  setEditing(false);
+                }
+              }}
+              disabled={!draftName.trim() || !draftLessonId}
+              className="flex h-8 flex-1 items-center justify-center rounded-lg bg-indigo-500 text-[12px] font-bold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              حفظ
+            </button>
+            <button
+              onClick={() => {
+                setDraftName(skill.name);
+                setDraftLessonId(skill.lesson_id || "");
+                setEditing(false);
+              }}
+              className="flex h-8 flex-1 items-center justify-center rounded-lg border border-border bg-card text-[12px] font-bold text-text-muted hover:text-text"
+            >
+              إلغاء
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -194,7 +228,11 @@ function SkillRow({
 
           <div className="flex flex-shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             <button
-              onClick={() => { setDraft(skill.name); setEditing(true); }}
+              onClick={() => { 
+                setDraftName(skill.name); 
+                setDraftLessonId(skill.lesson_id || ""); 
+                setEditing(true); 
+              }}
               title="تعديل المهارة"
               className="flex h-7 w-7 items-center justify-center rounded-lg border border-border text-text-muted transition-colors hover:border-indigo-500/50 hover:text-indigo-400"
             >
@@ -233,7 +271,7 @@ function SectionCard({
   onUpdateSection: (name: string) => void;
   onDeleteSection: () => void;
   onAddSkill: (name: string, lessonId: string) => void;
-  onEditSkill: (skillId: string, name: string) => void;
+  onEditSkill: (skillId: string, name: string, lessonId: string) => void;
   onDeleteSkill: (skillId: string) => void;
   onRequestConfirm: (opts: Omit<ConfirmDialogState, "open">) => void;
 }) {
@@ -312,7 +350,8 @@ function SectionCard({
             <SkillRow
               key={skill.id}
               skill={skill}
-              onEdit={(name) => onEditSkill(skill.id, name)}
+              sectionLessons={sectionLessons}
+              onEdit={(name, lessonId) => onEditSkill(skill.id, name, lessonId)}
               onDelete={() =>
                 onRequestConfirm({
                   title: "حذف المهارة",
@@ -467,6 +506,8 @@ export default function TracksPage() {
       if (activeTrackId === id) {
         setActiveTrackId(newTracks.length > 0 ? newTracks[0].id : "");
       }
+    } else {
+      alert("تعذر الحذف! يوجد أقسام أو دروس أو مهارات مرتبطة بهذا المسار ولم تكتمل مزامنة الحذف التسلسلي. جرب حذف المحتويات الداخلية أولاً.");
     }
   }
 
@@ -510,6 +551,8 @@ export default function TracksPage() {
             : t
         )
       );
+    } else {
+      alert("تعذر الحذف! هذا القسم يحتوي على مهارات لها تقدم مسجل للطلاب. تم حظر الحذف لحماية بيانات الطلاب.");
     }
   }
 
@@ -534,8 +577,8 @@ export default function TracksPage() {
     }
   }
 
-  async function handleEditSkill(sectionId: string, skillId: string, name: string) {
-    const success = await updateSkill(skillId, name);
+  async function handleEditSkill(sectionId: string, skillId: string, name: string, lessonId: string) {
+    const success = await updateSkill(skillId, name, lessonId);
     if (success) {
       setTracks((prev) =>
         prev.map((t) =>
@@ -549,13 +592,15 @@ export default function TracksPage() {
                     : {
                         ...s,
                         micro_skills: s.micro_skills.map((sk) =>
-                          sk.id === skillId ? { ...sk, name } : sk
+                          sk.id === skillId ? { ...sk, name, lesson_id: lessonId } : sk
                         ),
                       }
                 ),
               }
         )
       );
+    } else {
+      alert("تعذر تحديث المهارة. حاول مرة أخرى.");
     }
   }
 
@@ -579,6 +624,8 @@ export default function TracksPage() {
               }
         )
       );
+    } else {
+      alert("تعذر الحذف! يوجد تقدم لطلاب مسجل على هذه المهارة. لحماية بياناتهم تم حظر الحذف.");
     }
   }
 
@@ -805,7 +852,7 @@ export default function TracksPage() {
                           onUpdateSection={(name) => handleUpdateSection(section.id, name)}
                           onDeleteSection={() => handleDeleteSection(section.id)}
                           onAddSkill={(name, lessonId) => handleAddSkill(section.id, name, lessonId)}
-                          onEditSkill={(skillId, name) => handleEditSkill(section.id, skillId, name)}
+                          onEditSkill={(skillId, name, lessonId) => handleEditSkill(section.id, skillId, name, lessonId)}
                           onDeleteSkill={(skillId) => handleDeleteSkill(section.id, skillId)}
                           onRequestConfirm={(opts) => setConfirm({ ...opts, open: true })}
                         />

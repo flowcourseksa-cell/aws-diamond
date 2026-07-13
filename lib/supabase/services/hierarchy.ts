@@ -12,6 +12,7 @@ export {
 export type DbMicroSkill = {
   id: string;
   section_id: string;
+  lesson_id: string | null;
   name: string;
   description: string | null;
   remedial_video_url: string | null;
