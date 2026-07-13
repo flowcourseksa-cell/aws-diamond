@@ -89,7 +89,11 @@ export function DashboardClient() {
   const completedLessons = availableLessons.filter(l => l.status === "completed");
   const completedLessonsCount = completedLessons.length;
   
-  const totalStudySeconds = completedLessons.reduce((acc, l) => acc + (l.durationSeconds || 0), 0);
+  // حساب الوقت الفعلي للمذاكرة بناءً على progressPercent من كل الدروس (مكتملة أو جزئية)
+  const totalStudySeconds = availableLessons.reduce((acc, l) => {
+    const pct = l.progressPercent ?? (l.status === "completed" ? 100 : 0);
+    return acc + Math.round(((l.durationSeconds || 0) * pct) / 100);
+  }, 0);
   const totalStudyMinutes = Math.round(totalStudySeconds / 60);
   
   let studyTimeLabel = "";

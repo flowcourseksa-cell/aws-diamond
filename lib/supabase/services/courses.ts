@@ -125,7 +125,8 @@ export async function fetchCourses(type: 'course' | 'simulator' | 'all' = 'cours
       features: Array.isArray(meta.features) ? meta.features : [],
       tags: Array.isArray(meta.tags) ? meta.tags : [],
       instructorName: meta.instructorName || "",
-      totalHours: meta.totalHours || totalHoursStr,
+      // الأولوية للحساب الفعلي من الدروس — meta.totalHours احتياطي فقط إذا لم توجد دروس
+      totalHours: (totalSeconds > 0 ? totalHoursStr : null) || meta.totalHours || totalHoursStr,
       studentsCount: meta.studentsCount ?? 0,
       isActive: d.is_active,
       isFeatured: d.is_featured,

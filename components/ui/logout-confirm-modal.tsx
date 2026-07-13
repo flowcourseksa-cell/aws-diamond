@@ -50,7 +50,7 @@ export function LogoutConfirmModal({
     // Clear local storage completely to prevent data leaking between accounts
     localStorage.removeItem("flow-logged-in");
     localStorage.removeItem("flow-user-role");
-    localStorage.removeItem("platform-storage");
+    localStorage.removeItem("nokhba-platform-storage-v4");
     localStorage.removeItem("tkhsas-profile-cache");
     localStorage.removeItem("active_course_id");
     

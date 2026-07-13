@@ -193,7 +193,7 @@ export function useAuth() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("flow-logged-in");
       localStorage.removeItem("flow-user-role");
-      localStorage.removeItem("platform-storage");
+      localStorage.removeItem("nokhba-platform-storage-v4");
       localStorage.removeItem("tkhsas-profile-cache");
       localStorage.removeItem("active_course_id");
     }
