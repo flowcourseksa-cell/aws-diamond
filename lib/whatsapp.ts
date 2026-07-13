@@ -14,35 +14,50 @@ export interface WhatsAppSendResult {
 
 /**
  * إرسال رسالة واتساب فعلية عبر UltraMsg API
+ * يدعم إرسال الرسالة لأكثر من رقم إذا كانت مفصولة بفواصل أو مسافات
  */
 export async function sendWhatsApp(
   phone: string,
   message: string
 ): Promise<WhatsAppSendResult> {
-  // تنظيف رقم الهاتف (إزالة + وإضافة رمز السعودية إذا لزم)
-  const cleanPhone = formatSaudiPhone(phone);
+  // تقسيم الأرقام في حال وجود أكثر من رقم (بفواصل أو مسافات)
+  const phoneNumbers = phone.split(/[\s,]+/).filter(Boolean);
+  
+  if (phoneNumbers.length === 0) {
+    return { success: false, error: "لا يوجد رقم هاتف" };
+  }
 
   try {
-    const response = await fetch(
-      `https://api.ultramsg.com/${ULTRAMSG_INSTANCE}/messages/chat`,
-      {
-        method:  "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          token: ULTRAMSG_TOKEN,
-          to:    cleanPhone,
-          body:  message,
-        }),
+    let lastResult: WhatsAppSendResult = { success: false, error: "فشل مجهول" };
+
+    // إرسال الرسالة لكل رقم على حدة
+    for (const p of phoneNumbers) {
+      const cleanPhone = formatSaudiPhone(p);
+      
+      const response = await fetch(
+        `https://api.ultramsg.com/${ULTRAMSG_INSTANCE}/messages/chat`,
+        {
+          method:  "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            token: ULTRAMSG_TOKEN,
+            to:    cleanPhone,
+            body:  message,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.sent === "true" || result.id) {
+        lastResult = { success: true, messageId: result.id };
+      } else {
+        lastResult = { success: false, error: result.error || "إرسال فاشل" };
       }
-    );
-
-    const result = await response.json();
-
-    if (result.sent === "true" || result.id) {
-      return { success: true, messageId: result.id };
-    } else {
-      return { success: false, error: result.error || "إرسال فاشل" };
     }
+    
+    // إرجاع نتيجة آخر رقم (يفضل تحسين هذا لاحقاً ليدعم نتائج متعددة)
+    return lastResult;
   } catch (err: any) {
     return { success: false, error: err.message };
   }
