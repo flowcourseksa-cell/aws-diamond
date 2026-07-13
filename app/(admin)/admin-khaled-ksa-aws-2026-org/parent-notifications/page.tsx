@@ -35,6 +35,8 @@ export default function ParentNotificationsPage() {
   const [smsGateway, setSmsGateway] = useState("");
   const [whatsappDelay, setWhatsappDelay] = useState(15);
   const [autoCert, setAutoCert] = useState(true); // Certificate Notifications
+  const [gradOnlyMode, setGradOnlyMode] = useState(false);
+  const [gradOnlyChannel, setGradOnlyChannel] = useState<DeliveryChannel>("whatsapp");
 
   // Daily Settings
   const [autoDaily, setAutoDaily] = useState(false);
@@ -70,6 +72,8 @@ export default function ParentNotificationsPage() {
         setAutoCert(data.auto_cert ?? true);
         setAutoDaily(data.auto_daily ?? false);
         setAutoWeekly(data.auto_weekly ?? true);
+        setGradOnlyMode(data.grad_only_mode ?? false);
+        setGradOnlyChannel(data.grad_only_channel as DeliveryChannel || "whatsapp");
       }
     };
     loadSettings();
@@ -83,6 +87,8 @@ export default function ParentNotificationsPage() {
       auto_cert: autoCert,
       auto_daily: autoDaily,
       auto_weekly: autoWeekly,
+      grad_only_mode: gradOnlyMode,
+      grad_only_channel: gradOnlyChannel,
       updated_at: new Date().toISOString()
     });
 
@@ -240,6 +246,41 @@ export default function ParentNotificationsPage() {
                   />
                   <span className="text-sm font-bold text-text-muted">ثانية</span>
                 </div>
+              </div>
+            )}
+
+            {channel === "none" && (
+              <div className="mt-4 animate-in slide-in-from-top-4 p-5 rounded-2xl bg-bg border border-accent-amber/40">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h5 className="text-sm font-black text-accent-amber flex items-center gap-2 mb-1">
+                      <IconTrophy size={18} /> إرسال إشعار التخرج (الشهادات) فقط
+                    </h5>
+                    <p className="text-xs font-bold text-text-muted leading-relaxed">
+                      بما أن النظام موقوف بالكامل، يمكنك تفعيل هذا الخيار لإرسال رسائل التخرج والحصول على الشهادة النهائية فقط.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setGradOnlyMode(!gradOnlyMode)}
+                    className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 shrink-0 ${gradOnlyMode ? "bg-accent-amber" : "bg-border"}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${gradOnlyMode ? "-translate-x-6" : ""}`} />
+                  </button>
+                </div>
+                
+                {gradOnlyMode && (
+                  <div className="flex items-center gap-4 mt-3 bg-card p-3 rounded-xl border border-border">
+                    <span className="text-sm font-bold text-text">طريقة الإرسال:</span>
+                    <select 
+                      value={gradOnlyChannel}
+                      onChange={(e) => setGradOnlyChannel(e.target.value as DeliveryChannel)}
+                      className="bg-bg border border-border rounded-lg px-3 py-1.5 text-sm font-bold text-primary outline-none focus:border-accent-amber cursor-pointer"
+                    >
+                      <option value="whatsapp">واتساب</option>
+                      <option value="sms">رسائل SMS</option>
+                    </select>
+                  </div>
+                )}
               </div>
             )}
 

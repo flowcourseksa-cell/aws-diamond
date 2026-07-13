@@ -1,5 +1,8 @@
 "use server";
 
+import { createClient as createClientServer } from "@/lib/supabase/server";
+import { getAdminClient } from "./admin";
+import { sendWhatsApp } from "@/lib/whatsapp";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 function getReadClient() {
@@ -8,11 +11,6 @@ function getReadClient() {
   return createSupabaseClient(url, key, { auth: { persistSession: false } });
 }
 
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createSupabaseClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -331,23 +329,42 @@ async function issueCertificate(
   const studentName = profileRes.data?.full_name ?? "الطالب";
   const courseTitle = courseRes.data?.title ?? "الدورة";
 
-  // Insert instead of upsert to keep a history of all certificates
-  await supabase.from("certificates").insert({
+  // Insert instead of upsert to keep a history of all certificates and get the ID
+  const certResult = await supabase.from("certificates").insert({
     student_id: studentId,
     course_id: courseId,
     final_exam_id: finalExamId,
     score_pct: scorePct,
     student_name: studentName,
     course_title: courseTitle,
-  });
+  }).select("id").single();
+  
+  const certId = certResult.data?.id;
 
   // ── Read Admin Settings with fallback ──
   let autoCert = true;
   let channel = "whatsapp";
-  const { data: settings } = await supabase.from("admin_settings").select("auto_cert, parent_notif_channel").eq("id", 1).maybeSingle();
+  let gradOnlyMode = false;
+  let gradOnlyChannel = "whatsapp";
+  
+  const { data: settings } = await supabase.from("admin_settings").select("*").eq("id", 1).maybeSingle();
   if (settings) {
     autoCert = settings.auto_cert ?? true;
     channel = settings.parent_notif_channel ?? "whatsapp";
+    gradOnlyMode = settings.grad_only_mode ?? false;
+    gradOnlyChannel = settings.grad_only_channel ?? "whatsapp";
+  }
+
+  // Determine if we should send and which channel to use
+  const isSystemOff = channel === "none";
+  let shouldSendCertNotif = false;
+  let targetChannel = channel;
+
+  if (isSystemOff && gradOnlyMode) {
+     shouldSendCertNotif = true;
+     targetChannel = gradOnlyChannel;
+  } else if (!isSystemOff && autoCert) {
+     shouldSendCertNotif = true;
   }
 
   if (isPassed) {
@@ -361,12 +378,23 @@ async function issueCertificate(
     });
 
     // Send Parent Notification if enabled
-    if (autoCert && channel !== "none" && profileRes.data?.parent_phone) {
+    if (shouldSendCertNotif && profileRes.data?.parent_phone) {
+      const parentPhone = profileRes.data.parent_phone;
+      const messageBody = `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم عرض وتحميل الشهادة (بصيغة PDF أو صورة) عبر الرابط التالي:\nhttps://aws-diamond.vercel.app/certificate/${certId}`;
+      
+      let status = "sent";
+      
+      // Actual Send via WhatsApp if target is whatsapp
+      if (targetChannel === "whatsapp") {
+        const sendResult = await sendWhatsApp(parentPhone, messageBody);
+        if (!sendResult.success) status = "failed";
+      }
+      
       await supabase.from("notification_log").insert({
         student_id: studentId,
-        parent_phone: profileRes.data.parent_phone,
-        message_body: `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.`,
-        status: "sent",
+        parent_phone: parentPhone,
+        message_body: messageBody,
+        status: status,
       });
     }
   } else {

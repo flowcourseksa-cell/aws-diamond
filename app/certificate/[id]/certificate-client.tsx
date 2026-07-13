@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import { IconSchool, IconDownload, IconShare } from "@tabler/icons-react";
 import { Certificate } from "@/lib/supabase/services/certificates";
 import { toPng } from "html-to-image";
+import jsPDF from "jspdf";
 import Link from "next/link";
 
 export default function CertificateClient({ cert }: { cert: Certificate }) {
@@ -41,6 +42,50 @@ export default function CertificateClient({ cert }: { cert: Certificate }) {
       link.click();
     } catch (err) {
       console.error("Error generating image:", err);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!certificateRef.current) return;
+    try {
+      const errorHandler = (e: ErrorEvent) => {
+        if (e.message && e.message.includes('cssRules')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      };
+      window.addEventListener('error', errorHandler, true);
+
+      const filter = (node: HTMLElement) => {
+        if (node.tagName === 'LINK') return false;
+        return true;
+      };
+
+      const dataUrl = await toPng(certificateRef.current, { 
+        quality: 1, 
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        filter
+      });
+      
+      window.removeEventListener('error', errorHandler, true);
+
+      // Create PDF: A4 landscape (297x210 mm)
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Calculate image dimensions to fit A4 page
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`certificate-${cert.student_name}.pdf`);
+    } catch (err) {
+      console.error("Error generating PDF:", err);
     }
   };
 
@@ -147,14 +192,27 @@ export default function CertificateClient({ cert }: { cert: Certificate }) {
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-4 w-full max-w-xl mx-auto">
-        <button onClick={handleDownload} className="w-full sm:flex-1 flex items-center justify-center gap-2 py-4 rounded-xl text-lg font-bold text-white bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30">
-          <IconDownload size={24} />
+      <div className="flex flex-wrap gap-4 mt-8 w-full max-w-lg mx-auto justify-center">
+        <button 
+          onClick={handleDownloadPdf}
+          className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition-all shadow-md hover:-translate-y-0.5"
+        >
+          <IconDownload size={20} />
+          تحميل كـ PDF
+        </button>
+        <button 
+          onClick={handleDownload}
+          className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-all shadow-md hover:-translate-y-0.5"
+        >
+          <IconDownload size={20} />
           تحميل كصورة
         </button>
-        <button onClick={handleShare} className="w-full sm:flex-1 flex items-center justify-center gap-2 py-4 rounded-xl text-lg font-bold text-orange-700 bg-orange-100 hover:bg-orange-200 transition-all border border-orange-200">
-          <IconShare size={24} />
-          مشاركة الشهادة
+        <button 
+          onClick={handleShare}
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50 transition-all shadow-sm hover:-translate-y-0.5"
+        >
+          <IconShare size={20} />
+          مشاركة الرابط
         </button>
       </div>
     </div>
