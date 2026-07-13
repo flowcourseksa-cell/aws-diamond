@@ -79,12 +79,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, user, profile]);
 
-  // Fetch enrolled courses — only when userId actually changes
+  // Fetch enrolled courses — only when userId actually changes or every 30 seconds if empty
+  const lastEnrollmentFetch = useRef<number>(0);
+  
   useEffect(() => {
     if (!user || isLoading) return;
-    // Already loaded for this user
-    if (loadedForUserRef.current === user.id) return;
+    
+    const now = Date.now();
+    const isSameUser = loadedForUserRef.current === user.id;
+    const hasCourses = usePlatformStore.getState().enrolledCourses.length > 0;
+    
+    // Only skip if we already loaded for this user AND we have courses OR we checked less than 30 seconds ago
+    if (isSameUser && (hasCourses || now - lastEnrollmentFetch.current < 30000)) {
+      return;
+    }
+    
     loadedForUserRef.current = user.id;
+    lastEnrollmentFetch.current = now;
 
     fetchUserEnrollments(user.id).then((enrollments) => {
       if (enrollments && enrollments.length > 0) {
@@ -113,7 +124,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }
       }
     }).catch((err) => console.error("Error fetching enrollments:", err));
-  }, [user?.id, isLoading, setEnrolledCourses, enrolledCourseId, setEnrolledCourseId]);
+  }, [user?.id, isLoading, setEnrolledCourses, enrolledCourseId, setEnrolledCourseId, window.location.pathname]);
 
   // Fetch real content — stale-while-revalidate:
   // If cached data exists in Zustand, show it immediately (no spinner),
@@ -152,25 +163,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const { fetchPlatformSettings } = await import("@/lib/supabase/services/settings");
-        const platformSettings = await fetchPlatformSettings();
+        // Parallelize initial top-level fetches for maximum speed
+        const [
+          platformSettings,
+          dbTracks,
+          progressRes
+        ] = await Promise.all([
+          import("@/lib/supabase/services/settings").then(m => m.fetchPlatformSettings()),
+          fetchHierarchyByCourse(enrolledCourseId),
+          user ? import("@/lib/supabase/services/progress-actions").then(m => m.fetchUserProgressServer(user.id).catch(err => {
+            console.warn("Could not fetch user progress (possibly offline):", err?.message);
+            return { skills: [], lessons: [] };
+          })) : Promise.resolve({ skills: [], lessons: [] })
+        ]);
+
         usePlatformStore.getState().setPlatformSettings(platformSettings);
 
-        let skillsProgress: any[] = [];
-        let lessonsProgress: any[] = [];
-        let fetchedProgress = false;
+        const skillsProgress: any[] = progressRes.skills || [];
+        const lessonsProgress: any[] = progressRes.lessons || [];
+        const fetchedProgress = !!user;
 
         if (user) {
-          try {
-            const { fetchUserProgressServer } = await import("@/lib/supabase/services/progress-actions");
-            const res = await fetchUserProgressServer(user.id);
-            console.log("====== PROGRESS FETCHED FOR USER ======", user.id, "SKILLS:", res.skills.length, "LESSONS:", res.lessons.length);
-            skillsProgress = res.skills;
-            lessonsProgress = res.lessons;
-            fetchedProgress = true;
-          } catch (progressErr: any) {
-            console.warn("Could not fetch user progress (possibly offline):", progressErr?.message);
-          }
+          console.log("====== PROGRESS FETCHED FOR USER ======", user.id, "SKILLS:", skillsProgress.length, "LESSONS:", lessonsProgress.length);
         }
 
         const oldSkillsMap = new Map();
@@ -186,8 +200,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const lessonsMap = new Map(
           lessonsProgress.map((l: any) => [l.lesson_id, l])
         );
-
-        const dbTracks = await fetchHierarchyByCourse(enrolledCourseId);
         
         // Map DbTrack to FlowTrack for the UI — scores applied inline
         const mappedTracks: FlowTrack[] = dbTracks.map(t => ({
