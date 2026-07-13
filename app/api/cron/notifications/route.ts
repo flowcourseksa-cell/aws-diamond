@@ -86,7 +86,7 @@ export async function GET(request: Request) {
       });
 
       // Send actual message via UltraMsg if channel is whatsapp
-      let sendResult = { success: true, error: undefined };
+      let sendResult: { success: boolean; error?: string } = { success: true, error: undefined };
       if (settings.channel === "whatsapp") {
         sendResult = await sendWhatsApp(student.parent_phone, finalMessage);
       }

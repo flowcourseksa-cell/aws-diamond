@@ -1,7 +1,6 @@
 "use server";
 
 import { createClient as createClientServer } from "@/lib/supabase/server";
-import { getAdminClient } from "./admin";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
@@ -9,6 +8,12 @@ function getReadClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   return createSupabaseClient(url, key, { auth: { persistSession: false } });
+}
+
+function getAdminClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createSupabaseClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 
@@ -296,7 +301,7 @@ export async function submitFinalExamAttempt(
     .eq("final_exam_id", finalExamId);
 
   const numAttempts = allAttempts?.length || 1;
-  const bestScore = allAttempts ? Math.max(...allAttempts.map(a => a.score_pct)) : scorePct;
+  const bestScore = allAttempts ? Math.max(...allAttempts.map((a: any) => a.score_pct)) : scorePct;
   const maxAttempts = exam?.max_attempts ?? 3;
 
   // Finalized condition: hit 100% OR exhausted all attempts
