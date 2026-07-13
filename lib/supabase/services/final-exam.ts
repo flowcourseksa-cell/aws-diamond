@@ -385,7 +385,7 @@ async function issueCertificate(
     // Send Parent Notification if enabled
     if (shouldSendCertNotif && profileRes.data?.parent_phone) {
       const parentPhone = profileRes.data.parent_phone;
-      const messageBody = `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم عرض وتحميل الشهادة (بصيغة PDF أو صورة) عبر الرابط التالي:\nhttps://aws-diamond.vercel.app/certificate/${certId}`;
+      const messageBody = `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم عرض وتحميل الشهادة (بصيغة PDF أو صورة) عبر الرابط التالي:\nhttps://aws-diamond.vercel.app/verify/${certId}`;
       
       let status = "sent";
       

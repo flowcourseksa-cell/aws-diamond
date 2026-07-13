@@ -1,6 +1,9 @@
 // @ts-nocheck
 import { fetchCertificateById } from "@/lib/supabase/services/certificates";
 import { notFound } from "next/navigation";
+import { IconDownload, IconShare, IconArrowRight } from "@tabler/icons-react";
+import Link from "next/link";
+import VerifyClientButtons from "./verify-client-buttons";
 
 export const dynamic = "force-dynamic";
 
@@ -122,8 +125,26 @@ export default async function VerifyCertificatePage({ params }: { params: Promis
         </div>
 
         {/* Platform badge */}
-        <div style={{ marginTop: 32, color: "#64748b", fontSize: 14, fontWeight: 700 }}>
+        <div style={{ marginTop: 32, color: "#64748b", fontSize: 14, fontWeight: 700, marginBottom: 40 }}>
           منصة الأوس الماسية · التعليم بلا حدود
+        </div>
+
+        {/* Action Buttons */}
+        <VerifyClientButtons certId={cert.id} />
+        
+        <div style={{ marginTop: 32 }}>
+          <Link 
+            href="/"
+            style={{
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              padding: "16px 40px", backgroundColor: "#1A2B4C", color: "white",
+              fontSize: "18px", fontWeight: "bold", borderRadius: "16px",
+              textDecoration: "none", boxShadow: "0 10px 25px rgba(26, 43, 76, 0.2)",
+              border: "1px solid #0f172a"
+            }}
+          >
+            الذهاب لمنصة الأوس الماسية
+          </Link>
         </div>
       </div>
     </div>

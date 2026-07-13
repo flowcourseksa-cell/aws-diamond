@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
-import { IconDownload, IconShare } from "@tabler/icons-react";
+import { IconSchool, IconDownload, IconShare } from "@tabler/icons-react";
 import { Certificate } from "@/lib/supabase/services/certificates";
 import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
@@ -120,94 +120,84 @@ export default function CertificateClient({ cert }: { cert: Certificate }) {
 
   const issuedDate = new Date(cert.issued_at).toLocaleDateString('en-GB');
 
+  const getEstimationMessage = (pct: number, examTitle: string) => {
+    const TitleSpan = () => <span className="text-orange-600 bg-orange-50 px-2 py-1 rounded mx-1 whitespace-nowrap">"{examTitle}"</span>;
+    if (pct >= 85) return <>قد اجتاز بنجاح وتفوق <TitleSpan /> وحصل على درجة (ممتاز)، مما يعكس استعداده التام لاجتياز الاختبار الحقيقي بثقة عالية.</>;
+    if (pct >= 75) return <>قد اجتاز بنجاح <TitleSpan /> وحصل على درجة (جيد جداً)، مما يعكس مستوى متقدماً وجاهزية ممتازة للاختبار الحقيقي.</>;
+    if (pct >= 65) return <>قد اجتاز بنجاح <TitleSpan /> وحصل على درجة (جيد)، مما يعكس تحضيراً مناسباً للاختبار الحقيقي.</>;
+    return <>قد اجتاز <TitleSpan /> وحصل على درجة (مقبول)، مما يعكس إلماماً بالأساسيات، مع أمنياتنا له بمزيد من التوفيق.</>;
+  };
 
   return (
     <div className="w-full flex flex-col items-center">
       {/* Certificate Container */}
-      <div className="w-full relative mb-8 group max-w-5xl overflow-x-auto pb-4">
+      <div className="w-full relative mb-8 group max-w-4xl">
         <div 
           ref={certificateRef}
-          className="min-w-[800px] w-full aspect-[1.414/1] bg-[#fdfbf7] p-[3%]"
-          style={{
-            backgroundImage: 'radial-gradient(#ebe6df 1px, transparent 1px)',
-            backgroundSize: '20px 20px'
-          }}
+          className="w-full min-h-[500px] md:min-h-[600px] bg-white rounded-xl text-slate-800 shadow-2xl relative overflow-hidden flex flex-col justify-between p-8 md:p-12"
           dir="rtl"
         >
-          {/* Outer Gold Border */}
-          <div className="w-full h-full border-2 border-[#C5A059] bg-white p-[1.5%] shadow-[inset_0_0_40px_rgba(197,160,89,0.1),_0_10px_30px_rgba(0,0,0,0.1)] flex">
+          {/* Outer and Inner Borders */}
+          <div className="absolute inset-0 border-[6px] md:border-[10px] border-orange-500 m-2 md:m-3 opacity-100 pointer-events-none"></div>
+          <div className="absolute inset-0 border-[1px] md:border-[2px] border-orange-300 m-[12px] md:m-[18px] opacity-60 pointer-events-none"></div>
+          
+          {/* Security Paper Background Pattern */}
+          <div className="absolute inset-0 opacity-[0.04] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#ea580c 1px, transparent 1px)', backgroundSize: '15px 15px' }}></div>
+          <div className="absolute -top-32 -right-32 w-96 h-96 bg-orange-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+          <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-orange-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
+          
+          <div className="flex flex-col items-center justify-center text-center z-10 relative flex-1 w-full max-w-[90%] mx-auto mt-4 md:mt-8">
             
-            {/* Inner Dark Blue Border */}
-            <div className="w-full h-full border-4 border-[#1A2B4C] relative flex flex-col items-center py-[5%] px-[8%]">
-              
-              {/* Corner Ornaments */}
-              <div className="absolute -top-1 -right-1 w-12 h-12 border-4 border-transparent border-t-[#C5A059] border-r-[#C5A059] rounded-tr-xl"></div>
-              <div className="absolute -top-1 -left-1 w-12 h-12 border-4 border-transparent border-t-[#C5A059] border-l-[#C5A059] rounded-tl-xl"></div>
-              <div className="absolute -bottom-1 -right-1 w-12 h-12 border-4 border-transparent border-b-[#C5A059] border-r-[#C5A059] rounded-br-xl"></div>
-              <div className="absolute -bottom-1 -left-1 w-12 h-12 border-4 border-transparent border-b-[#C5A059] border-l-[#C5A059] rounded-bl-xl"></div>
-              
-              {/* Header */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-14 h-14 bg-[#1A2B4C] rounded-xl flex items-center justify-center text-[#C5A059] text-3xl shadow-lg border-2 border-[#C5A059]">
-                    🎓
-                  </div>
-                  <div className="font-sans font-black text-2xl text-[#1A2B4C]">منصة الأوس الماسية</div>
-                </div>
-                <div className="font-sans text-sm font-bold tracking-[8px] uppercase text-[#C5A059] mb-4">
-                  Certificate of Completion
-                </div>
-                <div className="font-serif text-5xl font-bold text-[#1A2B4C] mb-6">
-                  شَهَادَة إتْمَام دَوْرَة
-                </div>
+            {/* Header Badge (Logo) */}
+            <div className="mb-4 md:mb-6 relative">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-gradient-to-b from-orange-400 to-orange-600 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20 border-[3px] border-white mx-auto relative z-10">
+                <IconSchool className="text-white w-8 h-8 md:w-10 md:h-10" stroke={2} />
               </div>
-              
-              {/* Body */}
-              <div className="text-center flex-1 flex flex-col items-center">
-                <div className="font-sans text-lg text-slate-600 mb-2">يُشهد بأن الطالب / الطالبة</div>
-                <div className="font-serif text-[2.8rem] font-bold text-[#C5A059] border-b-2 border-slate-200 pb-2 mb-4 px-12 min-w-[400px]">
-                  {cert.student_name}
-                </div>
-                <div className="font-sans text-lg text-slate-600 mb-4 mt-2">قد أتم/ت بنجاح متطلبات اجتياز الدورة التدريبية</div>
-                <div className="font-sans text-3xl font-black text-[#1A2B4C] mb-8 max-w-2xl leading-relaxed">
-                  {cert.course_title}
-                </div>
-                
-                <div className="inline-flex items-center gap-3 bg-slate-50 border border-slate-300 rounded-full px-8 py-3 shadow-sm font-sans text-lg font-black text-[#1A2B4C]">
-                  التقييم النهائي: <span className="text-[#C5A059]">{cert.score_pct}%</span>
-                </div>
-              </div>
-              
-              {/* Seal */}
-              <div className="absolute top-[60%] -translate-y-1/2 left-[8%] w-32 h-32 rounded-full bg-[#1A2B4C] border-[4px] border-[#C5A059] shadow-xl z-10 flex items-center justify-center">
-                <div className="font-sans text-[#C5A059] text-base font-black text-center leading-snug">
-                  معتمد<br/>رسمياً<br/>★
-                </div>
-              </div>
-              
-              {/* Footer */}
-              <div className="absolute bottom-10 left-12 right-12 flex justify-between items-end">
-                <div className="flex flex-col items-center gap-2 w-48">
-                  {/* Fake QR using text for now or simple SVG icon if we don't have react-qr */}
-                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.origin + '/verify/' + cert.id : '')}`} className="w-20 h-20 p-1.5 bg-white border border-slate-200 rounded-lg" alt="QR" />
-                  <div className="font-sans text-[10px] font-bold text-slate-500 text-center leading-tight">
-                    امسح الكود<br/>للتحقق من الشهادة
-                  </div>
-                </div>
-                
-                <div className="text-center w-48">
-                  <div className="w-full h-px bg-[#1A2B4C] mb-2"></div>
-                  <div className="font-sans text-sm font-bold text-[#1A2B4C]">مدير المنصة</div>
-                  <div className="font-sans text-xs text-[#1A2B4C] mt-1">تاريخ الإصدار: {issuedDate}</div>
-                </div>
-              </div>
-              
-              {/* Meta */}
-              <div className="absolute bottom-3 left-0 right-0 text-center font-sans text-[10px] text-slate-400">
-                رقم الاعتماد: {cert.id.slice(0, 16).toUpperCase()}
-              </div>
-              
+              {/* Ribbon Tails */}
+              <div className="absolute -bottom-2 left-2 md:left-4 w-4 md:w-5 h-6 md:h-8 bg-orange-800 -rotate-12 rounded-sm z-0 shadow-sm"></div>
+              <div className="absolute -bottom-2 right-2 md:right-4 w-4 md:w-5 h-6 md:h-8 bg-orange-800 rotate-12 rounded-sm z-0 shadow-sm"></div>
             </div>
+
+            <h3 className="text-orange-600 font-bold tracking-widest uppercase text-xs md:text-sm mb-2">منصة الأوس الماسية للتدريب</h3>
+            <h1 className="text-3xl md:text-5xl font-black text-slate-900 mb-4 drop-shadow-sm">شهادة إتمام اختبار</h1>
+            
+            <p className="text-slate-500 font-semibold text-sm md:text-base mb-2">تشهد إدارة المنصة بأن المتدرب:</p>
+            
+            {/* User Name */}
+            <div className="text-4xl md:text-6xl font-black mb-6 md:mb-8 text-transparent bg-clip-text bg-gradient-to-r from-orange-700 via-orange-500 to-orange-700 leading-tight w-full break-words">
+              {cert.student_name || 'متدرب في الأوس الماسية'}
+            </div>
+
+            {/* Description text */}
+            <p className="text-slate-600 text-sm md:text-lg leading-relaxed font-bold w-full max-w-2xl mb-8 md:mb-12">
+              {getEstimationMessage(cert.score_pct, cert.course_title || 'محاكي اختبار ستيب')}
+            </p>
+
+            {/* Bottom Signature & Score Block */}
+            <div className="flex items-end justify-between w-full mt-auto pt-4 md:pt-8 px-2 md:px-8">
+              <div className="text-center w-24 md:w-32">
+                <div className="border-b-2 border-slate-300 mb-2 w-full"></div>
+                <div className="text-slate-500 text-[10px] md:text-xs font-bold uppercase">إدارة المنصة</div>
+              </div>
+              
+              <div className="text-center flex flex-col items-center px-4">
+                <div className="text-slate-500 text-[10px] md:text-xs font-bold mb-1 uppercase tracking-wider">الدرجة النهائية</div>
+                <div className="text-4xl md:text-6xl font-black text-orange-600 leading-none">{cert.score_pct}%</div>
+              </div>
+
+              <div className="text-center w-24 md:w-32">
+                <div className="text-slate-800 text-xs md:text-sm font-bold mb-1">{issuedDate}</div>
+                <div className="border-b-2 border-slate-300 mb-2 w-full"></div>
+                <div className="text-slate-500 text-[10px] md:text-xs font-bold uppercase">تاريخ الإصدار</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Legal Disclaimer */}
+          <div className="w-full text-center z-10 mt-8 md:mt-12 mb-2 md:mb-4 px-4 md:px-8">
+            <p className="text-[8px] md:text-[10px] text-slate-400 font-medium leading-tight text-center">
+              * تنويه: هذه الشهادة هي توثيق لاجتياز اختبار محاكي للتدريب على منصة الأوس الماسية فقط. ولا تمثل أو تغني عن الاختبار الحقيقي الرسمي، ولا يترتب عليها أي التزام أو مسؤولية قانونية أو أكاديمية.
+            </p>
           </div>
         </div>
       </div>
