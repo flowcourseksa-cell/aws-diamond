@@ -4,6 +4,7 @@ import { fetchWhatsappSettings } from "@/lib/supabase/services/settings";
 import { fetchStudents } from "@/lib/supabase/services/students";
 
 import { fetchStudentStats } from "@/lib/supabase/services/student-stats";
+import { sendWhatsApp } from "@/lib/whatsapp";
 
 export const maxDuration = 300; // 5 minutes max duration for serverless functions
 
@@ -144,11 +145,15 @@ export async function GET(request: Request) {
       }
 
       if (message) {
-        // TODO: Call UltraMsg API here
+        // Send actual message via UltraMsg
+        const sendResult = await sendWhatsApp(phone, message);
+        
         results.push({
           student: student.full_name,
           phone,
           type: reportType,
+          success: sendResult.success,
+          error: sendResult.error,
           messagePreview: message.substring(0, 50) + "..."
         });
 

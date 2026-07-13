@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { parseNotificationTemplate } from "@/lib/notifications/parser";
+import { sendWhatsApp } from "@/lib/whatsapp";
 
 // 1. Get environment variables
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -84,19 +85,24 @@ export async function GET(request: Request) {
         studentId: student.id
       });
 
-      // Here you would call your WhatsApp API (e.g., UltraMsg / Wati) or SMS API Gateway
-      // For now, we simulate the delay and log it.
+      // Send actual message via UltraMsg if channel is whatsapp
+      let sendResult = { success: true, error: undefined };
+      if (settings.channel === "whatsapp") {
+        sendResult = await sendWhatsApp(student.parent_phone, finalMessage);
+      }
       
       results.push({
         student: student.full_name,
         phone: student.parent_phone,
         message: finalMessage,
-        type: shouldSendWeekly ? "Weekly" : "Daily"
+        type: shouldSendWeekly ? "Weekly" : "Daily",
+        success: sendResult.success,
+        error: sendResult.error
       });
       
       // Implement the anti-ban delay (only for WhatsApp)
       if (settings.channel === "whatsapp") {
-        await new Promise(resolve => setTimeout(resolve, settings.whatsappDelay * 100)); // using 100ms instead of 1000ms just for testing speed, in production 1000ms
+        await new Promise(resolve => setTimeout(resolve, settings.whatsappDelay * 1000)); // use 1000ms for real delay
       }
     }
 
