@@ -158,11 +158,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     async function loadData() {
       console.log("====== app-shell loadData called! ======", { enrolledCourseId, user: user?.id, isFirstLoad, shouldRefresh });
-      if (!enrolledCourseId) {
-        setIsDataLoading(false);
-        return;
-      }
+      
       try {
+        // If no enrolled course, we still want to fetch the default course (دورة الاوس الماسية الشاملة)
+        // so the dashboard is populated with the hierarchy instead of being totally empty.
+        let targetCourseId = enrolledCourseId;
+        if (!targetCourseId) {
+          const { data: defaultCourse } = await import("@/lib/supabase/client").then(m => m.createClient().from('courses').select('id').neq('title', 'اختبار الستيب ( STEP )').not('title', 'ilike', '%محاكي%').limit(1).maybeSingle());
+          if (defaultCourse) {
+            targetCourseId = defaultCourse.id;
+          } else {
+            setIsDataLoading(false);
+            return;
+          }
+        }
+
         // Parallelize initial top-level fetches for maximum speed
         const [
           platformSettings,
@@ -170,7 +180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           progressRes
         ] = await Promise.all([
           import("@/lib/supabase/services/settings").then(m => m.fetchPlatformSettings()),
-          fetchHierarchyByCourse(enrolledCourseId),
+          fetchHierarchyByCourse(targetCourseId),
           user ? import("@/lib/supabase/services/progress-actions").then(m => m.fetchUserProgressServer(user.id).catch(err => {
             console.warn("Could not fetch user progress (possibly offline):", err?.message);
             return { skills: [], lessons: [] };
