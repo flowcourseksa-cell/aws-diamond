@@ -409,13 +409,13 @@ async function issueCertificate(
       
       // استخدام عدة صيغ للرسائل لتجنب الحظر من واتساب (Spam Filters)
       const messageTemplates = [
-        `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم عرض وتحميل الشهادة (بصيغة PDF أو صورة) عبر الرابط التالي:\nhttps://aws-diamond.vercel.app/verify/${certId}`,
+        `يسعدنا إبلاغكم أن الطالب ${studentName} قد أتم دورة "${courseTitle}" بنجاح وحصل على الشهادة النهائية بنسبة ${scorePct}%.\n\nيمكنكم الدخول لحساب الطالب في المنصة لعرض وتحميل الشهادة بصيغة PDF.`,
         
-        `نبارك للطالب المتفوق ${studentName} اجتياز دورة "${courseTitle}" بتقدير ${scorePct}% 🎓\n\nشهادة الإتمام جاهزة الآن، يمكنكم الاطلاع عليها وتحميلها من هنا:\nhttps://aws-diamond.vercel.app/verify/${certId}`,
+        `نبارك للطالب المتفوق ${studentName} اجتياز دورة "${courseTitle}" بتقدير ${scorePct}% 🎓\n\nشهادة الإتمام جاهزة الآن، يمكنكم الاطلاع عليها من خلال حساب الطالب بالمنصة.`,
         
-        `أخبار رائعة! 🎉 أتم الطالب ${studentName} بنجاح متطلبات دورة "${courseTitle}" وحقق نسبة ${scorePct}%.\n\nرابط التحقق من الشهادة وتحميلها (PDF):\nhttps://aws-diamond.vercel.app/verify/${certId}`,
+        `أخبار رائعة! 🎉 أتم الطالب ${studentName} بنجاح متطلبات دورة "${courseTitle}" وحقق نسبة ${scorePct}%.\n\nيرجى الدخول لمنصة الأوس الماسية من حساب الطالب لتحميل الشهادة.`,
         
-        `إشعار إتمام دورة: نهنئ الطالب ${studentName} على اجتياز "${courseTitle}" بنسبة ${scorePct}%.\n\nلرؤية الشهادة الفخمة وتحميلها الرجاء زيارة الرابط:\nhttps://aws-diamond.vercel.app/verify/${certId}`
+        `إشعار إتمام دورة: نهنئ الطالب ${studentName} على اجتياز "${courseTitle}" بنسبة ${scorePct}%.\n\nلرؤية الشهادة الفخمة وتحميلها الرجاء زيارة حساب الطالب في المنصة.`
       ];
       
       // اختيار صيغة عشوائية
