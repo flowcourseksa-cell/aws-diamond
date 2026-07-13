@@ -134,18 +134,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // otherwise we might fetch without a user and cache empty progress.
     if (isLoading) return;
 
-    if (!enrolledCourseId) {
-      setIsDataLoading(false);
-      return;
-    }
     const hasCachedData = tracks.length > 0;
-    const isFirstLoad = loadedForCourseRef.current !== enrolledCourseId;
+    // Use targetCourseId or a dummy string for first load check if neither exists
+    const isFirstLoad = loadedForCourseRef.current !== (enrolledCourseId || 'default');
     const now = Date.now();
     // Throttle background refresh to once every 10 minutes
     const shouldRefresh = now - lastRefreshRef.current > 10 * 60 * 1000;
 
     if (isFirstLoad) {
-      loadedForCourseRef.current = enrolledCourseId;
+      loadedForCourseRef.current = enrolledCourseId || 'default';
       lastRefreshRef.current = now;
       // Show spinner only if no cached data available
       if (!hasCachedData) setIsDataLoading(true);

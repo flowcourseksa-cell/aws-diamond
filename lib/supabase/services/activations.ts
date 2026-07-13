@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from '@supabase/supabase-js';
+import { revalidatePath } from 'next/cache';
 
 export async function fetchPendingActivations() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -108,6 +109,10 @@ export async function requestCourseActivation(
     }));
     await supabase.from('notifications').insert(adminNotifications);
   }
+
+  // Force Next.js to revalidate the home page so the card immediately shows "Pending" or "Active"
+  revalidatePath('/');
+  revalidatePath('/dashboard');
 
   return { success: true };
 }
