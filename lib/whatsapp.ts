@@ -82,8 +82,8 @@ function formatSaudiPhone(phone: string): string {
     cleaned = "966" + cleaned;
   }
 
-  // صيغة WhatsApp
-  return cleaned.includes("@c.us") ? cleaned : `${cleaned}@c.us`;
+  // UltraMsg expects plain numbers with country code, no @c.us suffix
+  return cleaned.replace("@c.us", "");
 }
 
 // ── Edge Function Handler ─────────────────────────────────────
