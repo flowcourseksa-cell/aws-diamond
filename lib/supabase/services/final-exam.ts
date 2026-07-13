@@ -334,17 +334,38 @@ async function issueCertificate(
   const studentName = profileRes.data?.full_name ?? "الطالب";
   const courseTitle = courseRes.data?.title ?? "الدورة";
 
-  // Insert instead of upsert to keep a history of all certificates and get the ID
-  const certResult = await supabase.from("certificates").insert({
-    student_id: studentId,
-    course_id: courseId,
-    final_exam_id: finalExamId,
-    score_pct: scorePct,
-    student_name: studentName,
-    course_title: courseTitle,
-  }).select("id").single();
-  
-  const certId = certResult.data?.id;
+  // First check if a certificate already exists for this student and course
+  const existingCert = await supabase
+    .from("certificates")
+    .select("id")
+    .eq("student_id", studentId)
+    .eq("course_id", courseId)
+    .maybeSingle();
+
+  let certId: string;
+
+  if (existingCert.data) {
+    // Update existing certificate
+    certId = existingCert.data.id;
+    await supabase.from("certificates").update({
+      score_pct: scorePct,
+      final_exam_id: finalExamId,
+      student_name: studentName,
+      course_title: courseTitle,
+    }).eq("id", certId);
+  } else {
+    // Insert new certificate
+    const certResult = await supabase.from("certificates").insert({
+      student_id: studentId,
+      course_id: courseId,
+      final_exam_id: finalExamId,
+      score_pct: scorePct,
+      student_name: studentName,
+      course_title: courseTitle,
+    }).select("id").single();
+    
+    certId = certResult.data?.id;
+  }
 
   // ── Read Admin Settings with fallback ──
   let autoCert = true;
