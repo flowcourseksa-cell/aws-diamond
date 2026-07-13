@@ -52,10 +52,10 @@ export default async function CertificatePage(props: { params: Promise<{ id: str
         {/* Call to Action for visitors */}
         <div className="mt-16 mb-8 text-center fade-in w-full">
           <Link 
-            href={`/simulator/${cert.course_id}`}
+            href="/"
             className="inline-flex w-full sm:w-auto items-center justify-center px-10 py-4 bg-slate-900 text-white text-lg font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 hover:-translate-y-1 border border-slate-700"
           >
-            الذهاب لصفحة المحاكي
+            الذهاب لمنصة الأوس الماسية
           </Link>
         </div>
 

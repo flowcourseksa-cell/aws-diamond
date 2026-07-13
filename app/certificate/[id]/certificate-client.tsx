@@ -70,20 +70,31 @@ export default function CertificateClient({ cert }: { cert: Certificate }) {
       
       window.removeEventListener('error', errorHandler, true);
 
-      // Create PDF: A4 landscape (297x210 mm)
-      const pdf = new jsPDF({
-        orientation: 'landscape',
+      // Calculate image dimensions
+      const imgProps = pdf.getImageProperties(dataUrl);
+      const isPortrait = imgProps.height > imgProps.width;
+
+      // Create PDF: A4
+      const pdfDoc = new jsPDF({
+        orientation: isPortrait ? 'portrait' : 'landscape',
         unit: 'mm',
         format: 'a4'
       });
       
-      // Calculate image dimensions to fit A4 page
-      const imgProps = pdf.getImageProperties(dataUrl);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      const pdfWidth = pdfDoc.internal.pageSize.getWidth();
+      const pdfHeight = pdfDoc.internal.pageSize.getHeight();
       
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`certificate-${cert.student_name}.pdf`);
+      // Scale to fit within A4 dimensions
+      const ratio = Math.min(pdfWidth / imgProps.width, pdfHeight / imgProps.height);
+      const scaledWidth = imgProps.width * ratio;
+      const scaledHeight = imgProps.height * ratio;
+      
+      // Center the image on the page
+      const x = (pdfWidth - scaledWidth) / 2;
+      const y = (pdfHeight - scaledHeight) / 2;
+      
+      pdfDoc.addImage(dataUrl, 'PNG', x, y, scaledWidth, scaledHeight);
+      pdfDoc.save(`certificate-${cert.student_name}.pdf`);
     } catch (err) {
       console.error("Error generating PDF:", err);
     }
