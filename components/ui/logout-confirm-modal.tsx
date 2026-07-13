@@ -53,6 +53,8 @@ export function LogoutConfirmModal({
     localStorage.removeItem("nokhba-platform-storage-v4");
     localStorage.removeItem("tkhsas-profile-cache");
     localStorage.removeItem("active_course_id");
+    localStorage.removeItem("tkhsas-active-exam");
+    localStorage.removeItem("flow-redirect-after-login");
     
     window.location.href = "/login";
   }

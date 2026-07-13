@@ -136,9 +136,26 @@ export function AdminSidebar({ open, onClose, adminLevel = "super" }: { open: bo
               <div className="truncate text-[13.5px] font-bold text-white">مدير المنصة</div>
               <div className="text-[11.5px] text-white/45">Center Admin</div>
             </div>
-            <Link href="/login" title="خروج" className="text-white/50 hover:text-accent-red">
+            <button
+              title="خروج"
+              className="text-white/50 hover:text-accent-red transition-colors"
+              onClick={async () => {
+                const { createClient } = await import("@/lib/supabase/client");
+                const supabase = createClient();
+                await supabase.auth.signOut();
+                sessionStorage.removeItem("admin_unlocked");
+                localStorage.removeItem("nokhba-platform-storage-v4");
+                localStorage.removeItem("tkhsas-profile-cache");
+                localStorage.removeItem("active_course_id");
+                localStorage.removeItem("tkhsas-active-exam");
+                localStorage.removeItem("flow-redirect-after-login");
+                localStorage.removeItem("flow-logged-in");
+                localStorage.removeItem("flow-user-role");
+                window.location.href = "/login";
+              }}
+            >
               <IconLogout2 size={19} />
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

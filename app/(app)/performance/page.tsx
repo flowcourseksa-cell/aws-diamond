@@ -40,7 +40,7 @@ const tooltipStyle = {
 export default function PerformancePage() {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
-  const { tracks: storeTracks } = usePlatformStore();
+  const { tracks: storeTracks, lessons: storeLessons } = usePlatformStore();
 
   useEffect(() => setIsMounted(true), []);
 
@@ -56,7 +56,11 @@ export default function PerformancePage() {
       ? Math.round(allSkills.reduce((acc, sk) => acc + (sk.masteryScore || 0), 0) / allSkills.length)
       : 0;
     const rec = avg >= 75 ? "good" : avg >= 50 ? "medium" : "weak";
-    return { trackId: t.id, lessons: `${Math.floor(allSkills.length * 0.7)} / ${allSkills.length}`, avg, time: "—", rec };
+    // حساب الدروس الحقيقية لهذا المسار من الـ store
+    const trackLessons = storeLessons.filter(l => l.trackId === t.id);
+    const completedCount = trackLessons.filter(l => l.status === "completed").length;
+    const totalCount = trackLessons.length;
+    return { trackId: t.id, lessons: totalCount > 0 ? `${completedCount} / ${totalCount}` : "—", avg, time: "—", rec };
   });
 
   const sorted = [...trackStats].sort((a, b) => a.avg - b.avg);
