@@ -39,7 +39,7 @@ export default function HeroSection() {
   const [factModal, setFactModal] = useState({ isOpen: false, subject: 'science', currentFact: '' });
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { lessons, exams, files } = usePlatformStore();
+  const { courses, enrolledCourses } = usePlatformStore();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
 
@@ -48,9 +48,12 @@ export default function HeroSection() {
   }, []);
 
   const searchItems = [
-    ...lessons.map(l => ({ id: `lesson-${l.id}`, title: l.title, type: "درس", icon: <IconBook2 size={16} />, href: "/lessons" })),
-    ...exams.map(e => ({ id: `exam-${e.id}`, title: e.name, type: "اختبار", icon: <IconClipboardText size={16} />, href: "/exams" })),
-    ...files.map(f => ({ id: `file-${f.id}`, title: f.title, type: "ملف", icon: <IconFolder size={16} />, href: "/library" }))
+    ...courses.map(c => ({ id: `course-${c.id}`, title: c.title || "", type: "دورة", icon: <IconSchool size={16} />, href: `/courses/${c.id}` })),
+    { id: 'static-about', title: 'من نحن', type: 'قسم', icon: <IconBook2 size={16} />, href: '#about' },
+    { id: 'static-features', title: 'مميزات المنصة', type: 'قسم', icon: <IconSparkles size={16} />, href: '#features' },
+    { id: 'static-terms', title: 'شروط الاستخدام', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '#footer' },
+    { id: 'static-privacy', title: 'سياسة الخصوصية', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '#footer' },
+    { id: 'static-refund', title: 'سياسة الاسترجاع', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '#footer' }
   ];
 
   const filteredItems = searchQuery.trim().length > 0 ? searchItems.filter(item => (item.title || "").toLowerCase().includes(searchQuery.toLowerCase())) : [];
@@ -284,9 +287,9 @@ export default function HeroSection() {
                         <>
                           <p className="text-sm font-bold text-slate-400 mb-3">عمليات البحث الشائعة</p>
                           <div className="flex flex-wrap gap-2">
-                            <button onClick={() => setSearchQuery('تجميعات التحصيلي 2026')} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-sm font-bold cursor-pointer hover:bg-indigo-100 transition-colors">تجميعات التحصيلي 2026</button>
-                            <button onClick={() => setSearchQuery('دورة الستيب المكثفة')} className="px-4 py-2 bg-amber-50 text-amber-600 rounded-full text-sm font-bold cursor-pointer hover:bg-amber-100 transition-colors">دورة الستيب المكثفة</button>
-                            <button onClick={() => setSearchQuery('ملفات التأسيس')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-sm font-bold cursor-pointer hover:bg-slate-200 transition-colors">ملفات التأسيس</button>
+                            <button onClick={() => setSearchQuery('دورة الأوس الشاملة')} className="px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-sm font-bold cursor-pointer hover:bg-indigo-100 transition-colors">دورة الأوس الشاملة</button>
+                            <button onClick={() => setSearchQuery('شروط')} className="px-4 py-2 bg-amber-50 text-amber-600 rounded-full text-sm font-bold cursor-pointer hover:bg-amber-100 transition-colors">شروط الاستخدام</button>
+                            <button onClick={() => setSearchQuery('من نحن')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-full text-sm font-bold cursor-pointer hover:bg-slate-200 transition-colors">من نحن</button>
                           </div>
                         </>
                       )}
@@ -359,9 +362,20 @@ export default function HeroSection() {
 
             {/* Added Back The Action Buttons exactly as requested */}
             <div className="flex flex-col sm:flex-row gap-4 mt-6 w-full lg:w-auto relative z-50">
-              <Link href={user ? "/dashboard" : "/login"} className="px-8 py-4 bg-gradient-to-r from-white to-orange-400 hover:to-orange-500 text-slate-900 rounded-full font-bold text-lg shadow-xl shadow-orange-500/30 transition-all hover:-translate-y-1 text-center">
+              <button 
+                onClick={(e) => {
+                  if (!user) {
+                    router.push("/login");
+                  } else if (enrolledCourses.length === 0) {
+                    handleSmoothScroll(e, 'courses');
+                  } else {
+                    router.push("/dashboard");
+                  }
+                }}
+                className="px-8 py-4 bg-gradient-to-r from-white to-orange-400 hover:to-orange-500 text-slate-900 rounded-full font-bold text-lg shadow-xl shadow-orange-500/30 transition-all hover:-translate-y-1 text-center"
+              >
                 ابدأ رحلة الـ 100%
-              </Link>
+              </button>
               <button onClick={(e) => handleSmoothScroll(e, 'courses')} className="px-8 py-4 bg-white border-2 border-slate-200 hover:border-indigo-600 text-slate-700 hover:text-indigo-600 rounded-full font-bold text-lg transition-all shadow-sm animate-pulse" style={{ animationDuration: '4s' }}>
                 استكشف الدورات
               </button>

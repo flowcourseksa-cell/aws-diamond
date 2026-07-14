@@ -56,6 +56,9 @@ export function LogoutConfirmModal({
     localStorage.removeItem("tkhsas-active-exam");
     localStorage.removeItem("flow-redirect-after-login");
     
+    // Clear Zustand memory state before redirecting
+    import("@/lib/store").then(m => m.usePlatformStore.getState().resetStore());
+    
     window.location.href = "/login";
   }
 

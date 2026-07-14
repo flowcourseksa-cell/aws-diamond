@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
-import { IconMenu2, IconSearch, IconMoon, IconSun, IconBook2, IconFolder, IconClipboardText, IconX } from "@tabler/icons-react";
+import { IconMenu2, IconSearch, IconMoon, IconSun, IconBook2, IconFolder, IconClipboardText, IconX, IconSchool, IconSparkles } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationsDropdown } from "./notifications-dropdown";
 import { ProfileDropdown } from "./profile-dropdown";
@@ -29,12 +29,15 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const { lessons, exams, files } = usePlatformStore();
+  const { courses } = usePlatformStore();
 
   const searchItems = [
-    ...lessons.map(l => ({ id: `lesson-${l.id}`, title: l.title || "", type: "درس", icon: <IconBook2 size={16} />, href: "/lessons" })),
-    ...exams.map(e => ({ id: `exam-${e.id}`, title: e.name || (e as any).title || "", type: "اختبار", icon: <IconClipboardText size={16} />, href: "/exams" })),
-    ...files.map(f => ({ id: `file-${f.id}`, title: f.title || "", type: "ملف", icon: <IconFolder size={16} />, href: "/library" }))
+    ...courses.map(c => ({ id: `course-${c.id}`, title: c.title || "", type: "دورة", icon: <IconSchool size={16} />, href: `/courses/${c.id}` })),
+    { id: 'static-about', title: 'من نحن', type: 'قسم', icon: <IconBook2 size={16} />, href: '/#about' },
+    { id: 'static-features', title: 'مميزات المنصة', type: 'قسم', icon: <IconSparkles size={16} />, href: '/#features' },
+    { id: 'static-terms', title: 'شروط الاستخدام', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '/#footer' },
+    { id: 'static-privacy', title: 'سياسة الخصوصية', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '/#footer' },
+    { id: 'static-refund', title: 'سياسة الاسترجاع', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '/#footer' }
   ];
 
   const filteredItems = searchQuery.trim().length > 0 ? searchItems.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase())) : [];

@@ -9,10 +9,20 @@ export type PendingExamAttempt = {
   timestamp: number;
 };
 
+export type PendingLesson = {
+  id: string;
+  userId: string;
+  lessonId: string;
+  timestamp: number;
+};
+
 type SyncState = {
   pendingExams: PendingExamAttempt[];
+  pendingLessons: PendingLesson[];
   addPendingExam: (attempt: Omit<PendingExamAttempt, "id" | "timestamp">) => void;
   removePendingExam: (id: string) => void;
+  addPendingLesson: (lesson: Omit<PendingLesson, "id" | "timestamp">) => void;
+  removePendingLesson: (id: string) => void;
   clearPending: () => void;
 };
 
@@ -20,6 +30,7 @@ export const useSyncStore = create<SyncState>()(
   persist(
     (set) => ({
       pendingExams: [],
+      pendingLessons: [],
       addPendingExam: (attempt) => set((state) => ({
         pendingExams: [
           ...state.pendingExams,
@@ -33,7 +44,20 @@ export const useSyncStore = create<SyncState>()(
       removePendingExam: (id) => set((state) => ({
         pendingExams: state.pendingExams.filter((exam) => exam.id !== id)
       })),
-      clearPending: () => set({ pendingExams: [] }),
+      addPendingLesson: (lesson) => set((state) => ({
+        pendingLessons: [
+          ...state.pendingLessons,
+          {
+            ...lesson,
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+          }
+        ]
+      })),
+      removePendingLesson: (id) => set((state) => ({
+        pendingLessons: state.pendingLessons.filter((l) => l.id !== id)
+      })),
+      clearPending: () => set({ pendingExams: [], pendingLessons: [] }),
     }),
     {
       name: "nokhba-sync-queue",

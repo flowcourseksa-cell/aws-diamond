@@ -191,7 +191,7 @@ export function TracksClient() {
 
   const activeTrack   = storeTracks.find(t => t.id === activeTab);
 
-  if (!isMounted || isDataLoading) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
+  if (!isMounted || (isDataLoading && storeTracks.length === 0)) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
   if (!activeTrack) return <div className="p-8 text-center text-text-muted font-bold">لا توجد مسارات مفعلة في هذه الدورة.</div>;
 
   // ── Stats for active track ─────────────────────────────────

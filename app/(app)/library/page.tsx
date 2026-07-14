@@ -108,7 +108,7 @@ export default function LibraryPage() {
     );
   }
 
-  if (!isMounted || isDataLoading) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
+  if (!isMounted || (isDataLoading && mappedFiles.length === 0)) return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
 
   return (
     <div className="flex flex-col gap-6">

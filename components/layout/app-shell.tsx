@@ -13,11 +13,13 @@ import { fetchExamsByTracks } from "@/lib/supabase/services/exams";
 import { fetchFilesByTracks } from "@/lib/supabase/services/library";
 import { FlowTrack } from "@/lib/mock-data";
 import { SyncManager } from "./sync-manager";
+import { useToast } from "@/components/ui/toast";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [examActive, setExamActive] = useState(false);
   const { user, profile, isLoading } = useAuth();
+  const { showToast } = useToast();
   const { setEnrolledCourses, enrolledCourseId, setEnrolledCourseId, setTracks, setLessons, setExams, setFiles, setIsDataLoading, applyUserProgress, tracks, lessons } = usePlatformStore();
   // Track the userId / courseId we last loaded for — prevents re-fetch on token refresh
   const loadedForUserRef = useRef<string | null>(null);
@@ -174,17 +176,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const [
           platformSettings,
           dbTracks,
-          progressRes
+          progressRes,
+          courseBooks
         ] = await Promise.all([
           import("@/lib/supabase/services/settings").then(m => m.fetchPlatformSettings()),
           fetchHierarchyByCourse(targetCourseId!),
           user ? import("@/lib/supabase/services/progress-actions").then(m => m.fetchUserProgressServer(user.id).catch(err => {
             console.warn("Could not fetch user progress (possibly offline):", err?.message);
             return { skills: [], lessons: [] };
-          })) : Promise.resolve({ skills: [], lessons: [] })
+          })) : Promise.resolve({ skills: [], lessons: [] }),
+          import("@/lib/supabase/services/book").then(m => m.fetchBooksByCourse(targetCourseId!))
         ]);
 
         usePlatformStore.getState().setPlatformSettings(platformSettings);
+        usePlatformStore.getState().setBooks(courseBooks.filter(b => b.is_published));
 
         const skillsProgress: any[] = progressRes.skills || [];
         const lessonsProgress: any[] = progressRes.lessons || [];
@@ -249,9 +254,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             fetchExamsByTracks(trackIds),
             fetchFilesByTracks(trackIds)
           ]);
-          
-          // Map to Store types — lesson status applied inline from DB progress
-          setLessons(fetchedLessons.map(l => {
+
+          const mappedLessons = fetchedLessons.map(l => {
             let status: "new" | "normal" | "completed" = "normal";
             let pSec = 0;
             if (fetchedProgress) {
@@ -260,7 +264,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               pSec = prog?.progress_seconds || 0;
             } else {
               status = (oldLessonsMap.get(l.id) as any) || "normal";
-              // We don't cache old progress_seconds yet, so assume 0 or 100%
               pSec = status === "completed" ? (l.duration_seconds || 1) : 0;
             }
             const dur = l.duration_seconds || 1;
@@ -282,9 +285,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               coverImage: l.cover_image || undefined,
               commentsEnabled: l.comments_enabled ?? true
             };
-          }));
-          
-          setExams(exams.map((e: any) => {
+          });
+
+          const mappedExams = exams.map((e: any) => {
             const questions = (e.questions || []).map((q: any) => {
               const options = q.question_options || [];
               return {
@@ -308,9 +311,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               price: e.price || 0,
               questions: questions
             };
-          }));
-          
-          setFiles(files.map((f: any) => ({
+          });
+
+          const mappedFiles = files.map((f: any) => ({
             id: f.id,
             title: f.title,
             type: f.file_type || 'pdf',
@@ -325,7 +328,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             dateLabel: new Date(f.created_at).toLocaleDateString("ar-EG"),
             accessType: f.access_type,
             price: 0
-          })));
+          }));
+
+          const applyData = () => {
+             setTracks(mappedTracks);
+             setLessons(mappedLessons);
+             setExams(mappedExams);
+             setFiles(mappedFiles);
+          };
+
+          if (isFirstLoad || !hasCachedData) {
+            applyData();
+          } else {
+            // Background refresh: Check if structure changed (counts or names)
+            const currentStructure = JSON.stringify(tracks.map(t => ({ id: t.id, n: t.name, c: t.sections.length }))) + lessons.length + usePlatformStore.getState().exams.length;
+            const newStructure = JSON.stringify(mappedTracks.map(t => ({ id: t.id, n: t.name, c: t.sections.length }))) + mappedLessons.length + mappedExams.length;
+
+            if (currentStructure !== newStructure) {
+               showToast("هناك محتوى جديد تم إضافته للدورة!", "success", {
+                 label: "تحديث الشاشة الآن 🚀",
+                 onClick: () => applyData()
+               });
+            } else {
+              applyData();
+            }
+          }
         } else {
           setLessons([]);
           setExams([]);
@@ -341,7 +368,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     
     loadData();
-  }, [enrolledCourseId, setTracks, setLessons, setExams, setFiles, setIsDataLoading, applyUserProgress, user?.id, isLoading]);
+  }, [enrolledCourseId, setTracks, setLessons, setExams, setFiles, setIsDataLoading, applyUserProgress, user?.id, isLoading, showToast]);
 
 
 

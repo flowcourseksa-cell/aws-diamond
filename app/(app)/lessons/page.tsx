@@ -670,7 +670,7 @@ export default function LessonsPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  if (!isMounted || isDataLoading) return <div className="p-8 text-center font-bold">جاري التحميل...</div>;
+  if (!isMounted || (isDataLoading && mappedLessons.length === 0)) return <div className="p-8 text-center font-bold">جاري التحميل...</div>;
 
   if (selected) {
     const s = resolvedExamId && statsMap[resolvedExamId] ? statsMap[resolvedExamId] : { bestScore: 0, attemptsCount: 0, maxAttempts: 5 };
@@ -699,12 +699,18 @@ export default function LessonsPage() {
           setDone(p => new Set([...p, selected.id]));
           usePlatformStore.getState().markLessonAsCompleted(selected.id);
           if (user) {
-            await markLessonCompleted(user.id, selected.id);
             try {
+              const res = await markLessonCompleted(user.id, selected.id);
+              if (!res && !navigator.onLine) {
+                 useSyncStore.getState().addPendingLesson({ userId: user.id, lessonId: selected.id });
+              }
               const { skills, lessons } = await fetchUserProgress(user.id);
               usePlatformStore.getState().applyUserProgress(skills, lessons);
             } catch (e) {
               console.error("Failed to sync progress on complete", e);
+              if (!navigator.onLine) {
+                 useSyncStore.getState().addPendingLesson({ userId: user.id, lessonId: selected.id });
+              }
             }
           }
         }}

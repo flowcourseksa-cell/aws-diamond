@@ -319,7 +319,7 @@ export function ExamsClient() {
     );
   }
 
-  if (isDataLoading) {
+  if (isDataLoading && allExams.length === 0) {
     return <div className="p-8 text-center text-text-muted font-bold">جاري التحميل...</div>;
   }
 

@@ -13,12 +13,11 @@ import type { Course } from "@/lib/store";
 
 export function BookClient() {
   const { user } = useAuth();
-  const { enrolledCourseId, enrolledCourses } = usePlatformStore();
+  const { enrolledCourseId, enrolledCourses, books } = usePlatformStore();
   const [courses, setCourses] = useState<{id: string, title: string, coverGradient?: string}[]>([]);
-  const [books, setBooks] = useState<Book[]>([]);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [pages, setPages] = useState<BookPage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // Apply Features Overrides
   const activeCourse = enrolledCourses.find(c => c.id === enrolledCourseId);
@@ -27,27 +26,12 @@ export function BookClient() {
   const isEnabled = overrides.interactive_book !== undefined ? overrides.interactive_book : pSettings.global_interactive_book;
 
   useEffect(() => {
-    async function loadBookshelf() {
-      if (!user) return;
-      try {
-        setLoading(true);
-        if (enrolledCourses.length > 0 && enrolledCourseId) {
-          const userCourses = enrolledCourses.filter(c => c.id === enrolledCourseId);
-          setCourses(userCourses);
-
-          const courseBooks = await fetchBooksByCourse(enrolledCourseId);
-          setBooks(courseBooks.filter(b => b.is_published));
-        } else {
-          setBooks([]);
-        }
-      } catch (err) {
-        console.error("Error loading bookshelf:", err);
-      } finally {
-        setLoading(false);
-      }
+    if (enrolledCourses.length > 0 && enrolledCourseId) {
+      setCourses(enrolledCourses.filter(c => c.id === enrolledCourseId));
+    } else {
+      setCourses([]);
     }
-    loadBookshelf();
-  }, [user, enrolledCourseId, enrolledCourses]);
+  }, [enrolledCourseId, enrolledCourses]);
 
   const handleSelectBook = async (book: Book) => {
     setSelectedBook(book);

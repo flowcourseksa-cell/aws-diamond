@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { type FlowTrack, type SkillQuestion } from "@/lib/mock-data";
+import { type Book } from "@/lib/supabase/services/book";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ type PlatformState = {
   lessons: AdminLesson[];
   exams: AdminExam[];
   files: LibraryFile[];
+  books: Book[];
   discountCodes: DiscountCode[];
   subscriptionPrices: SubscriptionPrices;
   courses: Course[];
@@ -122,6 +124,7 @@ type PlatformState = {
   setLessons: (lessons: AdminLesson[] | ((prev: AdminLesson[]) => AdminLesson[])) => void;
   setExams: (exams: AdminExam[] | ((prev: AdminExam[]) => AdminExam[])) => void;
   setFiles: (files: LibraryFile[] | ((prev: LibraryFile[]) => LibraryFile[])) => void;
+  setBooks: (books: Book[] | ((prev: Book[]) => Book[])) => void;
   setDiscountCodes: (updater: DiscountCode[] | ((prev: DiscountCode[]) => DiscountCode[])) => void;
   setSubscriptionPrices: (updater: SubscriptionPrices | ((prev: SubscriptionPrices) => SubscriptionPrices)) => void;
   setPlatformSettings: (settings: { global_interactive_book: boolean; global_study_plan: boolean; global_library: boolean; } | null) => void;
@@ -146,6 +149,7 @@ export const usePlatformStore = create<PlatformState>()(
       lessons: [],
       exams: [],
       files: [],
+      books: [],
       discountCodes: [],
       subscriptionPrices: { monthly: 0, yearly: 0 },
       platformSettings: null,
@@ -158,22 +162,22 @@ export const usePlatformStore = create<PlatformState>()(
       setIsExamMode: (val) => set({ isExamMode: val }),
 
       setTracks: (updater) => set((state) => ({
-        tracks: typeof updater === "function" ? updater(state.tracks) : updater
+        tracks: typeof updater === "function" ? updater(state.tracks) : updater,
       })),
-
       setLessons: (updater) => set((state) => ({
-        lessons: typeof updater === "function" ? updater(state.lessons) : updater
+        lessons: typeof updater === "function" ? updater(state.lessons) : updater,
+      })),
+      setExams: (updater) => set((state) => ({
+        exams: typeof updater === "function" ? updater(state.exams) : updater,
+      })),
+      setFiles: (updater) => set((state) => ({
+        files: typeof updater === "function" ? updater(state.files) : updater,
+      })),
+      setBooks: (updater) => set((state) => ({
+        books: typeof updater === "function" ? updater(state.books) : updater,
       })),
 
       setIsDataLoading: (loading) => set({ isDataLoading: loading }),
-
-      setExams: (updater) => set((state) => ({
-        exams: typeof updater === "function" ? updater(state.exams) : updater
-      })),
-
-      setFiles: (updater) => set((state) => ({
-        files: typeof updater === "function" ? updater(state.files) : updater
-      })),
 
       setDiscountCodes: (updater) => set((state) => ({
         discountCodes: typeof updater === "function" ? updater(state.discountCodes) : updater

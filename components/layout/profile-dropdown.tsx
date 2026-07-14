@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { LogoutConfirmModal } from "@/components/ui/logout-confirm-modal";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { usePlatformStore } from "@/lib/store";
 
 export function ProfileDropdown({ customTrigger, loginClassName }: { customTrigger?: React.ReactNode, loginClassName?: string } = {}) {
   const { user, profile, isLoading } = useAuth();
@@ -51,8 +52,16 @@ export function ProfileDropdown({ customTrigger, loginClassName }: { customTrigg
           .select("*", { count: "exact", head: true })
           .eq("student_id", user.id);
         
-        const progress = count ? Math.min(count * 15, 100) : 0;
-        setStats({ courses: count || 0, progress });
+        // Calculate real progress based on loaded lessons in the platform store
+        const lessons = usePlatformStore.getState().lessons || [];
+        let calculatedProgress = 0;
+        
+        if (lessons.length > 0) {
+          const completedLessons = lessons.filter(l => l.status === "completed" || l.progressPercent === 100).length;
+          calculatedProgress = Math.round((completedLessons / lessons.length) * 100);
+        }
+
+        setStats({ courses: count || 0, progress: calculatedProgress });
       };
       fetchStats();
     }
