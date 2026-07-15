@@ -90,7 +90,7 @@ export async function broadcastInAppNotification(title: string, message: string)
     if (!students || students.length === 0) return { success: true, count: 0 };
 
     // 1️⃣ Send to all students using the unified platform notification system
-    const { pushSent = 0, pushFailed = 0 } = await sendPlatformNotification(supabaseAdmin, {
+    const result = await sendPlatformNotification(supabaseAdmin, {
       userIds: students.map(s => s.id),
       title,
       message,
@@ -98,7 +98,7 @@ export async function broadcastInAppNotification(title: string, message: string)
       url: "/dashboard"
     });
 
-    return { success: true, count: students.length, pushSent, pushFailed };
+    return { success: true, count: students.length, pushSent: result.sent || 0, pushFailed: result.dead || 0 };
   } catch (err: any) {
     console.error("Broadcast error:", err);
     return { success: false, error: err.message };
