@@ -329,18 +329,18 @@ function PageComments({ pageId }: { pageId: string }) {
     setSending(true);
     const body = replyingTo ? `@${replyingTo.name} ${draft}` : draft;
     const created = await addPageComment(pageId, body, parentId, profile?.role === "admin");
+    
+    // Handle banned student
+    if (created === "banned") {
+      alert("عذراً، لقد تم حظرك من التعليق في هذه المنصة. يرجى التواصل مع الإدارة.");
+      setSending(false);
+      return;
+    }
+    
     if (created) {
-      if (parentId) {
-        // Find parent and add to replies
-        setComments(prev => prev.map(c => {
-          if (c.id === parentId) {
-            return { ...c, replies: [...(c.replies || []), created] };
-          }
-          return c;
-        }));
-      } else {
-        setComments((prev) => [created, ...prev]);
-      }
+      // BUG FIX: Push to flat comments array so replies appear immediately
+      // (rendering uses comments.filter(r => r.parent_id === c.id), not c.replies)
+      setComments(prev => parentId ? [...prev, created] : [created, ...prev]);
       setDraft("");
       setReplyingTo(null);
     }
@@ -406,21 +406,28 @@ function PageComments({ pageId }: { pageId: string }) {
             </button>
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="اكتب تعليقك هنا أو اسأل زملائك..."
-            className="flex-1 rounded-xl border border-border bg-bg px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
-          />
-          <button
-            type="submit"
-            disabled={sending || !draft.trim()}
-            className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50"
-          >
-            <IconSend size={16} /> إرسال
-          </button>
-        </div>
+        {profile?.is_banned_from_comments ? (
+          <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+            <IconBan size={16} className="shrink-0" />
+            <span className="font-bold">لقد تم حظرك من التعليقات. تواصل مع الإدارة لرفع الحظر.</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="اكتب تعليقك هنا أو اسأل زملائك..."
+              className="flex-1 rounded-xl border border-border bg-bg px-4 py-2.5 text-sm focus:border-primary focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={sending || !draft.trim()}
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-dark disabled:opacity-50"
+            >
+              <IconSend size={16} /> إرسال
+            </button>
+          </div>
+        )}
       </form>
 
       {loading ? (
@@ -496,11 +503,21 @@ function PageComments({ pageId }: { pageId: string }) {
                         </button>
                         {!c.is_admin_reply && (
                           <>
-                            <button onClick={() => handleAdminBan(c.student_id, false)} className="text-orange-500 hover:scale-110 transition-transform" title="حظر الطالب من هذا الكتاب">
-                              <IconBan size={15} />
+                            {/* حظر من هذا الكتاب فقط - برتقالي */}
+                            <button
+                              onClick={() => handleAdminBan(c.student_id, false)}
+                              className="flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-600 hover:bg-orange-200 transition-colors dark:bg-orange-900/30 dark:text-orange-400"
+                              title="حظر الطالب من هذا الكتاب فقط"
+                            >
+                              <IconBan size={11} /> حظر كتاب
                             </button>
-                            <button onClick={() => handleAdminBan(c.student_id, true)} className="text-red-600 hover:scale-110 transition-transform" title="حظر الطالب نهائياً من التعليقات">
-                              <IconBan size={15} />
+                            {/* حظر نهائي من كل المنصة - أحمر داكن */}
+                            <button
+                              onClick={() => handleAdminBan(c.student_id, true)}
+                              className="flex items-center gap-1 rounded-lg bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700 hover:bg-red-200 transition-colors dark:bg-red-900/30 dark:text-red-400"
+                              title="حظر الطالب نهائياً من جميع التعليقات في المنصة"
+                            >
+                              <IconBan size={11} /> حظر نهائي
                             </button>
                           </>
                         )}

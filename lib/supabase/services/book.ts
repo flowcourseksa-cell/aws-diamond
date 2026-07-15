@@ -114,13 +114,29 @@ export async function fetchPageComments(pageId: string): Promise<BookComment[]> 
 
 // Add a comment as the currently signed-in student.
 // RLS enforces that student_id must equal auth.uid().
-export async function addPageComment(pageId: string, body: string, parentId: string | null = null, isAdminReply: boolean = false): Promise<BookComment | null> {
+// Returns "banned" if the student is banned from commenting.
+export async function addPageComment(
+  pageId: string,
+  body: string,
+  parentId: string | null = null,
+  isAdminReply: boolean = false
+): Promise<BookComment | "banned" | null> {
   const trimmed = body.trim();
   if (!trimmed) return null;
 
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
+
+  // SECURITY: Check if student is banned from comments before inserting
+  if (!isAdminReply) {
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("is_banned_from_comments")
+      .eq("id", user.id)
+      .single();
+    if (profileData?.is_banned_from_comments) return "banned";
+  }
 
   const { data, error } = await supabase
     .from("book_page_comments")
