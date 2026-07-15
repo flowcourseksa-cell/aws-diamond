@@ -1,6 +1,7 @@
 "use server";
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { sendPlatformNotification } from "@/lib/notifications/server-push";
 import { revalidatePath } from 'next/cache';
 
 export async function fetchPendingActivations() {
@@ -126,12 +127,13 @@ export async function approveActivation(enrollmentId: string, studentId: string,
   const { error: updateError } = await supabase.from("enrollments").update({ is_active: true }).eq("id", enrollmentId);
   if (updateError) return { success: false, error: updateError.message };
 
-  // 2. Insert notification
-  await supabase.from("notifications").insert({
-    user_id: studentId,
+  // 2. Insert notification & send web push
+  await sendPlatformNotification(supabase, {
+    userIds: [studentId],
     title: "تم تفعيل الدورة بنجاح",
     message: `تم تفعيل اشتراكك في دورة "${courseTitle}". يمكنك الآن الدخول والبدء في التعلم!`,
-    type: "success"
+    type: "success",
+    url: "/dashboard"
   });
 
   return { success: true };
@@ -146,12 +148,13 @@ export async function rejectActivation(enrollmentId: string, studentId: string, 
   const { error: deleteError } = await supabase.from("enrollments").delete().eq("id", enrollmentId);
   if (deleteError) return { success: false, error: deleteError.message };
 
-  // 2. Insert notification
-  await supabase.from("notifications").insert({
-    user_id: studentId,
+  // 2. Insert notification & send web push
+  await sendPlatformNotification(supabase, {
+    userIds: [studentId],
     title: "تم رفض طلب التفعيل",
     message: `عذراً، تم رفض طلب تفعيل دورتك "${courseTitle}". يرجى التواصل مع الإدارة.`,
-    type: "rejected"
+    type: "rejected",
+    url: "/dashboard"
   });
 
   return { success: true };

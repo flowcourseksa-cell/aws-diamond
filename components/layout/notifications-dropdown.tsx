@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { IconBell, IconCheck, IconTrash, IconX } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
+import { PushNotificationBell } from "@/components/ui/push-notification-bell";
 
 type Notification = {
   id: string;
@@ -139,7 +140,8 @@ export function NotificationsDropdown({ customTrigger }: { customTrigger?: React
               <h3 className="font-black text-text flex items-center gap-2">
                 <IconBell size={18} className="text-primary" /> الإشعارات
               </h3>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <PushNotificationBell />
                 {notifications.length > 0 && (
                   <button 
                     onClick={deleteAll}

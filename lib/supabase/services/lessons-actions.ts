@@ -3,6 +3,7 @@
 import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
 
 import { createAdminClient } from "@/lib/supabase/client";
+import { sendPlatformNotification } from "@/lib/notifications/server-push";
 import type { DbLesson } from "./lessons";
 
 export async function createLesson(lesson: Partial<DbLesson>): Promise<DbLesson | null> {
@@ -172,13 +173,13 @@ export async function addLessonComment(
       const title = isAdminReply ? "رد جديد من الإدارة" : "رد جديد على تعليقك";
       const message = isAdminReply ? "قامت الإدارة بالرد على تعليقك في إحدى الدروس." : "قام أحد زملائك بالرد على تعليقك.";
       
-      await supabase.from("notifications").insert([{
-        user_id: parent.student_id,
+      await sendPlatformNotification(supabase, {
+        userIds: [parent.student_id],
         title,
         message,
-        type: "info",
-        is_read: false
-      }]);
+        type: "system",
+        url: "/dashboard" // Or specific lesson page if we had it
+      });
 
       // Prune notifications to max 5
       const { data: notifs } = await supabase

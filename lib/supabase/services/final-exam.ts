@@ -3,6 +3,7 @@
 import { createClient as createClientServer } from "@/lib/supabase/server";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { sendPlatformNotification } from "@/lib/notifications/server-push";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 // Type-safe wrapper around revalidateTag for this Next.js version
@@ -435,13 +436,13 @@ async function issueCertificate(
   }
 
   if (isPassed) {
-    // Send in-app notification
-    await supabase.from("notifications").insert({
-      user_id: studentId,
+    // Send in-app notification & web push
+    await sendPlatformNotification(supabase, {
+      userIds: [studentId],
       title: "🎓 تهانينا! حصلت على شهادتك",
       message: `لقد اجتزت الاختبار النهائي لدورة "${courseTitle}" بنجاح بدرجة ${scorePct}%. شهادتك جاهزة للتحميل.`,
-      type: "achievement",
-      is_read: false,
+      type: "success",
+      url: "/dashboard"
     });
 
     // Send Parent Notification if enabled
@@ -479,13 +480,13 @@ async function issueCertificate(
       });
     }
   } else {
-    // Send in-app notification
-    await supabase.from("notifications").insert({
-      user_id: studentId,
+    // Send in-app notification & web push
+    await sendPlatformNotification(supabase, {
+      userIds: [studentId],
       title: "❌ استنفاد محاولات الاختبار",
       message: `للأسف، لقد استنفدت جميع محاولاتك في الاختبار النهائي لدورة "${courseTitle}" ولم تتمكن من الاجتياز. يمكنك التواصل مع الإدارة أو إعادة تفعيل الدورة.`,
-      type: "alert",
-      is_read: false,
+      type: "error",
+      url: "/dashboard"
     });
 
     // Send Parent Notification if enabled
