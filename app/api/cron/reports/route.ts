@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "No reports scheduled for today or they are disabled." });
     }
 
-    const students = await fetchStudents();
+    const { data: students } = await fetchStudents(1, 10000);
     
     const todayStr = new Date().toISOString().split('T')[0];
 

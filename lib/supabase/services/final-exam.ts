@@ -3,6 +3,11 @@
 import { createClient as createClientServer } from "@/lib/supabase/server";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache, revalidateTag } from "next/cache";
+
+// Type-safe wrapper around revalidateTag for this Next.js version
+// The type definition in this version incorrectly requires 2 args, but 1 is correct per docs
+const invalidateExamCache = () => (revalidateTag as (tag: string) => void)("final-exam-questions");
 
 function getReadClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -85,35 +90,57 @@ export type UnlockStatus = {
 
 // ─── Read API ─────────────────────────────────────────────────────────────────
 
-export async function fetchFinalExamByCourse(courseId: string): Promise<FinalExamWithQuestions | null> {
-  const supabase = getReadClient();
-  const { data, error } = await supabase
-    .from("final_exams")
-    .select(`
-      *,
-      questions:final_exam_questions (
+/** Internal: raw DB fetch with no scrubbing — cached for 24h */
+const _fetchExamRaw = unstable_cache(
+  async (courseId: string) => {
+    const supabase = getReadClient();
+    const { data, error } = await supabase
+      .from("final_exams")
+      .select(`
         *,
-        options:final_exam_question_options (*)
-      )
-    `)
-    .eq("course_id", courseId)
-    .eq("is_published", true)
-    .single();
+        questions:final_exam_questions (
+          *,
+          options:final_exam_question_options (*)
+        )
+      `)
+      .eq("course_id", courseId)
+      .eq("is_published", true)
+      .single();
+    if (error || !data) return null;
+    return data;
+  },
+  ["final-exam-questions"],
+  { tags: ["final-exam-questions"], revalidate: 86400 } // 24 hours
+);
 
-  if (error || !data) return null;
+export async function fetchFinalExamByCourse(courseId: string): Promise<FinalExamWithQuestions | null> {
+  const data = await _fetchExamRaw(courseId);
+  if (!data) return null;
 
-  // Sort questions by order_index
-  if (data.questions) {
-    data.questions.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
-    // Shuffle options per question for fairness
-    data.questions.forEach((q: any) => {
+  // Deep-clone so we don't mutate the cached object
+  const cloned = JSON.parse(JSON.stringify(data));
+
+  // Sort questions by order_index and scrub secret data
+  if (cloned.questions) {
+    cloned.questions.sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0));
+    
+    cloned.questions.forEach((q: any) => {
+      // SECURITY: Remove explanation so students can't see hints in the network tab
+      delete q.explanation;
+      
       if (q.options) {
+        // Shuffle options per question for fairness
         q.options = q.options.sort(() => Math.random() - 0.5);
+        
+        // SECURITY: Remove is_correct flag so students can't cheat by inspecting network payloads
+        q.options.forEach((opt: any) => {
+          delete opt.is_correct;
+        });
       }
     });
   }
 
-  return data as FinalExamWithQuestions;
+  return cloned as FinalExamWithQuestions;
 }
 
 /** Check how many attempts the student has used */
@@ -154,7 +181,7 @@ export async function checkFinalExamUnlock(
     requiredExamsPassed: false,
   };
 
-  // 1. Get final exam unlock config
+  // Step 1: Get final exam unlock config
   const { data: exam } = await supabase
     .from("final_exams")
     .select("unlock_lessons_pct, unlock_skills_pct, unlock_require_exams")
@@ -167,7 +194,7 @@ export async function checkFinalExamUnlock(
   const requiredSkillsPct = exam.unlock_skills_pct ?? 0;
   const requiredExamsPassed = exam.unlock_require_exams ?? false;
 
-  // 2. Get all track IDs for this course
+  // Step 2: Get all track IDs for this course
   const { data: tracks } = await supabase
     .from("tracks")
     .select("id")
@@ -264,18 +291,32 @@ export async function submitFinalExamAttempt(
 ): Promise<{ scorePct: number; passed: boolean; correct: number; total: number }> {
   const supabase = getAdminClient();
 
-  let correct = 0;
+  // SECURE GRADING: Extract the IDs of the options the user selected
+  const selectedOptionIds: string[] = [];
   questions.forEach((q, i) => {
     const selectedIdx = answers[i];
-    if (selectedIdx !== null && q.options[selectedIdx]?.is_correct) {
-      correct++;
+    if (selectedIdx !== null && q.options[selectedIdx]) {
+      selectedOptionIds.push(q.options[selectedIdx].id);
     }
   });
+
+  let correct = 0;
+  
+  if (selectedOptionIds.length > 0) {
+    // Query the database securely to check which of those specific option IDs are correct
+    const { data: correctOptions } = await supabase
+      .from("final_exam_question_options")
+      .select("id")
+      .in("id", selectedOptionIds)
+      .eq("is_correct", true);
+      
+    correct = correctOptions ? correctOptions.length : 0;
+  }
 
   const total = questions.length;
   const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
-  // Fetch passing score and max attempts
+  // Fetch passing score
   const { data: exam } = await supabase
     .from("final_exams")
     .select("passing_score, max_attempts, course_id")
@@ -586,18 +627,24 @@ export async function saveSimulatorQuestions(examId: string, questions: any[]) {
     is_correct: o.is_correct ?? false,
   }));
   const { error: optsErr } = await supabase.from("final_exam_question_options").insert(opts);
+  
+  // CACHE: Invalidate so next student request gets fresh questions
+  if (!optsErr) invalidateExamCache();
+  
   return !optsErr;
 }
 
 export async function deleteFinalExamQuestion(questionId: string): Promise<boolean> {
   const supabase = getAdminClient();
   const { error } = await supabase.from("final_exam_questions").delete().eq("id", questionId);
+  if (!error) invalidateExamCache();
   return !error;
 }
 
 export async function deleteFinalExam(examId: string): Promise<boolean> {
   const supabase = getAdminClient();
   const { error } = await supabase.from("final_exams").delete().eq("id", examId);
+  if (!error) invalidateExamCache();
   return !error;
 }
 
@@ -618,6 +665,8 @@ export async function bulkSaveFinalExamQuestions(
     });
     if (ok) success++; else failed++;
   }
+  // Bulk invalidate once after all saves
+  if (success > 0) invalidateExamCache();
   return { success, failed };
 }
 

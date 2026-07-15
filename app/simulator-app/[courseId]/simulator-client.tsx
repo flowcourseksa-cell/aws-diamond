@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createCertificate } from "@/lib/supabase/services/certificates";
 import { toPng } from "html-to-image";
+import { gradeSimulatorAttempt } from "@/app/actions/simulator";
 
 type SimulatorClientProps = {
   courseId: string;
@@ -65,6 +66,16 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
   const [showEndModal, setShowEndModal] = useState(false);
   const [userName, setUserName] = useState("طالب الأوس الماسية");
   
+  const [isGrading, setIsGrading] = useState(false);
+  const [gradingResult, setGradingResult] = useState<{
+    score: number;
+    total: number;
+    percentage: number;
+    passed: boolean;
+    sections: Record<string, { total: number; correct: number; label: string }>;
+    certId: string | null;
+  } | null>(null);
+  
   const searchParams = useSearchParams();
   const autoNextEnabled = searchParams.get('autoNext') !== 'false'; // defaults to true if not explicitly false
 
@@ -108,20 +119,31 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
   
   const currentQuestion = questions[currentIndex];
 
+  const [endTime, setEndTime] = useState<number | null>(null);
+
   useEffect(() => {
-    if (isFinished) return;
-    const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setIsFinished(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    // Initialize endTime only on client-side to prevent hydration mismatch
+    if (!isFinished && !endTime) {
+      const initialSeconds = initialExam?.time_limit_minutes ? initialExam.time_limit_minutes * 60 : 60 * 60;
+      setEndTime(Date.now() + initialSeconds * 1000);
+    }
+  }, [isFinished, endTime, initialExam]);
+
+  useEffect(() => {
+    if (isFinished || !endTime) return;
+    
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        setIsFinished(true);
+      }
+    };
+
+    updateTimer(); // Initial sync
+    const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, [isFinished]);
+  }, [isFinished, endTime]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -155,43 +177,11 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
   const certificateRef = useRef<HTMLDivElement>(null);
   const [certId, setCertId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isFinished && !certId && questions.length > 0) {
-      const saveScore = async () => {
-        let score = 0;
-        questions.forEach((q: any) => {
-          const selected = answers[q.id];
-          const correct = q.options.find((o: any) => o.is_correct)?.id;
-          if (selected === correct) score++;
-        });
-        const percentage = Math.round((score / questions.length) * 100);
-
-        const supabase = createClient();
-        const { data: userData } = await supabase.auth.getUser();
-        const studentId = userData?.user?.id || 'anonymous';
-        
-        const newCert = await createCertificate({
-          student_id: studentId,
-          course_id: courseId,
-          final_exam_id: initialExam?.id || null,
-          score_pct: percentage,
-          student_name: userName || 'طالب متميز',
-          course_title: initialExam?.title || 'محاكي اختبار ستيب'
-        });
-        
-        if (newCert) {
-          setCertId(newCert.id);
-        }
-      };
-
-      saveScore();
-    }
-  }, [isFinished, certId, questions, answers, courseId, initialExam, userName]);
-
   const handleRetake = () => {
     setAnswers({});
     setCurrentIndex(0);
     setIsFinished(false);
+    setEndTime(null);
     setTimeLeft(initialExam?.time_limit_minutes ? initialExam.time_limit_minutes * 60 : 60 * 60);
   };
 
@@ -239,36 +229,8 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
 
   const handleShare = async () => {
     try {
-      let finalCertId = certId;
-      
-      // Calculate score if not done yet
-      let score = 0;
-      questions.forEach((q: any) => {
-        const selected = answers[q.id];
-        const correct = q.options.find((o: any) => o.is_correct)?.id;
-        if (selected === correct) score++;
-      });
-      const percentage = Math.round((score / questions.length) * 100);
-
-      if (!finalCertId && percentage >= 50) {
-        const supabase = createClient();
-        const { data: userData } = await supabase.auth.getUser();
-        const studentId = userData?.user?.id || 'anonymous';
-        
-        const newCert = await createCertificate({
-          student_id: studentId,
-          course_id: courseId,
-          final_exam_id: initialExam?.id || null,
-          score_pct: percentage,
-          student_name: userName,
-          course_title: 'محاكي الأوس الماسية'
-        });
-        
-        if (newCert) {
-          finalCertId = newCert.id;
-          setCertId(newCert.id);
-        }
-      }
+      const finalCertId = gradingResult?.certId || certId;
+      const percentage = gradingResult?.percentage || 0;
 
       const shareUrl = finalCertId 
         ? `${window.location.origin}/certificate/${finalCertId}`
@@ -289,31 +251,8 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
     }
   };
 
-  if (isFinished) {
-    let score = 0;
-    const sections: Record<string, { total: number; correct: number; label: string }> = {
-      reading: { total: 0, correct: 0, label: "الاستيعاب المقروء" },
-      grammar: { total: 0, correct: 0, label: "التراكيب النحوية" },
-      listening: { total: 0, correct: 0, label: "فهم المسموع" },
-      analysis: { total: 0, correct: 0, label: "التحليل الكتابي" }
-    };
-
-    questions.forEach((q: any) => {
-      const selected = answers[q.id];
-      const correct = q.options.find((o: any) => o.is_correct)?.id;
-      const type = q.section_type || 'grammar';
-      
-      if (!sections[type]) sections[type] = { total: 0, correct: 0, label: type };
-      
-      sections[type].total++;
-      if (selected === correct) {
-        score++;
-        sections[type].correct++;
-      }
-    });
-
-    const percentage = Math.round((score / questions.length) * 100);
-    const passed = percentage >= 50;
+  if (isFinished && gradingResult) {
+    const { percentage, passed, sections } = gradingResult;
 
     const getEstimationMessage = (pct: number, examTitle: string) => {
       const TitleSpan = () => <span className="text-orange-600 bg-orange-50 px-2 py-1 rounded mx-1 whitespace-nowrap">"{examTitle}"</span>;
@@ -438,7 +377,7 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
               <div className="bg-slate-50 rounded-2xl p-8 mb-8 border border-slate-100 w-full">
                 <div className="text-sm font-bold text-slate-400 mb-2">النتيجة التقريبية</div>
                 <div className="text-6xl font-black text-slate-700">{percentage}%</div>
-                <div className="text-sm font-semibold text-slate-500 mt-3">أجبت على {score} من {questions.length} أسئلة بشكل صحيح</div>
+                <div className="text-sm font-semibold text-slate-500 mt-3">أجبت على {gradingResult.score} من {questions.length} أسئلة بشكل صحيح</div>
               </div>
             )}
 
@@ -538,13 +477,35 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
                 إلغاء التراجع
               </button>
               <button
-                onClick={() => {
-                  setShowEndModal(false);
-                  setIsFinished(true);
+                onClick={async () => {
+                  setIsGrading(true);
+                  try {
+                    const supabase = createClient();
+                    const { data: userData } = await supabase.auth.getUser();
+                    const studentId = userData?.user?.id || 'anonymous';
+                    
+                    const result = await gradeSimulatorAttempt(
+                      courseId,
+                      initialExam?.id || '',
+                      answers,
+                      studentId,
+                      userName || 'طالب متميز',
+                      initialExam?.title || 'محاكي اختبار ستيب'
+                    );
+                    setGradingResult(result);
+                    setCertId(result.certId);
+                    setShowEndModal(false);
+                    setIsFinished(true);
+                  } catch (e) {
+                    alert("حدث خطأ أثناء تصحيح الاختبار");
+                  } finally {
+                    setIsGrading(false);
+                  }
                 }}
-                className="flex-1 py-3.5 rounded-xl bg-rose-500 text-white font-bold text-sm hover:bg-rose-600 shadow-lg shadow-rose-500/30 transition-all hover:-translate-y-0.5"
+                disabled={isGrading}
+                className="flex-1 py-3.5 rounded-xl bg-rose-500 text-white font-bold text-sm hover:bg-rose-600 shadow-lg shadow-rose-500/30 transition-all hover:-translate-y-0.5 disabled:opacity-50"
               >
-                إنهاء الآن
+                {isGrading ? "جاري التصحيح..." : "إنهاء الآن"}
               </button>
             </div>
           </div>

@@ -16,13 +16,19 @@ import { type Course } from "@/lib/store";
 export default function AdminStudentsPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [students, setStudents] = useState<StudentWithDetails[]>([]);
+  const [totalStudents, setTotalStudents] = useState(0);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // States
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  
+  // Pagination & Search States
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // For debouncing or manual trigger
   const [filterCourse, setFilterCourse] = useState("all");
+  const [page, setPage] = useState(1);
+  const limit = 50;
   
   // Modals
   const [manageStudent, setManageStudent] = useState<StudentWithDetails | null>(null);
@@ -34,36 +40,40 @@ export default function AdminStudentsPage() {
   const [passwordStudent, setPasswordStudent] = useState<StudentWithDetails | null>(null);
   const [newPassword, setNewPassword] = useState("");
 
+  const loadStudents = async (p = page, s = search, c = filterCourse) => {
+    setIsLoading(true);
+    const { data, count } = await fetchStudents(p, limit, s, c);
+    setStudents(data);
+    setTotalStudents(count);
+    setIsLoading(false);
+  };
+
   useEffect(() => {
     setIsMounted(true);
-    Promise.all([fetchStudents(), fetchCourses('all')]).then(([sData, cData]) => {
-      setStudents(sData);
+    fetchCourses('all').then(cData => {
       setCourses(cData);
-      if (cData.length > 0) {
-        setSelectedCourseToEnroll(cData[0].id);
-      }
-      setIsLoading(false);
+      if (cData.length > 0) setSelectedCourseToEnroll(cData[0].id);
     });
+    loadStudents(1, search, filterCourse);
   }, []);
 
-  const filtered = students.filter(s => {
-    const studentId = `TKH-${s.id.split('-')[0].toUpperCase()}`;
-    const searchLower = search.toLowerCase();
-    
-    if (search && 
-        !s.full_name.toLowerCase().includes(searchLower) && 
-        !studentId.toLowerCase().includes(searchLower)
-    ) return false;
-    
-    if (filterCourse !== "all") {
-      const isEnrolled = s.enrollments.some(e => e.course_id === filterCourse);
-      if (!isEnrolled) return false;
-    }
-    return true;
-  });
+  // When search or filter changes, reset to page 1 and load
+  useEffect(() => {
+    if (!isMounted) return;
+    setPage(1);
+    loadStudents(1, search, filterCourse);
+  }, [search, filterCourse]);
 
-  const totalStudents = students.length;
-  const activeSubs = students.filter(s => s.enrollments.length > 0).length;
+  // When page changes, load data
+  // When page changes, load data
+  useEffect(() => {
+    if (!isMounted) return;
+    loadStudents(page, search, filterCourse);
+  }, [page]);
+
+  const totalPages = Math.max(1, Math.ceil(totalStudents / limit));
+  const activeSubs = 0; // We can no longer calculate this client-side without another query, so we'll just show 0 or hide it, or we could fetch stats separately. Let's just calculate from current page for now:
+  const currentPageActiveSubs = students.filter(s => s.enrollments.length > 0).length;
 
   async function handleEnroll() {
     if (!manageStudent || !selectedCourseToEnroll) return;
@@ -75,9 +85,9 @@ export default function AdminStudentsPage() {
 
     const success = await enrollStudent(manageStudent.id, selectedCourseToEnroll);
     if (success) {
-      const sData = await fetchStudents();
-      setStudents(sData);
-      setManageStudent(sData.find(s => s.id === manageStudent.id) || null);
+      const { data } = await fetchStudents(page, limit, search, filterCourse);
+      setStudents(data);
+      setManageStudent(data.find((s: any) => s.id === manageStudent.id) || null);
     }
   }
 
@@ -86,9 +96,9 @@ export default function AdminStudentsPage() {
     
     const success = await unenrollStudent(enrollmentId);
     if (success) {
-      const sData = await fetchStudents();
-      setStudents(sData);
-      setManageStudent(sData.find(s => s.id === manageStudent?.id) || null);
+      const { data } = await fetchStudents(page, limit, search, filterCourse);
+      setStudents(data);
+      setManageStudent(data.find((s: any) => s.id === manageStudent?.id) || null);
     }
   }
 
@@ -101,7 +111,8 @@ export default function AdminStudentsPage() {
     if (!editStudent) return;
     const success = await updateStudent(editStudent.id, editForm);
     if (success) {
-      setStudents(await fetchStudents());
+      const { data } = await fetchStudents(page, limit, search, filterCourse);
+      setStudents(data);
       setEditStudent(null);
     }
   }
@@ -127,7 +138,8 @@ export default function AdminStudentsPage() {
     
     const success = await toggleStudentBan(student.id, !isBanned);
     if (success) {
-      setStudents(await fetchStudents());
+      const { data } = await fetchStudents(page, limit, search, filterCourse);
+      setStudents(data);
     }
   }
 
@@ -141,7 +153,8 @@ export default function AdminStudentsPage() {
     const success = await deleteStudentCompletely(student.id);
     if (success) {
       alert("تم حذف الطالب بنجاح.");
-      setStudents(await fetchStudents());
+      const { data } = await fetchStudents(page, limit, search, filterCourse);
+      setStudents(data);
     } else {
       alert("فشل في حذف الطالب.");
     }
@@ -158,15 +171,14 @@ export default function AdminStudentsPage() {
         </div>
         <p className="text-white/55 text-sm">إدارة وصول الطلاب للدورات، متابعة الحسابات، وتفعيل الاشتراكات.</p>
       </div>
-
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 fade-up">
         <div className="rounded-xl border border-border bg-card p-4">
           <div className="text-sm font-bold text-text-muted mb-1 flex items-center gap-2"><IconUsers size={16}/> إجمالي الطلاب</div>
           <div className="text-2xl font-black text-primary">{totalStudents}</div>
         </div>
         <div className="rounded-xl border border-border bg-card p-4">
-          <div className="text-sm font-bold text-text-muted mb-1 flex items-center gap-2"><IconCheck size={16}/> طلاب لديهم اشتراكات</div>
-          <div className="text-2xl font-black text-emerald-500">{activeSubs}</div>
+          <div className="text-sm font-bold text-text-muted mb-1 flex items-center gap-2"><IconCheck size={16}/> طلاب في هذه الصفحة</div>
+          <div className="text-2xl font-black text-emerald-500">{currentPageActiveSubs}</div>
         </div>
       </div>
 
@@ -197,7 +209,7 @@ export default function AdminStudentsPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(student => {
+              {students.map(student => {
                 const hasSubs = student.enrollments.length > 0;
                 return (
                   <tr key={student.id} className="border-b border-border last:border-none hover:bg-bg/40 transition-colors">
@@ -274,7 +286,7 @@ export default function AdminStudentsPage() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {students.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-text-muted font-bold">لا يوجد طلاب يطابقون البحث</td>
                 </tr>
@@ -282,6 +294,28 @@ export default function AdminStudentsPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between border-t border-border bg-card p-4">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 text-sm font-bold bg-bg border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg/80 transition-colors"
+            >
+              السابق
+            </button>
+            <div className="text-sm font-bold text-text-muted">
+              صفحة {page} من {totalPages}
+            </div>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 text-sm font-bold bg-bg border border-border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-bg/80 transition-colors"
+            >
+              التالي
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Manage Enrollments Modal */}

@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 
 import { useEffect, useState, useRef } from "react";
@@ -14,7 +13,7 @@ import {
   type FinalExamQuestion,
   type UnlockStatus,
 } from "@/lib/supabase/services/final-exam";
-import { fetchCertificateForCourse, fetchStudentCertificates } from "@/lib/supabase/services/certificates";
+import { fetchCertificateForCourse } from "@/lib/supabase/services/certificates";
 import { archiveStudentCourse } from "@/app/actions/progress";
 import { usePlatformStore } from "@/lib/store";
 import {
@@ -71,6 +70,8 @@ export default function FinalExamPage() {
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState("");
 
+  const [endTime, setEndTime] = useState<number | null>(null);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -80,17 +81,16 @@ export default function FinalExamPage() {
       const uid = session.user.id;
       if (active) setUserId(uid);
 
-      const [examData, unlockData, cert, allStudentCerts, courseRes] = await Promise.all([
+      // Removed fetchStudentCertificates to improve performance!
+      const [examData, unlockData, cert, courseRes] = await Promise.all([
         fetchFinalExamByCourse(courseId),
         checkFinalExamUnlock(uid, courseId),
         fetchCertificateForCourse(uid, courseId),
-        fetchStudentCertificates(uid),
         supabase.from("courses").select("title").eq("id", courseId).single(),
       ]);
 
       if (!active) return;
       
-      // BLOCK: If the course is a simulator, it should NEVER have a final exam.
       if (courseRes.data && (courseRes.data.title.includes("محاكي") || courseRes.data.title.includes("STEP") || courseRes.data.title.includes("اختبار الستيب"))) {
         router.replace("/dashboard");
         return;
@@ -99,7 +99,7 @@ export default function FinalExamPage() {
       setExam(examData);
       setUnlock(unlockData);
       
-      const courseCerts = allStudentCerts.filter(c => c.course_id === courseId);
+      const courseCerts = cert ? [cert] : [];
       setAllCerts(courseCerts);
 
       if (examData) {
@@ -107,14 +107,14 @@ export default function FinalExamPage() {
         setAttempts(attemptsData);
         
         const numAttempts = attemptsData.length;
-        const bestScore = numAttempts > 0 ? Math.max(...attemptsData.map(a => Math.round(a.score_pct))) : 0;
+        const bestScore = numAttempts > 0 ? Math.max(...attemptsData.map(a => Math.round(a.score_pct ?? 0))) : 0;
         const maxAttempts = examData.max_attempts || 3;
         
         const finalized = bestScore === 100 || numAttempts >= maxAttempts;
         if (finalized) {
           if (bestScore >= (examData.passing_score || 70)) {
             setIsGraduated(true);
-            const passingCert = cert && cert.score_pct >= (examData.passing_score || 70) ? cert : courseCerts.find(c => c.course_id === courseId && c.score_pct >= (examData.passing_score || 70));
+            const passingCert = cert && cert.score_pct >= (examData.passing_score || 70) ? cert : null;
             if (passingCert) {
               setHasCert(true);
               setCertId(passingCert.id);
@@ -130,17 +130,22 @@ export default function FinalExamPage() {
     return () => { active = false; };
   }, [courseId]);
 
-  // Timer countdown
+  // Absolute Timer countdown
   useEffect(() => {
-    if (stage !== "exam") return;
-    const interval = setInterval(() => {
-      setSecondsLeft(s => {
-        if (s <= 1) { clearInterval(interval); handleSubmit(); return 0; }
-        return s - 1;
-      });
-    }, 1000);
+    if (stage !== "exam" || !endTime) return;
+    
+    const updateTimer = () => {
+      const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining <= 0) {
+        handleSubmit();
+      }
+    };
+
+    updateTimer(); // Initial sync
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [stage]);
+  }, [stage, endTime]);
 
   // Cleanup exam mode on unmount
   useEffect(() => {
@@ -153,8 +158,10 @@ export default function FinalExamPage() {
     if (!exam) return;
     setAnswers(new Array(exam.questions.length).fill(null));
     setCurrentQ(0);
-    setSecondsLeft(exam.time_limit_minutes * 60);
+    const totalSecs = exam.time_limit_minutes * 60;
+    setSecondsLeft(totalSecs);
     setStartTime(Date.now());
+    setEndTime(Date.now() + totalSecs * 1000);
     setStage("exam");
     
     // Hide AppShell Nav
@@ -235,7 +242,7 @@ export default function FinalExamPage() {
         setAttempts(updatedAttempts);
         
         const numAttempts = updatedAttempts.length;
-        const bestScore = numAttempts > 0 ? Math.max(...updatedAttempts.map(a => Math.round(a.score_pct))) : 0;
+        const bestScore = numAttempts > 0 ? Math.max(...updatedAttempts.map(a => Math.round(a.score_pct ?? 0))) : 0;
         const maxAttempts = exam.max_attempts || 3;
         const finalized = bestScore === 100 || numAttempts >= maxAttempts;
         
@@ -538,39 +545,49 @@ export default function FinalExamPage() {
   // ── RESULT STAGE ──────────────────────────────────────────────
   if (stage === "result" && result) {
     return (
-      <div className="min-h-screen bg-bg flex items-center justify-center p-4" dir="rtl">
-        <div className="bg-card rounded-3xl p-8 w-full max-w-lg border border-border shadow-2xl text-center">
-          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl ${result.passed ? "bg-accent-teal/10 text-accent-teal" : "bg-accent-red/10 text-accent-red"}`}>
-            {result.passed ? "🎉" : "😔"}
+      <div className="min-h-screen bg-bg flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
+        {/* Confetti effect background if passed */}
+        {result.passed && (
+          <>
+            <div className="absolute top-0 right-1/4 w-64 h-64 bg-green-500/20 rounded-full blur-[100px] animate-pulse" />
+            <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-teal-500/20 rounded-full blur-[100px] animate-pulse" />
+          </>
+        )}
+        
+        <div className="bg-card rounded-[2rem] p-8 md:p-12 w-full max-w-xl border border-border shadow-2xl relative z-10 text-center flex flex-col items-center">
+          <div className={`w-32 h-32 rounded-full flex items-center justify-center mx-auto mb-8 text-6xl shadow-2xl ${result.passed ? "bg-gradient-to-br from-green-400 to-teal-600 text-white shadow-green-500/30" : "bg-gradient-to-br from-red-400 to-rose-600 text-white shadow-red-500/30"}`}>
+            {result.passed ? "🏆" : "😔"}
           </div>
-          <h2 className={`text-3xl font-black mb-2 ${result.passed ? "text-accent-teal" : "text-accent-red"}`}>
-            {result.passed ? "أحسنت! لقد اجتزت الاختبار" : "لم تجتز الاختبار هذه المرة"}
+          
+          <h2 className={`text-3xl md:text-4xl font-black mb-3 ${result.passed ? "text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-teal-500" : "text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-rose-500"}`}>
+            {result.passed ? "ألف مبروك! لقد اجتزت الاختبار" : "لم تجتز الاختبار هذه المرة"}
           </h2>
-          <p className="text-text-muted font-semibold mb-8">
-            {result.passed ? "شهادتك جاهزة للتحميل الآن!" : `درجة النجاح ${exam.passing_score}%. لا تستسلم!`}
+          
+          <p className="text-text-muted font-bold text-lg mb-10 max-w-md">
+            {result.passed ? "لقد حققت متطلبات النجاح بتفوق، وشهادتك الآن جاهزة للتحميل والمشاركة!" : `درجة النجاح المطلوبة هي ${exam.passing_score}%. لا تستسلم، يمكنك مراجعة المادة والمحاولة مجدداً.`}
           </p>
 
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-3 gap-4 mb-10 w-full">
             {[
-              { label: "درجتك", value: `${result.scorePct}%`, color: result.passed ? "text-accent-teal" : "text-accent-red" },
-              { label: "الإجابات الصحيحة", value: `${result.correct}/${result.total}`, color: "text-text" },
-              { label: "المحاولات المتبقية", value: attemptsLeft, color: "text-accent-amber" },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="bg-bg rounded-2xl p-4 border border-border">
-                <div className={`text-2xl font-black ${color}`}>{value}</div>
-                <div className="text-xs font-bold text-text-muted mt-1">{label}</div>
+              { label: "درجتك النهائية", value: `${result.scorePct}%`, color: result.passed ? "text-green-500" : "text-red-500", bg: result.passed ? "bg-green-500/10 border-green-500/20" : "bg-red-500/10 border-red-500/20" },
+              { label: "الإجابات الصحيحة", value: `${result.correct}/${result.total}`, color: "text-text", bg: "bg-bg border-border" },
+              { label: "المحاولات المتبقية", value: attemptsLeft, color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20" },
+            ].map(({ label, value, color, bg }) => (
+              <div key={label} className={`${bg} rounded-2xl p-5 border flex flex-col justify-center`}>
+                <div className={`text-3xl font-black mb-1 ${color}`}>{value}</div>
+                <div className="text-xs font-bold text-text-muted">{label}</div>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4 w-full">
             {result.passed && certId && (
               <a
                 href={`/api/certificates/generate?id=${certId}`}
                 target="_blank"
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-gradient-to-l from-amber-500 to-yellow-400 text-white font-black text-lg shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+                className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-white font-black text-xl shadow-[0_10px_20px_-10px_rgba(251,191,36,0.5)] hover:shadow-[0_10px_25px_-5px_rgba(251,191,36,0.6)] transition-all hover:-translate-y-1"
               >
-                <IconDownload size={22} /> تحميل الشهادة (PDF)
+                <IconDownload size={26} /> تحميل الشهادة الآن (PDF)
               </a>
             )}
             {!result.passed && attemptsLeft > 0 && (
@@ -578,11 +595,11 @@ export default function FinalExamPage() {
                 onClick={handleStart}
                 className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl bg-primary text-white font-black text-lg shadow-primary/30 shadow-lg hover:-translate-y-0.5 transition-all"
               >
-                <IconRefresh size={22} /> إعادة المحاولة ({attemptsLeft} متبقية)
+                <IconRefresh size={22} /> إعادة المحاولة الآن ({attemptsLeft} متبقية)
               </button>
             )}
-            <Link href="/dashboard" className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-border text-text-muted font-bold hover:bg-bg transition-colors">
-              <IconArrowRight size={18} /> العودة للوحة التحكم
+            <Link href="/dashboard" className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border-2 border-border text-text font-bold hover:bg-bg transition-colors">
+              <IconArrowRight size={20} /> العودة للوحة التحكم
             </Link>
           </div>
         </div>
@@ -763,28 +780,33 @@ export default function FinalExamPage() {
 
       <div className="max-w-7xl mx-auto px-4 pb-16">
         {/* Hero */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-purple-700 to-indigo-900 p-8 md:p-12 text-white mb-8 shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_50%,rgba(255,255,255,0.05),transparent)]" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-3xl">🏆</div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-widest opacity-60">الاختبار النهائي</div>
-                <h1 className="text-2xl font-black">{exam.title}</h1>
-              </div>
+        <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#1E1B4B] via-indigo-900 to-purple-900 p-8 md:p-14 text-white mb-8 shadow-2xl border border-indigo-500/20 group">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay" />
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/30 rounded-full blur-[80px] group-hover:bg-primary/40 transition-colors duration-700" />
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-purple-500/30 rounded-full blur-[80px] group-hover:bg-purple-500/40 transition-colors duration-700" />
+          
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="w-20 h-20 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center text-4xl mb-6 shadow-[0_0_40px_rgba(255,255,255,0.1)] backdrop-blur-xl">
+              🏆
             </div>
+            <div className="text-sm font-bold uppercase tracking-[0.2em] opacity-70 mb-2">الاختبار النهائي</div>
+            <h1 className="text-3xl md:text-5xl font-black mb-10 text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70">
+              {exam.title}
+            </h1>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full max-w-4xl mx-auto">
               {[
-                { icon: "⏱️", label: "المدة", value: `${exam.time_limit_minutes} دقيقة` },
-                { icon: "📊", label: "درجة النجاح", value: `${exam.passing_score}%` },
-                { icon: "🔄", label: "المحاولات المتاحة", value: `${exam.max_attempts}` },
-                { icon: "❓", label: "عدد الأسئلة", value: `${exam.questions.length}` },
-              ].map(({ icon, label, value }) => (
-                <div key={label} className="bg-white/10 border border-white/15 rounded-2xl p-4 text-center">
-                  <div className="text-2xl mb-1">{icon}</div>
-                  <div className="text-xs opacity-60 font-semibold mb-1">{label}</div>
-                  <div className="font-black text-lg">{value}</div>
+                { icon: <IconClock size={24} className="text-blue-400" />, label: "المدة الزمنية", value: `${exam.time_limit_minutes} دقيقة` },
+                { icon: <IconCheck size={24} className="text-green-400" />, label: "درجة النجاح", value: `${exam.passing_score}%` },
+                { icon: <IconRefresh size={24} className="text-amber-400" />, label: "المحاولات المتاحة", value: `${exam.max_attempts}` },
+                { icon: <IconStarFilled size={24} className="text-purple-400" />, label: "عدد الأسئلة", value: `${exam.questions.length}` },
+              ].map(({ icon, label, value }, idx) => (
+                <div key={label} className="bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all duration-300 rounded-2xl p-5 text-center flex flex-col items-center justify-center backdrop-blur-md">
+                  <div className="mb-3 p-2 rounded-xl bg-white/5">
+                    {icon}
+                  </div>
+                  <div className="text-xs opacity-70 font-semibold mb-1">{label}</div>
+                  <div className="font-black text-xl">{value}</div>
                 </div>
               ))}
             </div>
@@ -924,16 +946,16 @@ export default function FinalExamPage() {
                 </div>
                 <div className="font-black text-text">الاختبار مقفل</div>
                 <div className="text-sm text-text-muted font-semibold max-w-xs">
-                  {unlock.lessonsPct < unlock.requiredLessonsPct 
-                    ? `يجب إكمال ${unlock.requiredLessonsPct}% من دروس الدورة لفتح الاختبار النهائي` 
-                    : unlock.skillsAvgPct < unlock.requiredSkillsPct 
-                      ? `يجب تحقيق نسبة إتقان ${unlock.requiredSkillsPct}% للمهارات لفتح الاختبار` 
+                  {(unlock?.lessonsPct ?? 0) < (unlock?.requiredLessonsPct ?? 0)
+                    ? `يجب إكمال ${unlock?.requiredLessonsPct}% من دروس الدورة لفتح الاختبار النهائي` 
+                    : (unlock?.skillsAvgPct ?? 0) < (unlock?.requiredSkillsPct ?? 0)
+                      ? `يجب تحقيق نسبة إتقان ${unlock?.requiredSkillsPct}% للمهارات لفتح الاختبار` 
                       : `يجب اجتياز جميع اختبارات المسارات لفتح الاختبار`}
                 </div>
                 <Link href="/dashboard" className="mt-2 px-5 py-2 bg-primary text-white font-bold rounded-xl text-sm">
-                  {unlock.lessonsPct < unlock.requiredLessonsPct 
+                  {(unlock?.lessonsPct ?? 0) < (unlock?.requiredLessonsPct ?? 0)
                     ? "أكمل الدروس أولاً" 
-                    : unlock.skillsAvgPct < unlock.requiredSkillsPct 
+                    : (unlock?.skillsAvgPct ?? 0) < (unlock?.requiredSkillsPct ?? 0)
                       ? "ارفع نسبة إتقان المهارات" 
                       : "اجتز اختبارات المسارات"}
                 </Link>

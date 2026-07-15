@@ -131,11 +131,19 @@ export function ExamRunner({
       return;
     }
     const interval = setInterval(() => {
-      setRemainingSeconds((s) => s - 1);
+      if (startedAtRef.current) {
+        const now = Date.now();
+        const start = new Date(startedAtRef.current).getTime();
+        const totalSecs = timeMinutes * 60;
+        const elapsed = Math.floor((now - start) / 1000);
+        setRemainingSeconds(Math.max(0, totalSecs - elapsed));
+      } else {
+        setRemainingSeconds((s) => s - 1);
+      }
     }, 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remainingSeconds, stage]);
+  }, [remainingSeconds, stage, timeMinutes]);
 
   const question = questions[currentQ];
   const minutes = Math.floor(remainingSeconds / 60);

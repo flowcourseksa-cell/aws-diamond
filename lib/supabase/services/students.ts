@@ -59,35 +59,59 @@ export type StudentWithDetails = DbProfile & {
   enrollments: DbEnrollment[];
 };
 
-// Fetch all profiles with role='student'
-export async function fetchStudents(): Promise<StudentWithDetails[]> {
+// Fetch profiles with role='student', with pagination and search
+export async function fetchStudents(
+  page: number = 1,
+  limit: number = 50,
+  searchQuery: string = "",
+  courseIdFilter: string = "all"
+): Promise<{ data: StudentWithDetails[], count: number }> {
   const supabase = getReadClient();
   
-  // We'll fetch all students and filter enrollments in javascript.
-  const { data: allProfiles, error: fetchErr } = await supabase
+  // Base select. If courseIdFilter is not "all", we must use !inner join to filter the parent (profiles)
+  const selectQuery = courseIdFilter !== "all" 
+    ? `*, enrollments!inner(*, course:courses(*))`
+    : `*, enrollments(*, course:courses(*))`;
+
+  let query = supabase
     .from("profiles")
-    .select(`
-      *,
-      enrollments (
-        *,
-        course:courses(*)
-      )
-    `)
-    .eq("role", "student")
-    .order("created_at", { ascending: false });
+    .select(selectQuery, { count: "exact" })
+    .eq("role", "student");
+
+  if (courseIdFilter !== "all") {
+    query = query.eq("enrollments.course_id", courseIdFilter).eq("enrollments.is_active", true);
+  }
+
+  if (searchQuery) {
+    // If the search query looks like a TKH-ID (e.g., TKH-1234), strip it to search the UUID
+    const cleanSearch = searchQuery.toLowerCase().replace("tkh-", "").trim();
+    // Use ilike for partial matching
+    query = query.or(`full_name.ilike.%${cleanSearch}%,id.ilike.%${cleanSearch}%`);
+  }
+
+  // Pagination
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  query = query.order("created_at", { ascending: false }).range(from, to);
+
+  const { data: allProfiles, count, error: fetchErr } = await query;
 
   if (fetchErr) {
     console.warn("Error fetching students:", fetchErr);
-    return [];
+    return { data: [], count: 0 };
   }
 
-  // Filter out pending enrollments
+  // Filter out pending enrollments in JS (if courseFilter is 'all', we didn't filter is_active on the server for the relation)
   const filteredData = (allProfiles || []).map((student: any) => ({
     ...student,
     enrollments: (student.enrollments || []).filter((e: any) => e.is_active === true)
   }));
 
-  return filteredData as unknown as StudentWithDetails[];
+  return { 
+    data: filteredData as unknown as StudentWithDetails[],
+    count: count || 0
+  };
 }
 
 // Grant access to a student for a specific course
