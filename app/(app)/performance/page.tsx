@@ -21,6 +21,19 @@ const REC: Record<string, { label: string; icon: React.ReactNode; cls: string }>
 };
 
 const avgColor = (a: number) => a >= 75 ? "#10b981" : a >= 50 ? "#f59e0b" : "#ef4444";
+
+// Guaranteed distinct colors per track index (fallback if t.color not set or duplicated)
+const TRACK_COLORS = [
+  "#6366f1", // indigo
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // rose
+  "#8b5cf6", // violet
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#ec4899", // pink
+];
+
 // Multi-color fiery/purple gradient for the heatmap
 const heatColor = (v: number) => {
   if (v < 0.2) return "var(--border)"; // Empty
@@ -74,10 +87,10 @@ export default function PerformancePage() {
   const allRealSkills = activeTracks.flatMap(t => t.sections.flatMap(s => s.skills));
   const masteredSkillsCount = allRealSkills.filter(sk => (sk.masteryScore || 0) >= 75).length;
   
-  // توزيع المهارات الحقيقي على المسارات
-  const TIME_DIST = activeTracks.map(t => {
+  // توزيع المهارات الحقيقي على المسارات — لون مختلف مضمون لكل مسار
+  const TIME_DIST = activeTracks.map((t, i) => {
     const count = t.sections.flatMap(s => s.skills).length;
-    return { name: t.name, value: count, color: t.color };
+    return { name: t.name, value: count, color: TRACK_COLORS[i % TRACK_COLORS.length] };
   });
 
   // أضعف المهارات الحقيقية للتوصيات
@@ -186,7 +199,12 @@ export default function PerformancePage() {
                   <tr key={row.trackId} className="border-b border-slate-50 last:border-none transition-colors hover:bg-slate-50/50">
                     <td className="py-4 pr-4">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-sm text-white" style={{ background: track?.color }}>{track?.icon}</div>
+                        <div
+                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-sm text-white"
+                          style={{ background: TRACK_COLORS[trackStats.findIndex(r => r.trackId === row.trackId) % TRACK_COLORS.length] }}
+                        >
+                          {track?.icon}
+                        </div>
                         <span className="font-extrabold text-slate-700">{track?.name}</span>
                       </div>
                     </td>

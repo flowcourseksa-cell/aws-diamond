@@ -29,13 +29,12 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const { courses, enrolledCourses } = usePlatformStore();
+  const { courses } = usePlatformStore();
 
-  // ── Search items: Courses + Simulators + Books + Main sections only ──
-  // (No internal lessons, exams, or micro-content)
+  // ── Search items: Courses + Main sections only ──
+  // All courses link to /dashboard to avoid 404 on /courses/[id]
   const searchItems = [
-    // دورات مسجّلة
-    ...enrolledCourses.map(c => ({
+    ...courses.map(c => ({
       id: `course-${c.id}`,
       title: c.title || "",
       type: "دورة",
@@ -43,27 +42,15 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
       icon: <IconSchool size={16} />,
       href: `/dashboard?courseId=${c.id}`,
     })),
-    // دورات عامة (non-enrolled)
-    ...courses
-      .filter(c => !enrolledCourses.find(e => e.id === c.id))
-      .map(c => ({
-        id: `allcourse-${c.id}`,
-        title: c.title || "",
-        type: "دورة",
-        color: "bg-indigo-100 text-indigo-600",
-        icon: <IconSchool size={16} />,
-        href: `/courses/${c.id}`,
-      })),
-    // أقسام رئيسية
-    { id: "nav-tracks",   title: "الأقسام والمهارات",  type: "قسم",   color: "bg-violet-100 text-violet-600",  icon: <IconBrain size={16} />,         href: "/tracks" },
-    { id: "nav-exams",    title: "الاختبارات",           type: "قسم",   color: "bg-blue-100 text-blue-600",     icon: <IconChecks size={16} />,        href: "/exams" },
-    { id: "nav-final",   title: "الاختبار النهائي",      type: "قسم",   color: "bg-amber-100 text-amber-600",   icon: <IconTrophy size={16} />,        href: "/final-exam" },
-    { id: "nav-book",    title: "الكتاب التفاعلي",       type: "قسم",   color: "bg-emerald-100 text-emerald-600", icon: <IconBook2 size={16} />,         href: "/book" },
-    { id: "nav-library", title: "المكتبة والملفات",      type: "قسم",   color: "bg-cyan-100 text-cyan-600",     icon: <IconFolder size={16} />,        href: "/library" },
-    { id: "nav-plan",    title: "خطة المذاكرة",         type: "قسم",   color: "bg-pink-100 text-pink-600",     icon: <IconCalendarTime size={16} />,  href: "/study-plan" },
-    { id: "nav-perf",    title: "تحليل الأداء",          type: "قسم",   color: "bg-orange-100 text-orange-600", icon: <IconChartBar size={16} />,      href: "/performance" },
-    { id: "nav-certs",   title: "شهاداتي",               type: "قسم",   color: "bg-yellow-100 text-yellow-600", icon: <IconAward size={16} />,         href: "/certificates" },
-    { id: "nav-simulator",title: "المحاكي",               type: "محاكي", color: "bg-rose-100 text-rose-600",     icon: <IconSparkles size={16} />,      href: "/simulator" },
+    { id: "nav-tracks",    title: "الأقسام والمهارات",  type: "قسم",   color: "bg-violet-100 text-violet-600",   icon: <IconBrain size={16} />,        href: "/tracks" },
+    { id: "nav-exams",     title: "الاختبارات",           type: "قسم",   color: "bg-blue-100 text-blue-600",      icon: <IconChecks size={16} />,       href: "/exams" },
+    { id: "nav-final",    title: "الاختبار النهائي",      type: "قسم",   color: "bg-amber-100 text-amber-600",    icon: <IconTrophy size={16} />,       href: "/final-exam" },
+    { id: "nav-book",     title: "الكتاب التفاعلي",       type: "قسم",   color: "bg-emerald-100 text-emerald-600",icon: <IconBook2 size={16} />,        href: "/book" },
+    { id: "nav-library",  title: "المكتبة والملفات",      type: "قسم",   color: "bg-cyan-100 text-cyan-600",      icon: <IconFolder size={16} />,       href: "/library" },
+    { id: "nav-plan",     title: "خطة المذاكرة",         type: "قسم",   color: "bg-pink-100 text-pink-600",      icon: <IconCalendarTime size={16} />, href: "/study-plan" },
+    { id: "nav-perf",     title: "تحليل الأداء",          type: "قسم",   color: "bg-orange-100 text-orange-600",  icon: <IconChartBar size={16} />,     href: "/performance" },
+    { id: "nav-certs",    title: "شهاداتي",               type: "قسم",   color: "bg-yellow-100 text-yellow-600",  icon: <IconAward size={16} />,        href: "/certificates" },
+    { id: "nav-simulator",title: "المحاكي",               type: "محاكي", color: "bg-rose-100 text-rose-600",      icon: <IconSparkles size={16} />,     href: "/simulator" },
   ];
 
   const filteredItems = searchQuery.trim().length > 0
@@ -72,6 +59,7 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
         item.type.includes(searchQuery)
       )
     : [];
+
 
   useEffect(() => {
     setMounted(true);
