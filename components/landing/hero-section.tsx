@@ -48,7 +48,7 @@ export default function HeroSection() {
   }, []);
 
   const searchItems = [
-    ...courses.map(c => ({ id: `course-${c.id}`, title: c.title || "", type: "دورة", icon: <IconSchool size={16} />, href: `/courses/${c.id}` })),
+    ...courses.map(c => ({ id: `course-${c.id}`, title: c.title || "", type: "دورة", icon: <IconSchool size={16} />, href: `/course/${c.id}` })),
     { id: 'static-about', title: 'من نحن', type: 'قسم', icon: <IconBook2 size={16} />, href: '#about' },
     { id: 'static-features', title: 'مميزات المنصة', type: 'قسم', icon: <IconSparkles size={16} />, href: '#features' },
     { id: 'static-terms', title: 'شروط الاستخدام', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '#footer' },
