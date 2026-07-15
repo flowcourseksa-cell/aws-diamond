@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "next-themes";
-import { IconMenu2, IconSearch, IconMoon, IconSun, IconBook2, IconFolder, IconClipboardText, IconX, IconSchool, IconSparkles } from "@tabler/icons-react";
+import { IconMenu2, IconSearch, IconMoon, IconSun, IconBook2, IconFolder, IconClipboardText, IconX, IconSchool, IconSparkles, IconChartBar, IconChecks, IconCalendarTime, IconAward, IconTrophy, IconBrain } from "@tabler/icons-react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationsDropdown } from "./notifications-dropdown";
 import { ProfileDropdown } from "./profile-dropdown";
@@ -29,18 +29,49 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const { courses } = usePlatformStore();
+  const { courses, enrolledCourses } = usePlatformStore();
 
+  // ── Search items: Courses + Simulators + Books + Main sections only ──
+  // (No internal lessons, exams, or micro-content)
   const searchItems = [
-    ...courses.map(c => ({ id: `course-${c.id}`, title: c.title || "", type: "دورة", icon: <IconSchool size={16} />, href: `/courses/${c.id}` })),
-    { id: 'static-about', title: 'من نحن', type: 'قسم', icon: <IconBook2 size={16} />, href: '/#about' },
-    { id: 'static-features', title: 'مميزات المنصة', type: 'قسم', icon: <IconSparkles size={16} />, href: '/#features' },
-    { id: 'static-terms', title: 'شروط الاستخدام', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '/#footer' },
-    { id: 'static-privacy', title: 'سياسة الخصوصية', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '/#footer' },
-    { id: 'static-refund', title: 'سياسة الاسترجاع', type: 'سياسة', icon: <IconClipboardText size={16} />, href: '/#footer' }
+    // دورات مسجّلة
+    ...enrolledCourses.map(c => ({
+      id: `course-${c.id}`,
+      title: c.title || "",
+      type: "دورة",
+      color: "bg-indigo-100 text-indigo-600",
+      icon: <IconSchool size={16} />,
+      href: `/dashboard?courseId=${c.id}`,
+    })),
+    // دورات عامة (non-enrolled)
+    ...courses
+      .filter(c => !enrolledCourses.find(e => e.id === c.id))
+      .map(c => ({
+        id: `allcourse-${c.id}`,
+        title: c.title || "",
+        type: "دورة",
+        color: "bg-indigo-100 text-indigo-600",
+        icon: <IconSchool size={16} />,
+        href: `/courses/${c.id}`,
+      })),
+    // أقسام رئيسية
+    { id: "nav-tracks",   title: "الأقسام والمهارات",  type: "قسم",   color: "bg-violet-100 text-violet-600",  icon: <IconBrain size={16} />,         href: "/tracks" },
+    { id: "nav-exams",    title: "الاختبارات",           type: "قسم",   color: "bg-blue-100 text-blue-600",     icon: <IconChecks size={16} />,        href: "/exams" },
+    { id: "nav-final",   title: "الاختبار النهائي",      type: "قسم",   color: "bg-amber-100 text-amber-600",   icon: <IconTrophy size={16} />,        href: "/final-exam" },
+    { id: "nav-book",    title: "الكتاب التفاعلي",       type: "قسم",   color: "bg-emerald-100 text-emerald-600", icon: <IconBook2 size={16} />,         href: "/book" },
+    { id: "nav-library", title: "المكتبة والملفات",      type: "قسم",   color: "bg-cyan-100 text-cyan-600",     icon: <IconFolder size={16} />,        href: "/library" },
+    { id: "nav-plan",    title: "خطة المذاكرة",         type: "قسم",   color: "bg-pink-100 text-pink-600",     icon: <IconCalendarTime size={16} />,  href: "/study-plan" },
+    { id: "nav-perf",    title: "تحليل الأداء",          type: "قسم",   color: "bg-orange-100 text-orange-600", icon: <IconChartBar size={16} />,      href: "/performance" },
+    { id: "nav-certs",   title: "شهاداتي",               type: "قسم",   color: "bg-yellow-100 text-yellow-600", icon: <IconAward size={16} />,         href: "/certificates" },
+    { id: "nav-simulator",title: "المحاكي",               type: "محاكي", color: "bg-rose-100 text-rose-600",     icon: <IconSparkles size={16} />,      href: "/simulator" },
   ];
 
-  const filteredItems = searchQuery.trim().length > 0 ? searchItems.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase())) : [];
+  const filteredItems = searchQuery.trim().length > 0
+    ? searchItems.filter(item =>
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.type.includes(searchQuery)
+      )
+    : [];
 
   useEffect(() => {
     setMounted(true);
@@ -81,7 +112,7 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
             setIsSearchOpen(true);
           }}
           onFocus={() => setIsSearchOpen(true)}
-          placeholder="ابحث عن درس، اختبار، ملف..."
+          placeholder="ابحث عن دورة، قسم، محاكي..."
           className="h-9.5 w-full rounded-[10px] border border-border bg-bg pr-10 pl-4 text-[13.5px] text-text outline-none transition-colors duration-200 focus:border-primary"
         />
         
@@ -91,13 +122,13 @@ export function Header({ onMenuClick, sidebarOpen }: { onMenuClick: () => void; 
               <div className="max-h-64 overflow-y-auto">
                 <div className="p-2 px-3 text-xs font-bold text-text-muted bg-bg/50">نتائج البحث ({filteredItems.length})</div>
                 {filteredItems.map(item => (
-                  <Link 
-                    key={item.id} 
+                  <Link
+                    key={item.id}
                     href={item.href}
-                    onClick={() => setIsSearchOpen(false)}
+                    onClick={() => { setIsSearchOpen(false); setSearchQuery(""); }}
                     className="flex items-center gap-3 px-4 py-3 hover:bg-bg transition-colors border-t border-border/50 group"
                   >
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform ${item.color}`}>
                       {item.icon}
                     </div>
                     <div>
