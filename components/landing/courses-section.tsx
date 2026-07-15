@@ -39,63 +39,45 @@ export default function CoursesSection() {
     let active = true;
     const loadData = async () => {
       try {
-        const data = await fetchCourses('all');
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+
+        const dataPromise = fetchCourses('all');
+        const enrollmentsPromise = session ? fetchUserEnrollments(session.user.id).catch(() => null) : Promise.resolve(null);
+        const statusesPromise = session ? fetchStudentCourseStatuses(session.user.id).catch(() => null) : Promise.resolve(null);
+
+        const [data, userEnrollments, statusData] = await Promise.all([
+          dataPromise,
+          enrollmentsPromise,
+          statusesPromise
+        ]);
+
         if (!active) return;
         setCourses(data.filter((c) => c.isActive));
 
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // 5s timeout for fetching enrollments so we don't hang the UI
-          let timeoutId: NodeJS.Timeout;
-          const timeoutPromise = new Promise<any[]>((_, reject) => {
-            timeoutId = setTimeout(() => reject(new Error("Enrollments timeout")), 5000);
-          });
-          
-          let userEnrollments: any[] | null = null;
-          let statusData: { certifiedCourseIds: string[], failedCourseIds: string[] } | null = null;
+        if (session && userEnrollments) {
+          const enrollMap: Record<string, 'active' | 'pending'> = {};
+          const statusMap: Record<string, 'certified' | 'failed' | 'active' | 'none'> = {};
 
-          try {
-            const results = await Promise.race([
-              Promise.all([
-                fetchUserEnrollments(session.user.id),
-                fetchStudentCourseStatuses(session.user.id)
-              ]),
-              timeoutPromise
-            ]).finally(() => clearTimeout(timeoutId));
+          userEnrollments.forEach((e: any) => {
+            enrollMap[e.course_id] = e.is_active ? 'active' : 'pending';
             
-            if (results && Array.isArray(results)) {
-              userEnrollments = results[0] as any[];
-              statusData = results[1] as any;
+            if (statusData?.certifiedCourseIds?.includes(e.course_id)) {
+              statusMap[e.course_id] = 'certified';
+            } else if (statusData?.failedCourseIds?.includes(e.course_id)) {
+              statusMap[e.course_id] = 'failed';
+            } else if (e.is_active) {
+              statusMap[e.course_id] = 'active';
+            } else {
+              statusMap[e.course_id] = 'none';
             }
-          } catch (err) {
-            console.warn("fetchUserEnrollments or statuses timed out or failed", err);
-          }
-          
-          if (active && userEnrollments) {
-            const enrollMap: Record<string, 'active' | 'pending'> = {};
-            const statusMap: Record<string, 'certified' | 'failed' | 'active' | 'none'> = {};
+          });
 
-            userEnrollments.forEach(e => {
-              enrollMap[e.course_id] = e.is_active ? 'active' : 'pending';
-              
-              if (statusData?.certifiedCourseIds.includes(e.course_id)) {
-                statusMap[e.course_id] = 'certified';
-              } else if (statusData?.failedCourseIds.includes(e.course_id)) {
-                statusMap[e.course_id] = 'failed';
-              } else if (e.is_active) {
-                statusMap[e.course_id] = 'active';
-              } else {
-                statusMap[e.course_id] = 'none';
-              }
-            });
-
-            setEnrollments(enrollMap);
-            setCourseStatuses(statusMap);
-          }
+          setEnrollments(enrollMap);
+          setCourseStatuses(statusMap);
         }
       } catch (e) {
-        console.error(e);
+        console.error("Error loading courses:", e);
       } finally {
         if (active) setIsMounted(true);
       }

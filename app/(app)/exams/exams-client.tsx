@@ -236,12 +236,15 @@ export function ExamsClient() {
             isPendingSync: false,
           };
           
-          try {
-            const { skills: updatedSkills, lessons: updatedLessons } = await fetchUserProgress(user.id);
-            applyUserProgress(updatedSkills, updatedLessons);
-          } catch (e) {
-            console.error("Failed to re-sync user progress after exam:", e);
-          }
+          // DO NOT AWAIT THIS - run in background to transition UI instantly
+          (async () => {
+            try {
+              const { skills: updatedSkills, lessons: updatedLessons } = await fetchUserProgress(user.id);
+              applyUserProgress(updatedSkills, updatedLessons);
+            } catch (e) {
+              console.error("Failed to re-sync user progress after exam:", e);
+            }
+          })();
 
           setStats(prev => ({
             ...prev,

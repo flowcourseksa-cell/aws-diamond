@@ -223,28 +223,35 @@ export default function FinalExamPage() {
     );
     setResult(res);
     
-    // Refresh attempts
-    const updatedAttempts = await fetchStudentFinalExamAttempts(userId, exam.id);
-    setAttempts(updatedAttempts);
-    
-    const numAttempts = updatedAttempts.length;
-    const bestScore = numAttempts > 0 ? Math.max(...updatedAttempts.map(a => Math.round(a.score_pct))) : 0;
-    const maxAttempts = exam.max_attempts || 3;
-    const finalized = bestScore === 100 || numAttempts >= maxAttempts;
-    
-    if (finalized) {
-       if (bestScore >= (exam.passing_score || 70)) {
-          setIsGraduated(true);
-          const cert = await fetchCertificateForCourse(userId, courseId);
-          if (cert && cert.score_pct >= (exam.passing_score || 70)) { setHasCert(true); setCertId(cert.id); }
-       } else {
-          setIsFailed(true);
-       }
-    }
-    
+    // TRANSITION IMMEDIATELY to prevent hanging
     setStage("result");
     setSubmitting(false);
     isSubmittingRef.current = false;
+    
+    // Run background tasks without blocking the UI
+    (async () => {
+      try {
+        const updatedAttempts = await fetchStudentFinalExamAttempts(userId, exam.id);
+        setAttempts(updatedAttempts);
+        
+        const numAttempts = updatedAttempts.length;
+        const bestScore = numAttempts > 0 ? Math.max(...updatedAttempts.map(a => Math.round(a.score_pct))) : 0;
+        const maxAttempts = exam.max_attempts || 3;
+        const finalized = bestScore === 100 || numAttempts >= maxAttempts;
+        
+        if (finalized) {
+           if (bestScore >= (exam.passing_score || 70)) {
+              setIsGraduated(true);
+              const cert = await fetchCertificateForCourse(userId, courseId);
+              if (cert && cert.score_pct >= (exam.passing_score || 70)) { setHasCert(true); setCertId(cert.id); }
+           } else {
+              setIsFailed(true);
+           }
+        }
+      } catch (err) {
+        console.error("Background sync error:", err);
+      }
+    })();
   };
 
   const handleResetCourse = async () => {
@@ -603,7 +610,7 @@ export default function FinalExamPage() {
             <div className="font-black text-text text-sm md:text-base line-clamp-1">{exam.title}</div>
             <div className="text-xs text-text-muted font-semibold">السؤال {currentQ + 1} من {exam.questions.length}</div>
           </div>
-          <button onClick={() => setShowConfirmSubmit(true)} disabled={submitting} className="px-4 py-2 bg-accent-red hover:bg-red-600 text-white font-bold text-sm rounded-xl disabled:opacity-50 transition-colors">
+          <button onClick={() => setShowConfirmSubmit(true)} disabled={submitting || answers.includes(null)} className="px-4 py-2 bg-accent-red hover:bg-red-600 text-white font-bold text-sm rounded-xl disabled:opacity-50 transition-colors">
             {submitting ? "جاري..." : "إنهاء الاختبار"}
           </button>
         </div>
@@ -694,7 +701,7 @@ export default function FinalExamPage() {
                 التالي →
               </button>
             ) : (
-              <button onClick={() => setShowConfirmSubmit(true)} disabled={submitting} className="px-6 py-3 rounded-xl bg-accent-teal text-white font-bold disabled:opacity-50 hover:bg-accent-teal/90 transition-colors shadow-md shadow-accent-teal/20 flex-shrink-0">
+              <button onClick={() => setShowConfirmSubmit(true)} disabled={submitting || answers.includes(null)} className="px-6 py-3 rounded-xl bg-accent-teal text-white font-bold disabled:opacity-50 hover:bg-accent-teal/90 transition-colors shadow-md shadow-accent-teal/20 flex-shrink-0">
                 {submitting ? "جاري..." : "تسليم الاختبار ✓"}
               </button>
             )}
@@ -728,7 +735,7 @@ export default function FinalExamPage() {
                 </button>
                 <button 
                   onClick={() => { setShowConfirmSubmit(false); handleSubmit(); }}
-                  disabled={submitting}
+                  disabled={submitting || answers.includes(null)}
                   className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
                   {submitting ? "جاري التسليم..." : "نعم، تسليم"}

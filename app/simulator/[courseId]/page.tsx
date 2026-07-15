@@ -539,7 +539,7 @@ export default function SimulatorPage({ params }: { params: Promise<{ courseId: 
 
       <CartDrawer />
       <Navbar />
-      <StickyBar onAdd={handleAdd} />
+      {!showStartModal && <StickyBar onAdd={handleAdd} />}
 
       {/* ═══════════════ HERO ═══════════════ */}
       <section className="pt-36 pb-12 px-4 relative overflow-hidden flex flex-col items-center">

@@ -451,8 +451,8 @@ export function ExamRunner({
           
           <button
             onClick={handleNext}
-            disabled={isSubmitting}
-            className={`flex h-14 items-center justify-center rounded-2xl bg-primary px-10 text-[17px] font-black text-white shadow-lg shadow-primary/30 transition-all ${isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:shadow-xl hover:bg-primary-dark"}`}
+            disabled={isSubmitting || answers[currentQ] === null}
+            className={`flex h-14 items-center justify-center rounded-2xl bg-primary px-10 text-[17px] font-black text-white shadow-lg shadow-primary/30 transition-all ${isSubmitting || answers[currentQ] === null ? "opacity-50 cursor-not-allowed" : "hover:-translate-y-1 hover:shadow-xl hover:bg-primary-dark"}`}
           >
             {isSubmitting ? "جاري الإرسال..." : (isLast ? "تأكيد الإجابة وإرسال" : "التالي")}
           </button>

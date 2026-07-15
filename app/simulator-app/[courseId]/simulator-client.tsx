@@ -552,26 +552,31 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
       )}
 
       {/* Top Bar */}
-      <header className="h-16 bg-[#2B2D31] flex items-center justify-between px-6 text-white shadow-md z-10 shrink-0">
-        <div className="flex items-center gap-4">
-          <button onClick={handleFinish} className="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-6 rounded-md transition-colors text-sm">
+      <header className="h-auto min-h-[64px] py-2 sm:py-0 bg-[#2B2D31] flex items-center justify-between px-3 sm:px-6 text-white shadow-md z-10 shrink-0 gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          <button onClick={handleFinish} className="bg-rose-500 hover:bg-rose-600 text-white font-bold py-1.5 px-3 sm:py-2 sm:px-6 rounded-md transition-colors text-xs sm:text-sm">
             انهاء الاختبار
           </button>
-          <div className="flex items-center gap-2 text-rose-400 font-mono font-bold text-lg bg-black/20 px-4 py-1.5 rounded-md">
-            <IconClock size={20} />
+          <div className="flex items-center gap-1 sm:gap-2 text-rose-400 font-mono font-bold text-sm sm:text-lg bg-black/20 px-2 sm:px-4 py-1.5 rounded-md shrink-0">
+            <IconClock size={16} className="sm:w-5 sm:h-5" />
             {formatTime(timeLeft)}
           </div>
         </div>
         
-        <div className="flex items-center gap-6" dir="rtl">
-          <div className="text-right">
-            <h1 className="font-bold text-sm text-slate-200">{initialExam?.title || "اختبار ستيب الشامل التجريبي"}</h1>
+        <div className="flex items-center gap-2 sm:gap-6 shrink-0" dir="rtl">
+          <div className="text-right hidden sm:block">
+            <h1 className="font-bold text-sm text-slate-200 line-clamp-1">{initialExam?.title || "اختبار ستيب الشامل التجريبي"}</h1>
             <div className="text-xs text-slate-400 font-semibold mt-0.5">
               السؤال {currentIndex + 1} من {questions.length}
             </div>
           </div>
-          <div className="w-10 h-10 rounded-md bg-orange-500/20 text-orange-400 flex items-center justify-center border border-orange-500/30">
-            <span className="font-black text-xl leading-none">{currentIndex + 1}</span>
+          <div className="text-right sm:hidden">
+            <div className="text-[10px] text-slate-400 font-semibold leading-tight">
+              سؤال {currentIndex + 1} / {questions.length}
+            </div>
+          </div>
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-md bg-orange-500/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shrink-0">
+            <span className="font-black text-base sm:text-xl leading-none">{currentIndex + 1}</span>
           </div>
         </div>
       </header>
