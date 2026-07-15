@@ -9,9 +9,9 @@ import {
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import {
   type BookPage, type BookComment, type Book,
-  addPageComment, deleteMyComment
+  addPageComment, deleteMyComment, fetchPageComments
 } from "@/lib/supabase/services/book";
-import { deleteBookComment, toggleStudentCommentBan, editBookComment, fetchPageComments } from "@/lib/supabase/services/book-actions";
+import { deleteBookComment, toggleStudentCommentBan, editBookComment } from "@/lib/supabase/services/book-actions";
 import { useAuth } from "@/hooks/use-auth";
 
 import type { Course } from "@/lib/store";
@@ -302,9 +302,14 @@ function PageComments({ pageId }: { pageId: string }) {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    fetchPageComments(pageId).then((c) => {
-      if (active) { setComments(c); setLoading(false); }
-    });
+    fetchPageComments(pageId)
+      .then((c) => {
+        if (active) { setComments(c); setLoading(false); }
+      })
+      .catch(() => {
+        // Silently recover — show empty state instead of infinite spinner
+        if (active) setLoading(false);
+      });
     return () => { active = false; };
   }, [pageId]);
 

@@ -13,6 +13,7 @@ export type AuthProfile = {
   role: "admin" | "student";
   phone: string | null;
   parent_phone: string | null;
+  is_banned_from_comments?: boolean;
 };
 
 const PROFILE_CACHE_KEY = "tkhsas-profile-cache";
