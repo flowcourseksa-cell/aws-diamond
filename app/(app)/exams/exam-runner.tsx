@@ -57,7 +57,7 @@ export function ExamRunner({
         savedSession.current = session;
         // Restore state directly into exam stage
         setAnswers(session.answers);
-        setCurrentQ(session.currentQ);
+        setCurrentQ(Math.min(session.currentQ, questions.length - 1));
         setRemainingSeconds(remaining);
         startedAtRef.current = session.startedAt;
         setStage("exam");
@@ -150,18 +150,21 @@ export function ExamRunner({
   const seconds = remainingSeconds % 60;
   const isDanger = remainingSeconds <= 120;
   const isLast = currentQ === questions.length - 1;
+  const autoAdvanceTimeoutRef = useRef<any>(null);
 
   function selectOption(optionIndex: number) {
     setAnswers((prev) => prev.map((a, i) => (i === currentQ ? optionIndex : a)));
     
     if (autoAdvance && !isLast) {
-      setTimeout(() => {
-        setCurrentQ((q) => q + 1);
+      if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
+      autoAdvanceTimeoutRef.current = setTimeout(() => {
+        setCurrentQ((q) => Math.min(q + 1, questions.length - 1));
       }, 400);
     }
   }
 
   function handleNext() {
+    if (autoAdvanceTimeoutRef.current) clearTimeout(autoAdvanceTimeoutRef.current);
     if (isLast) {
       if (isSubmittingRef.current) return;
       isSubmittingRef.current = true;
@@ -173,7 +176,7 @@ export function ExamRunner({
       else if ((document as any).webkitFullscreenElement) (document as any).webkitExitFullscreen();
       onFinish(answers);
     } else {
-      setCurrentQ((q) => q + 1);
+      setCurrentQ((q) => Math.min(q + 1, questions.length - 1));
     }
   }
 
@@ -344,9 +347,20 @@ export function ExamRunner({
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-bg/80 backdrop-blur-xl p-4">
         <div className="mx-auto max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl text-center font-bold text-text-muted">
           حدث خطأ: لا يمكن تحميل هذا السؤال.
-          {onExit && (
-            <button onClick={onExit} className="mt-6 flex h-14 w-full items-center justify-center rounded-2xl bg-primary text-white">العودة</button>
-          )}
+          <div className="mt-6 flex flex-col gap-3">
+            <button 
+              onClick={() => {
+                clearExamSession();
+                window.location.reload();
+              }} 
+              className="flex h-14 w-full items-center justify-center rounded-2xl bg-accent-red text-white font-bold"
+            >
+              مسح الجلسة والبدء من جديد
+            </button>
+            {onExit && (
+              <button onClick={onExit} className="flex h-14 w-full items-center justify-center rounded-2xl bg-primary text-white font-bold">العودة</button>
+            )}
+          </div>
         </div>
       </div>
     );
