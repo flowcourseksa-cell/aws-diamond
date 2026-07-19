@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { IconSwords, IconTrophy, IconX, IconSkull, IconFlame } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -27,7 +26,6 @@ type Stage = "idle" | "searching" | "countdown" | "playing" | "result";
 
 export function PkChallengeWidget() {
   const { user } = useAuth();
-  const router = useRouter();
   const [stage, setStage] = useState<Stage>("idle");
   const [questions, setQuestions] = useState<PkQuestion[]>([]);
   const [challengeId, setChallengeId] = useState<string | null>(null);

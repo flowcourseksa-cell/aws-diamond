@@ -1,6 +1,5 @@
-"use server";
-import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
-import { createAdminClient, createClient } from "@/lib/supabase/client";
+// pk-actions.ts — دوال الطالب (client-side)
+import { createClient } from "@/lib/supabase/client";
 
 export type PkQuestion = {
   id: string;
@@ -31,29 +30,20 @@ export type PkChallenge = {
   finished_at: string | null;
 };
 
-// ── قراءة أسئلة التحدي (عشوائية) ──────────────────────────
 export async function fetchRandomPkQuestions(count = 10): Promise<PkQuestion[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("pk_questions")
-    .select("*")
-    .limit(200);
-
+  const { data, error } = await supabase.from("pk_questions").select("*").limit(200);
   if (error || !data) return [];
-
-  // خلط عشوائي
   const shuffled = [...data].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count) as PkQuestion[];
 }
 
-// ── قراءة أسئلة بمعرفاتها ────────────────────────────────
 export async function fetchPkQuestionsByIds(ids: string[]): Promise<PkQuestion[]> {
   const supabase = createClient();
   const { data } = await supabase.from("pk_questions").select("*").in("id", ids);
   return (data || []) as PkQuestion[];
 }
 
-// ── إنشاء تحدي جديد ──────────────────────────────────────
 export async function createPkChallenge(
   challengerId: string,
   questionIds: string[]
@@ -69,12 +59,10 @@ export async function createPkChallenge(
     }])
     .select()
     .single();
-
   if (error) { console.error("createPkChallenge:", error.message); return null; }
   return data as PkChallenge;
 }
 
-// ── إنهاء التحدي وحفظ النتيجة ─────────────────────────────
 export async function finishPkChallenge(
   challengeId: string,
   challengerScore: number,
@@ -96,11 +84,9 @@ export async function finishPkChallenge(
       finished_at: new Date().toISOString(),
     })
     .eq("id", challengeId);
-
   return !error;
 }
 
-// ── آخر 5 تحديات للطالب ──────────────────────────────────
 export async function fetchMyPkHistory(userId: string): Promise<PkChallenge[]> {
   const supabase = createClient();
   const { data } = await supabase
@@ -111,43 +97,4 @@ export async function fetchMyPkHistory(userId: string): Promise<PkChallenge[]> {
     .order("finished_at", { ascending: false })
     .limit(5);
   return (data || []) as PkChallenge[];
-}
-
-// ──────────────────────────────────────────────────────────
-// Admin Actions
-// ──────────────────────────────────────────────────────────
-
-export async function adminFetchPkQuestions(): Promise<PkQuestion[]> {
-  await verifyAdminAccess();
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("pk_questions")
-    .select("*")
-    .order("created_at", { ascending: false });
-  return (data || []) as PkQuestion[];
-}
-
-export async function adminCreatePkQuestion(q: Omit<PkQuestion, "id" | "created_at">): Promise<boolean> {
-  await verifyAdminAccess();
-  const supabase = createAdminClient();
-  const { error } = await supabase.from("pk_questions").insert([q]);
-  if (error) { console.error("adminCreatePkQuestion:", error.message); return false; }
-  return true;
-}
-
-export async function adminUpdatePkQuestion(
-  id: string,
-  q: Partial<Omit<PkQuestion, "id" | "created_at">>
-): Promise<boolean> {
-  await verifyAdminAccess();
-  const supabase = createAdminClient();
-  const { error } = await supabase.from("pk_questions").update(q).eq("id", id);
-  return !error;
-}
-
-export async function adminDeletePkQuestion(id: string): Promise<boolean> {
-  await verifyAdminAccess();
-  const supabase = createAdminClient();
-  const { error } = await supabase.from("pk_questions").delete().eq("id", id);
-  return !error;
 }

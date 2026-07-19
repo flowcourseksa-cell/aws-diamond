@@ -5,13 +5,13 @@ import {
   IconPlus, IconTrash, IconEdit, IconX, IconCheck,
   IconSwords, IconCategory, IconSearch, IconLoader2
 } from "@tabler/icons-react";
+import { type PkQuestion } from "@/lib/supabase/services/pk-actions";
 import {
   adminFetchPkQuestions,
   adminCreatePkQuestion,
   adminUpdatePkQuestion,
   adminDeletePkQuestion,
-  type PkQuestion,
-} from "@/lib/supabase/services/pk-actions";
+} from "@/lib/supabase/services/pk-admin-actions";
 
 const CATEGORIES = [
   { value: "quantitative", label: "كمي", color: "bg-blue-100 text-blue-700 border-blue-200" },
