@@ -3,7 +3,7 @@
 import {
   IconUsers, IconClipboardText, IconBook, IconCurrencyDollar,
   IconTrendingUp, IconAlertTriangle, IconCircleCheck, IconBrain,
-  IconBrandWhatsapp, IconChartBar,
+  IconBrandWhatsapp, IconChartBar, IconSwords,
 } from "@tabler/icons-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -175,12 +175,13 @@ export default function AdminDashboard() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             {[
-              { href: "/admin-khaled-ksa-aws-2026-org/courses",  label: "إضافة دورة جديدة",   icon: <IconUsers size={20}/>,         color: "#6366f1" },
-              { href: "/admin-khaled-ksa-aws-2026-org/exams",    label: "إضافة اختبار",        icon: <IconClipboardText size={20}/>,  color: "#f59e0b" },
-              { href: "/admin-khaled-ksa-aws-2026-org/lessons",  label: "رفع درس جديد",         icon: <IconBook size={20}/>,           color: "#10b981" },
-              { href: "/admin-khaled-ksa-aws-2026-org/tracks",   label: "تعديل المهارات",       icon: <IconBrain size={20}/>,          color: "#8b5cf6" },
-              { href: "/admin-khaled-ksa-aws-2026-org/whatsapp", label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366", restricted: true },
-              { href: "/admin-khaled-ksa-aws-2026-org/pricing",  label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444", restricted: true },
+              { href: "/admin-khaled-ksa-aws-2026-org/courses",     label: "إضافة دورة جديدة",   icon: <IconUsers size={20}/>,         color: "#6366f1" },
+              { href: "/admin-khaled-ksa-aws-2026-org/exams",       label: "إضافة اختبار",        icon: <IconClipboardText size={20}/>,  color: "#f59e0b" },
+              { href: "/admin-khaled-ksa-aws-2026-org/lessons",     label: "رفع درس جديد",         icon: <IconBook size={20}/>,           color: "#10b981" },
+              { href: "/admin-khaled-ksa-aws-2026-org/tracks",      label: "تعديل المهارات",       icon: <IconBrain size={20}/>,          color: "#8b5cf6" },
+              { href: "/admin-khaled-ksa-aws-2026-org/pk-questions",label: "أسئلة تحدي الأبطال",  icon: <IconSwords size={20}/>,         color: "#f97316" },
+              { href: "/admin-khaled-ksa-aws-2026-org/whatsapp",    label: "إشعارات الواتساب",    icon: <IconBrandWhatsapp size={20}/>,   color: "#25d366", restricted: true },
+              { href: "/admin-khaled-ksa-aws-2026-org/pricing",     label: "التسعير والكودات",    icon: <IconCurrencyDollar size={20}/>,  color: "#ef4444", restricted: true },
             ]
             .filter(action => !(adminLevel === "content" && action.restricted))
             .map((action, i) => (

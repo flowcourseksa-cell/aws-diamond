@@ -1,0 +1,153 @@
+"use server";
+import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
+import { createAdminClient, createClient } from "@/lib/supabase/client";
+
+export type PkQuestion = {
+  id: string;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_index: number;
+  category: "quantitative" | "verbal" | "analytical" | "mixed";
+  created_at: string;
+};
+
+export type PkChallenge = {
+  id: string;
+  challenger_id: string;
+  opponent_id: string | null;
+  is_bot: boolean;
+  bot_name: string | null;
+  challenger_score: number;
+  opponent_score: number;
+  challenger_answers: number[];
+  opponent_answers: number[];
+  status: "waiting" | "active" | "finished";
+  question_ids: string[];
+  total_questions: number;
+  created_at: string;
+  finished_at: string | null;
+};
+
+// ── قراءة أسئلة التحدي (عشوائية) ──────────────────────────
+export async function fetchRandomPkQuestions(count = 10): Promise<PkQuestion[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("pk_questions")
+    .select("*")
+    .limit(200);
+
+  if (error || !data) return [];
+
+  // خلط عشوائي
+  const shuffled = [...data].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count) as PkQuestion[];
+}
+
+// ── قراءة أسئلة بمعرفاتها ────────────────────────────────
+export async function fetchPkQuestionsByIds(ids: string[]): Promise<PkQuestion[]> {
+  const supabase = createClient();
+  const { data } = await supabase.from("pk_questions").select("*").in("id", ids);
+  return (data || []) as PkQuestion[];
+}
+
+// ── إنشاء تحدي جديد ──────────────────────────────────────
+export async function createPkChallenge(
+  challengerId: string,
+  questionIds: string[]
+): Promise<PkChallenge | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("pk_challenges")
+    .insert([{
+      challenger_id: challengerId,
+      question_ids: questionIds,
+      total_questions: questionIds.length,
+      status: "waiting",
+    }])
+    .select()
+    .single();
+
+  if (error) { console.error("createPkChallenge:", error.message); return null; }
+  return data as PkChallenge;
+}
+
+// ── إنهاء التحدي وحفظ النتيجة ─────────────────────────────
+export async function finishPkChallenge(
+  challengeId: string,
+  challengerScore: number,
+  opponentScore: number,
+  challengerAnswers: number[],
+  isBot: boolean,
+  botName?: string
+): Promise<boolean> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("pk_challenges")
+    .update({
+      status: "finished",
+      challenger_score: challengerScore,
+      opponent_score: opponentScore,
+      challenger_answers: challengerAnswers,
+      is_bot: isBot,
+      bot_name: botName || null,
+      finished_at: new Date().toISOString(),
+    })
+    .eq("id", challengeId);
+
+  return !error;
+}
+
+// ── آخر 5 تحديات للطالب ──────────────────────────────────
+export async function fetchMyPkHistory(userId: string): Promise<PkChallenge[]> {
+  const supabase = createClient();
+  const { data } = await supabase
+    .from("pk_challenges")
+    .select("*")
+    .eq("challenger_id", userId)
+    .eq("status", "finished")
+    .order("finished_at", { ascending: false })
+    .limit(5);
+  return (data || []) as PkChallenge[];
+}
+
+// ──────────────────────────────────────────────────────────
+// Admin Actions
+// ──────────────────────────────────────────────────────────
+
+export async function adminFetchPkQuestions(): Promise<PkQuestion[]> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("pk_questions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  return (data || []) as PkQuestion[];
+}
+
+export async function adminCreatePkQuestion(q: Omit<PkQuestion, "id" | "created_at">): Promise<boolean> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("pk_questions").insert([q]);
+  if (error) { console.error("adminCreatePkQuestion:", error.message); return false; }
+  return true;
+}
+
+export async function adminUpdatePkQuestion(
+  id: string,
+  q: Partial<Omit<PkQuestion, "id" | "created_at">>
+): Promise<boolean> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("pk_questions").update(q).eq("id", id);
+  return !error;
+}
+
+export async function adminDeletePkQuestion(id: string): Promise<boolean> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("pk_questions").delete().eq("id", id);
+  return !error;
+}

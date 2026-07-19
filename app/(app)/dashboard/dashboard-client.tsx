@@ -11,6 +11,7 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { usePlatformStore } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { PkChallengeWidget } from "@/components/dashboard/pk-challenge-widget";
 
 const QUICK_LINKS = [
   { href: "/tracks",      title: "الأقسام والمهارات", sub: "تتبع تقدمك بدقة",      icon: IconBrain },
@@ -146,91 +147,99 @@ export function DashboardClient() {
         <MetricCard delay={4} icon={<IconClipboardText size={20} />}iconBg="var(--accent-blue-light)"  iconColor="var(--accent-blue)"  value={availableExams.length}        label="الاختبارات المتاحة لك"      trend={undefined} />
       </section>
 
-      {/* ── بطاقة نسب إتقان المهارات ── */}
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-        <div className="fade-up rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <IconBrain size={20} className="text-primary" />
-              <span className="text-base font-extrabold">تقدمك في المسارات</span>
-            </div>
-            <Link href="/tracks" className="text-[12.5px] font-bold text-primary hover:underline">
-              عرض التفصيل
-            </Link>
-          </div>
-
-          {/* Progress bars */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
-              <div className="text-2xl font-black text-emerald-600">{masteredSkills}</div>
-              <div className="text-xs font-bold text-emerald-700 mt-0.5">متقنة</div>
-            </div>
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-center">
-              <div className="text-2xl font-black text-amber-600">{averageSkillsCount}</div>
-              <div className="text-xs font-bold text-amber-700 mt-0.5">متوسطة</div>
-            </div>
-            <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-center">
-              <div className="text-2xl font-black text-rose-600">{weakSkillsCount}</div>
-              <div className="text-xs font-bold text-rose-700 mt-0.5">ضعيفة</div>
-            </div>
-            <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 text-center">
-              <div className="text-2xl font-black text-gray-500">{notStartedSkillsCount}</div>
-              <div className="text-xs font-bold text-gray-600 mt-0.5">لم تبدأ</div>
-            </div>
-          </div>
-
-          {/* Overall bar */}
-          <div className="mb-2">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="font-bold text-text-muted">متوسط الإتقان الكلي</span>
-              <span className="font-black text-primary">{avgMastery}%</span>
-            </div>
-            <div className="h-3 bg-border rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-violet-500 rounded-full transition-all duration-700"
-                style={{ width: `${avgMastery}%` }}
-              />
-            </div>
-          </div>
+      {/* ── تحدي الأبطال + بطاقة نسب إتقان المهارات ── */}
+      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        {/* تحدي الأبطال */}
+        <div className="lg:col-span-1">
+          <PkChallengeWidget />
         </div>
 
-        {/* أضعف المهارات */}
-        <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
-          <div className="flex items-center gap-1.5 text-sm font-black text-rose-600 mb-4">
-            <IconAlertTriangle size={18} />
-            مهارات تحتاج للتحسين
-          </div>
-          {topWeakSkills.length > 0 ? (
-            <>
-              <div className="space-y-3">
-                {topWeakSkills.map(sk => (
-                  <div key={sk.id} className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-bold text-text truncate">{sk.name}</div>
-                      <span className="text-xs font-black text-rose-600">{sk.score}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
-                      <div className="h-full bg-rose-500 rounded-full" style={{ width: `${sk.score}%` }} />
-                    </div>
-                  </div>
-                ))}
+        {/* بطاقة نسب إتقان المهارات */}
+        <div className="lg:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
+          <div className="fade-up rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <IconBrain size={20} className="text-primary" />
+                <span className="text-base font-extrabold">تقدمك في المسارات</span>
               </div>
-              <Link
-                href="/tracks"
-                className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs hover:bg-rose-100 transition-colors"
-              >
-                <IconBrain size={16} />
-                تدرّب عليها الآن
+              <Link href="/tracks" className="text-[12.5px] font-bold text-primary hover:underline">
+                عرض التفصيل
               </Link>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[120px] text-center">
-              <div className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-2">
-                <IconChecks size={24} />
-              </div>
-              <p className="text-xs font-bold text-emerald-600">لا توجد مهارات ضعيفة حالياً، ممتاز!</p>
             </div>
-          )}
+
+            {/* Progress bars */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-center">
+                <div className="text-2xl font-black text-emerald-600">{masteredSkills}</div>
+                <div className="text-xs font-bold text-emerald-700 mt-0.5">متقنة</div>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-center">
+                <div className="text-2xl font-black text-amber-600">{averageSkillsCount}</div>
+                <div className="text-xs font-bold text-amber-700 mt-0.5">متوسطة</div>
+              </div>
+              <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-center">
+                <div className="text-2xl font-black text-rose-600">{weakSkillsCount}</div>
+                <div className="text-xs font-bold text-rose-700 mt-0.5">ضعيفة</div>
+              </div>
+              <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 text-center">
+                <div className="text-2xl font-black text-gray-500">{notStartedSkillsCount}</div>
+                <div className="text-xs font-bold text-gray-600 mt-0.5">لم تبدأ</div>
+              </div>
+            </div>
+
+            {/* Overall bar */}
+            <div className="mb-2">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="font-bold text-text-muted">متوسط الإتقان الكلي</span>
+                <span className="font-black text-primary">{avgMastery}%</span>
+              </div>
+              <div className="h-3 bg-border rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-primary to-violet-500 rounded-full transition-all duration-700"
+                  style={{ width: `${avgMastery}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* أضعف المهارات */}
+          <div className="fade-up delay-1 rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-1.5 text-sm font-black text-rose-600 mb-4">
+              <IconAlertTriangle size={18} />
+              مهارات تحتاج للتحسين
+            </div>
+            {topWeakSkills.length > 0 ? (
+              <>
+                <div className="space-y-3">
+                  {topWeakSkills.map(sk => (
+                    <div key={sk.id} className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-bold text-text truncate">{sk.name}</div>
+                        <span className="text-xs font-black text-rose-600">{sk.score}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-border rounded-full overflow-hidden">
+                        <div className="h-full bg-rose-500 rounded-full" style={{ width: `${sk.score}%` }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Link
+                  href="/tracks"
+                  className="mt-5 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 font-bold text-xs hover:bg-rose-100 transition-colors"
+                >
+                  <IconBrain size={16} />
+                  تدرّب عليها الآن
+                </Link>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-[120px] text-center">
+                <div className="w-10 h-10 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mb-2">
+                  <IconChecks size={24} />
+                </div>
+                <p className="text-xs font-bold text-emerald-600">لا توجد مهارات ضعيفة حالياً، ممتاز!</p>
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
