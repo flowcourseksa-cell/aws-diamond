@@ -261,7 +261,9 @@ export default function ChallengePage() {
 
   function setupBroadcast(id: string) {
     if (broadcastRef.current) broadcastRef.current.unsubscribe();
-    broadcastRef.current = supabase.channel(`challenge-bc-${id}`);
+    broadcastRef.current = supabase.channel(`challenge-bc-${id}`, {
+      config: { broadcast: { ack: false, self: true } }
+    });
     broadcastRef.current?.on('broadcast', { event: 'score_update' }, ({ payload }) => {
       setOppScore(payload.score);
       setOppAnswers(prev => { const u = [...prev]; u[payload.qIndex] = payload.answer; return u; });
@@ -545,37 +547,37 @@ export default function ChallengePage() {
           <header className="shrink-0 bg-card border-b border-border">
             <div className="flex items-stretch divide-x divide-x-reverse divide-border">
               {/* Opponent */}
-              <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0">
-                <div className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center font-black text-xs bg-orange-500/10 border border-orange-500/20 text-orange-500">
+              <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 flex-1 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-xl flex items-center justify-center font-black text-xs bg-orange-500/10 border border-orange-500/20 text-orange-500">
                   {oppName.charAt(0) || "؟"}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-bold text-text-muted truncate max-w-[80px] lg:max-w-none">{oppName} {isBot ? "🤖" : "👤"}</div>
-                  <div className="text-2xl font-black text-orange-500 leading-none">{oppScore}</div>
+                  <div className="text-[9px] sm:text-[10px] font-bold text-text-muted truncate max-w-[60px] sm:max-w-none">{oppName} {isBot ? "🤖" : "👤"}</div>
+                  <div className="text-lg sm:text-2xl font-black text-orange-500 leading-none">{oppScore}</div>
                 </div>
               </div>
 
               {/* Center */}
-              <div className="shrink-0 flex flex-col items-center justify-center px-4 py-2 gap-0.5">
-                <div className="text-[10px] font-bold text-text-muted">س {currentQ + 1}/{questions.length}</div>
-                <div key={qTimer} className="text-3xl font-black leading-none" style={{ color: timerColor }}>{qTimer}</div>
+              <div className="shrink-0 flex flex-col items-center justify-center px-2 sm:px-4 py-1.5 sm:py-2 gap-0.5">
+                <div className="text-[9px] sm:text-[10px] font-bold text-text-muted">س {currentQ + 1}/{questions.length}</div>
+                <div key={qTimer} className="text-2xl sm:text-3xl font-black leading-none" style={{ color: timerColor }}>{qTimer}</div>
                 <div className="flex gap-0.5 mt-0.5">
                   {questions.map((_, i) => (
-                    <div key={i} className="h-1 w-3 rounded-full"
+                    <div key={i} className="h-1 w-1.5 sm:w-3 rounded-full"
                       style={{ background: i < currentQ ? "var(--primary)" : i === currentQ ? timerColor : "var(--border)" }} />
                   ))}
                 </div>
               </div>
 
               {/* Me + Exit */}
-              <div className="flex items-center gap-3 px-4 py-3 flex-1 min-w-0 justify-end">
+              <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 flex-1 min-w-0 justify-end">
                 <div className="text-right min-w-0">
-                  <div className="text-[10px] font-bold text-text-muted">نقاطك</div>
-                  <div className="text-2xl font-black text-primary leading-none">{myScore}</div>
+                  <div className="text-[9px] sm:text-[10px] font-bold text-text-muted">نقاطك</div>
+                  <div className="text-lg sm:text-2xl font-black text-primary leading-none">{myScore}</div>
                 </div>
-                <div className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center font-black text-xs bg-primary/10 border border-primary/20 text-primary">أنت</div>
+                <div className="hidden sm:flex w-9 h-9 shrink-0 rounded-xl items-center justify-center font-black text-xs bg-primary/10 border border-primary/20 text-primary">أنت</div>
                 <button onClick={tryExit}
-                  className="w-8 h-8 shrink-0 rounded-xl flex items-center justify-center border border-border text-text-muted/40 hover:text-red-500 hover:border-red-500/30 transition-all">
+                  className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg sm:rounded-xl flex items-center justify-center border border-border text-text-muted/40 hover:text-red-500 hover:border-red-500/30 transition-all">
                   <IconX size={13} />
                 </button>
               </div>
