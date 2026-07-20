@@ -75,7 +75,7 @@ function ExitModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: (
 
 /* ══════════════════════════════════════════════════════ */
 export default function ChallengePage() {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
   const { showToast } = useToast();
   // Use a single stable supabase client instance
@@ -111,11 +111,11 @@ export default function ChallengePage() {
   const matchedRef = useRef(false);
 
   // Show page as soon as user is known — don't wait if loading but user is cached
-  const isReady = !!user || !loading;
+  const isReady = !!user || !isLoading;
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login?callbackUrl=/challenge");
-  }, [user, loading]);
+    if (!isLoading && !user) router.push("/login?callbackUrl=/challenge");
+  }, [user, isLoading]);
 
   useEffect(() => {
     if (user?.id) fetchMyPkHistory(user.id).then(setHistory);
