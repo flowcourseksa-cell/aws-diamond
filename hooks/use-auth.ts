@@ -150,7 +150,7 @@ let globalProfileFetchUserId: string | null = null;
 
     init();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
       if (!mounted) return;
 
       const newUserId = session?.user?.id ?? null;

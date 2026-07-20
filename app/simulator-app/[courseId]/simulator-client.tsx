@@ -108,7 +108,7 @@ export function SimulatorClient({ courseId, initialExam }: SimulatorClientProps)
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(({ data }: any) => {
       if (data?.user?.user_metadata?.full_name) {
         setUserName(data.user.user_metadata.full_name);
       } else if (data?.user?.email) {

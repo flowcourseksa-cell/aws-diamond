@@ -178,11 +178,13 @@ export function PkChallengeWidget() {
     if (!challengeId || !user?.id) return;
     await finishPkChallenge(
       challengeId,
+      true,
       myScore,
-      botScore,
       myAnswers.map(a => a ?? -1),
       true,
-      botName
+      botName,
+      botScore,
+      botAnswers.map(a => a ?? -1)
     );
     fetchMyPkHistory(user.id).then(setHistory);
   }

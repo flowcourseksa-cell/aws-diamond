@@ -241,7 +241,7 @@ export default function ChallengePage() {
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public',
         table: 'pk_challenges', filter: `id=eq.${chal.id}`
-      }, async (payload) => {
+      }, async (payload: any) => {
         if (payload.new.status === 'active' && payload.new.opponent_id) {
           await onOpponentJoined(payload.new.opponent_id);
         }
@@ -262,7 +262,7 @@ export default function ChallengePage() {
   function setupBroadcast(id: string) {
     if (broadcastRef.current) broadcastRef.current.unsubscribe();
     broadcastRef.current = supabase.channel(`challenge-bc-${id}`);
-    broadcastRef.current.on('broadcast', { event: 'score_update' }, ({ payload }) => {
+    broadcastRef.current?.on('broadcast', { event: 'score_update' }, ({ payload }) => {
       setOppScore(payload.score);
       setOppAnswers(prev => { const u = [...prev]; u[payload.qIndex] = payload.answer; return u; });
     }).subscribe();

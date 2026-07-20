@@ -42,7 +42,7 @@ export function NotificationsDropdown({ customTrigger }: { customTrigger?: React
 
       if (data && !error) {
         setNotifications(data);
-        setUnreadCount(data.filter((n) => !n.is_read).length);
+        setUnreadCount(data.filter((n: any) => !n.is_read).length);
       }
     } catch (err) {
       // Ignore network failures for background polling
