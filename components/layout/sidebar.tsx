@@ -48,7 +48,6 @@ const TOOLS_ITEMS: NavItem[] = [
   { href: "/study-plan", label: "خطة المذاكرة", icon: <IconCalendarTime size={19} /> },
   { href: "/performance", label: "تحليل الأداء", icon: <IconChartLine size={19} /> },
   { href: "/book", label: "الكتاب التفاعلي", icon: <IconBook2 size={19} /> },
-  { href: "/dashboard#pk", label: "تحدي الأبطال", icon: <IconSwords size={19} />, badge: "جديد" },
 ];
 
 function NavLink({ item, active, onClick }: { item: NavItem; active: boolean; onClick?: () => void }) {

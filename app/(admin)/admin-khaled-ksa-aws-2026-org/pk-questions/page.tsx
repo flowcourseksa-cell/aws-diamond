@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   IconPlus, IconTrash, IconEdit, IconX, IconCheck,
-  IconSwords, IconCategory, IconSearch, IconLoader2
+  IconSwords, IconCategory, IconSearch, IconLoader2, IconUpload
 } from "@tabler/icons-react";
+import * as XLSX from "xlsx";
 import { type PkQuestion } from "@/lib/supabase/services/pk-actions";
+import { useToast } from "@/components/ui/toast";
 import {
   adminFetchPkQuestions,
   adminCreatePkQuestion,
   adminUpdatePkQuestion,
   adminDeletePkQuestion,
+  adminCreateBulkPkQuestions,
+  adminDeleteAllPkQuestions,
 } from "@/lib/supabase/services/pk-admin-actions";
 
 const CATEGORIES = [
@@ -41,8 +45,12 @@ export default function AdminPkQuestionsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<PkQuestion | null>(null);
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const { showToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -99,6 +107,92 @@ export default function AdminPkQuestionsPage() {
     await load();
   }
 
+  async function handleDeleteAll() {
+    setDeletingAll(true);
+    const ok = await adminDeleteAllPkQuestions();
+    setDeletingAll(false);
+    setConfirmDeleteAll(false);
+    if (ok) {
+      showToast("تم حذف جميع الأسئلة بنجاح!", "success");
+      await load();
+    } else {
+      showToast("حدث خطأ أثناء الحذف.", "error");
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsLoading(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+
+      const parsedQuestions: Omit<PkQuestion, "id" | "created_at">[] = [];
+      for (const row of jsonData) {
+        if (!row["السؤال"]) continue;
+        
+        let correctIndex = 0;
+        const ansLabel = String(row["الإجابة_الصحيحة"]).trim();
+        if (["أ", "a", "0", "A"].includes(ansLabel)) correctIndex = 0;
+        else if (["ب", "b", "1", "B"].includes(ansLabel)) correctIndex = 1;
+        else if (["ج", "c", "2", "C"].includes(ansLabel)) correctIndex = 2;
+        else if (["د", "d", "3", "D"].includes(ansLabel)) correctIndex = 3;
+
+        let category: PkQuestion["category"] = "mixed";
+        const catLabel = String(row["القسم"]).trim();
+        if (catLabel.includes("كمي")) category = "quantitative";
+        else if (catLabel.includes("لفظي")) category = "verbal";
+        else if (catLabel.includes("إدراكي")) category = "analytical";
+
+        const rawOptions = [
+          String(row["الخيار_أ"] || row["الخيار_ا"] || ""),
+          String(row["الخيار_ب"] || ""),
+          String(row["الخيار_ج"] || ""),
+          String(row["الخيار_د"] || "")
+        ];
+        
+        const correctAnswerString = rawOptions[correctIndex];
+
+        // Shuffle options randomly
+        const shuffledOptions = [...rawOptions].sort(() => Math.random() - 0.5);
+
+        // Find the new correct index
+        const newCorrectIndex = shuffledOptions.indexOf(correctAnswerString);
+
+        parsedQuestions.push({
+          question: String(row["السؤال"]),
+          option_a: shuffledOptions[0],
+          option_b: shuffledOptions[1],
+          option_c: shuffledOptions[2],
+          option_d: shuffledOptions[3],
+          correct_index: newCorrectIndex,
+          category,
+        });
+      }
+
+      if (parsedQuestions.length > 0) {
+        const success = await adminCreateBulkPkQuestions(parsedQuestions);
+        if (success) {
+          showToast(`تم استيراد ${parsedQuestions.length} سؤال بنجاح!`, "success");
+          await load();
+        } else {
+          showToast("حدث خطأ أثناء حفظ الأسئلة.", "error");
+        }
+      } else {
+        showToast("لم يتم العثور على بيانات صالحة في الملف. تأكد من تطابق عناوين الأعمدة.", "warning");
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("حدث خطأ في قراءة ملف الإكسيل.", "error");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsLoading(false);
+    }
+  }
+
   const catInfo = (cat: string) => CATEGORIES.find(c => c.value === cat) || CATEGORIES[3];
 
   return (
@@ -114,12 +208,35 @@ export default function AdminPkQuestionsPage() {
             <p className="text-sm text-white/60">{questions.length} سؤال في بنك التحدي</p>
           </div>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-accent-amber/30 transition-all hover:-translate-y-0.5 hover:shadow-xl"
-        >
-          <IconPlus size={18} /> إضافة سؤال جديد
-        </button>
+        <div className="flex gap-2">
+          <input 
+            type="file" 
+            accept=".xlsx, .xls" 
+            className="hidden" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+          />
+          {questions.length > 0 && (
+            <button
+              onClick={() => setConfirmDeleteAll(true)}
+              className="flex items-center gap-2 rounded-xl bg-accent-red/80 px-5 py-2.5 text-sm font-black text-white shadow-lg transition-all hover:-translate-y-0.5"
+            >
+              <IconTrash size={18} /> حذف الكل
+            </button>
+          )}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 rounded-xl bg-accent-teal px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-accent-teal/30 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+          >
+            <IconUpload size={18} /> استيراد إكسيل
+          </button>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 rounded-xl bg-accent-amber px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-accent-amber/30 transition-all hover:-translate-y-0.5 hover:shadow-xl"
+          >
+            <IconPlus size={18} /> إضافة سؤال جديد
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -315,7 +432,7 @@ export default function AdminPkQuestionsPage() {
         </div>
       )}
 
-      {/* Confirm Delete */}
+      {/* Confirm Delete One */}
       {confirmDel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-sm rounded-3xl bg-card border border-border p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200">
@@ -327,6 +444,39 @@ export default function AdminPkQuestionsPage() {
             <div className="flex gap-3">
               <button onClick={() => handleDelete(confirmDel)} className="flex-1 h-11 rounded-2xl bg-accent-red text-white font-black text-sm">حذف</button>
               <button onClick={() => setConfirmDel(null)} className="flex-1 h-11 rounded-2xl border border-border font-bold text-sm">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete ALL */}
+      {confirmDeleteAll && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl bg-card border border-accent-red/30 p-8 shadow-2xl text-center animate-in zoom-in-95 duration-200">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-accent-red/10 text-accent-red border-2 border-accent-red/20">
+              <IconTrash size={36} />
+            </div>
+            <h3 className="text-xl font-black mb-2 text-accent-red">حذف جميع الأسئلة!</h3>
+            <p className="text-sm text-text-muted mb-2">
+              أنت على وشك حذف <span className="font-black text-text">{questions.length} سؤال</span> بشكل كامل.
+            </p>
+            <p className="text-xs text-accent-red/70 mb-6 font-bold">⚠️ هذا الإجراء لا يمكن التراجع عنه!</p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteAll}
+                disabled={deletingAll}
+                className="flex-1 h-12 rounded-2xl bg-accent-red text-white font-black text-sm disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {deletingAll ? <IconLoader2 size={18} className="animate-spin" /> : <IconTrash size={18} />}
+                {deletingAll ? "جاري الحذف..." : "نعم، احذف الكل"}
+              </button>
+              <button
+                onClick={() => setConfirmDeleteAll(false)}
+                disabled={deletingAll}
+                className="flex-1 h-12 rounded-2xl border border-border font-bold text-sm"
+              >
+                إلغاء
+              </button>
             </div>
           </div>
         </div>

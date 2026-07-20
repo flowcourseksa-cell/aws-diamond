@@ -6,7 +6,7 @@ import {
   IconRocket, IconLayoutDashboard, IconUsers, IconUpload,
   IconClipboardText, IconCurrencyDollar, IconArrowRight,
   IconLogout2, IconBrain, IconBook, IconBook2, IconFolder, IconBrandWhatsapp,
-  IconSchool, IconBell, IconBellRinging, IconSettings, IconKey, IconDeviceDesktopAnalytics
+  IconSchool, IconBell, IconBellRinging, IconSettings, IconKey, IconDeviceDesktopAnalytics, IconSwords
 } from "@tabler/icons-react";
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
@@ -25,6 +25,7 @@ const NAV_GROUPS = [
       { href: "/admin-khaled-ksa-aws-2026-org/library",  label: "إدارة المكتبة",       icon: <IconFolder size={19} /> },
       { href: "/admin-khaled-ksa-aws-2026-org/book", label: "الكتاب التفاعلي", icon: <IconBook2 size={19} /> },
       { href: "/admin-khaled-ksa-aws-2026-org/certificates", label: "الشهادات الممنوحة", icon: <IconSchool size={19} /> },
+      { href: "/admin-khaled-ksa-aws-2026-org/pk-questions", label: "تحدي الأبطال", icon: <IconSwords size={19} /> },
     ] as NavItem[],
   },
   {

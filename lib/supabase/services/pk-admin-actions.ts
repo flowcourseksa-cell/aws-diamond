@@ -42,3 +42,24 @@ export async function adminDeletePkQuestion(id: string): Promise<boolean> {
   const { error } = await supabase.from("pk_questions").delete().eq("id", id);
   return !error;
 }
+
+export async function adminDeleteAllPkQuestions(): Promise<boolean> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("pk_questions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+  if (error) { console.error("adminDeleteAllPkQuestions:", error.message); return false; }
+  return true;
+}
+
+export async function adminCreateBulkPkQuestions(
+  questions: Omit<PkQuestion, "id" | "created_at">[]
+): Promise<boolean> {
+  await verifyAdminAccess();
+  const supabase = createAdminClient();
+  const { error } = await supabase.from("pk_questions").insert(questions);
+  if (error) {
+    console.error("adminCreateBulkPkQuestions:", error.message);
+    return false;
+  }
+  return true;
+}

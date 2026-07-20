@@ -11,7 +11,6 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { usePlatformStore } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { PkChallengeWidget } from "@/components/dashboard/pk-challenge-widget";
 
 const QUICK_LINKS = [
   { href: "/tracks",      title: "الأقسام والمهارات", sub: "تتبع تقدمك بدقة",      icon: IconBrain },
@@ -147,16 +146,9 @@ export function DashboardClient() {
         <MetricCard delay={4} icon={<IconClipboardText size={20} />}iconBg="var(--accent-blue-light)"  iconColor="var(--accent-blue)"  value={availableExams.length}        label="الاختبارات المتاحة لك"      trend={undefined} />
       </section>
 
-      {/* ── تحدي الأبطال + بطاقة نسب إتقان المهارات ── */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        {/* تحدي الأبطال */}
-        <div className="lg:col-span-1">
-          <PkChallengeWidget />
-        </div>
-
-        {/* بطاقة نسب إتقان المهارات */}
-        <div className="lg:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-[2fr_1fr]">
-          <div className="fade-up rounded-2xl border border-border bg-card p-5">
+      {/* بطاقة نسب إتقان المهارات */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] items-start">
+        <div className="fade-up rounded-2xl border border-border bg-card p-5">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <IconBrain size={20} className="text-primary" />
@@ -240,7 +232,6 @@ export function DashboardClient() {
               </div>
             )}
           </div>
-        </div>
       </section>
 
       {/* روابط سريعة */}

@@ -43,23 +43,42 @@ export function useAuth() {
   // Tracks the userId we initialized for — prevents re-fetch on token refresh
   const currentUserIdRef = useRef<string | null>(null);
 
+// Deduplicate profile fetches across all useAuth hooks to prevent 17 concurrent Server Action calls
+let globalProfileFetchPromise: Promise<AuthProfile | null | undefined> | null = null;
+let globalProfileFetchUserId: string | null = null;
+
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         console.warn("Offline: skipping profile fetch");
         return undefined;
       }
+      
+      // If we are already fetching for this exact user, return the same promise
+      if (globalProfileFetchUserId === userId && globalProfileFetchPromise) {
+        return await globalProfileFetchPromise;
+      }
+
+      globalProfileFetchUserId = userId;
+      
       let timeoutId: NodeJS.Timeout;
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error("Profile fetch timeout")), 8000);
       });
-      const result = await Promise.race([
+      
+      globalProfileFetchPromise = Promise.race([
         fetchProfileServer(userId),
         timeoutPromise
       ]).finally(() => clearTimeout(timeoutId));
+      
+      const result = await globalProfileFetchPromise;
+      // Clear the promise so next time it fetches fresh data
+      globalProfileFetchPromise = null;
+      
       return result as AuthProfile | null;
     } catch (err) {
       console.warn("fetchProfileServer timed out or failed:", err);
+      globalProfileFetchPromise = null;
       return undefined;
     }
   }, []);

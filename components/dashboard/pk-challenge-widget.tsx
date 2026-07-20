@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { IconSwords, IconTrophy, IconX, IconSkull, IconFlame } from "@tabler/icons-react";
+import { IconSwords, IconTrophy, IconX, IconSkull, IconFlame, IconRobot, IconBolt } from "@tabler/icons-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/components/ui/toast";
 import {
   fetchRandomPkQuestions,
   createPkChallenge,
@@ -41,6 +42,7 @@ export function PkChallengeWidget() {
   const [history, setHistory] = useState<PkChallenge[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false);
+  const { showToast } = useToast();
 
   // تحميل السجل
   useEffect(() => {
@@ -56,7 +58,11 @@ export function PkChallengeWidget() {
     setSearchCountdown(10);
 
     const qs = await fetchRandomPkQuestions(10);
-    if (qs.length < 5) { setStage("idle"); return; }
+    if (qs.length < 5) { 
+      showToast("لا يوجد عدد كافٍ من الأسئلة في بنك التحدي (يجب أن يكون 5 على الأقل). يرجى إضافة أسئلة من لوحة الإدارة.", "error");
+      setStage("idle"); 
+      return; 
+    }
 
     const challenge = await createPkChallenge(user.id, qs.map(q => q.id));
     if (!challenge) { setStage("idle"); return; }
@@ -202,47 +208,47 @@ export function PkChallengeWidget() {
   // RENDERS
   // ──────────────────────────────────────────────
 
-  // IDLE: عرض الودجت في الداشبورد
+  // IDLE: كارت المعلومات الكاملة عن التحدي
   if (stage === "idle") {
     return (
-      <div className="animated-border rounded-2xl bg-sidebar p-5 text-white">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-amber/20 text-accent-amber">
-              <IconSwords size={20} />
-            </div>
-            <span className="text-base font-black shimmer-text">⚔️ تحدي الأبطال</span>
+      <div className="bg-card border border-border rounded-3xl p-8 shadow-2xl backdrop-blur-xl relative overflow-hidden">
+        {/* الزخرفة الخلفية */}
+        <div className="absolute -top-24 -right-24 w-48 h-48 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-accent-amber/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 text-center mb-8">
+          <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-primary/20 to-accent-amber/20 flex items-center justify-center text-primary mb-4 shadow-lg border border-primary/20">
+            <IconSwords size={40} className="animate-pulse" />
           </div>
-          {history.length > 0 && (
-            <span className="text-xs text-white/50 font-bold">{history.length} تحدٍّ سابق</span>
-          )}
+          <h3 className="text-2xl font-black text-text mb-2">تحدي الأبطال</h3>
+          <p className="text-sm text-text-muted">مواجهة مباشرة لاختبار سرعة بديهتك ودقة معلوماتك</p>
         </div>
 
-        {/* وصف */}
-        <p className="text-sm text-white/60 mb-4 leading-relaxed">
-          تحدَّ منافساً حقيقياً أو البوت الذكي في 10 أسئلة متنوعة من كمي ولفظي وإدراكي!
-        </p>
+        <div className="grid grid-cols-1 gap-4 mb-8">
+          <div className="flex items-start gap-4 p-4 rounded-2xl bg-sidebar/50 border border-border">
+            <div className="p-2 rounded-xl bg-accent-blue/10 text-accent-blue">
+              <IconRobot size={24} />
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-text text-sm mb-1">منافس أو محاكي</div>
+              <div className="text-xs text-text-muted">إذا لم نجد منافساً لك خلال 10 ثوانٍ، ستواجه البوت الذكي الذي يلعب بمستوى واقعي.</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-4 p-4 rounded-2xl bg-sidebar/50 border border-border">
+            <div className="p-2 rounded-xl bg-accent-amber/10 text-accent-amber">
+              <IconBolt size={24} />
+            </div>
+            <div className="text-right">
+              <div className="font-bold text-text text-sm mb-1">السرعة مطلوبة</div>
+              <div className="text-xs text-text-muted">التحدي يتكون من 10 أسئلة عشوائية، ولديك 25 ثانية لكل سؤال. الإجابة الأسرع تمنحك نقاطاً أكثر!</div>
+            </div>
+          </div>
+        </div>
 
-        {/* آخر التحديات */}
         {history.length > 0 && (
-          <div className="space-y-2 mb-4">
-            {history.slice(0, 3).map(h => {
-              const won = h.challenger_score > h.opponent_score;
-              return (
-                <div key={h.id} className="flex items-center justify-between rounded-xl bg-white/5 px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    {won ? <IconTrophy size={14} className="text-accent-amber" /> : <IconSkull size={14} className="text-accent-red" />}
-                    <span className="text-xs font-bold text-white/70">
-                      {h.is_bot ? `ضد ${h.bot_name || "البوت"}` : "تحدي حقيقي"}
-                    </span>
-                  </div>
-                  <span className={`text-xs font-black ${won ? "text-accent-teal" : "text-accent-red"}`}>
-                    {h.challenger_score} - {h.opponent_score}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="mb-8 p-4 rounded-2xl bg-primary/5 border border-primary/10 flex items-center justify-between">
+            <div className="text-sm font-bold text-text">تحدياتك السابقة: <span className="text-primary">{history.length}</span></div>
+            <div className="text-xs text-text-muted">واصل التقدم لرفع مستواك!</div>
           </div>
         )}
 
