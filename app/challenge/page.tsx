@@ -123,10 +123,14 @@ export default function ChallengePage() {
 
   useEffect(() => () => cleanup(), []);
 
-  function cleanup() {
-    broadcastRef.current?.unsubscribe();
+  function stopSearchSync() {
     dbListenerRef.current?.unsubscribe();
     if (pollRef.current) clearInterval(pollRef.current);
+  }
+
+  function cleanup() {
+    broadcastRef.current?.unsubscribe();
+    stopSearchSync();
     matchedRef.current = false;
   }
 
@@ -134,7 +138,7 @@ export default function ChallengePage() {
   useEffect(() => {
     if (stage !== "searching" || !isChallenger) return;
     if (searchTimer <= 0) {
-      cleanup();
+      stopSearchSync();
       setIsBot(true);
       setOppName(BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)]);
       setGameCountdown(3);
@@ -188,7 +192,7 @@ export default function ChallengePage() {
   async function onOpponentJoined(opponentId: string) {
     if (matchedRef.current) return;
     matchedRef.current = true;
-    cleanup();
+    stopSearchSync();
     setIsBot(false);
     const name = await getName(opponentId);
     setOppName(name);
@@ -547,39 +551,27 @@ export default function ChallengePage() {
           <header className="shrink-0 bg-card border-b border-border">
             <div className="flex items-stretch divide-x divide-x-reverse divide-border">
               {/* Opponent */}
-              <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 flex-1 min-w-0">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 shrink-0 rounded-xl flex items-center justify-center font-black text-xs bg-orange-500/10 border border-orange-500/20 text-orange-500">
-                  {oppName.charAt(0) || "؟"}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[9px] sm:text-[10px] font-bold text-text-muted truncate max-w-[60px] sm:max-w-none">{oppName} {isBot ? "🤖" : "👤"}</div>
-                  <div className="text-lg sm:text-2xl font-black text-orange-500 leading-none">{oppScore}</div>
-                </div>
+              <div className="flex flex-col justify-center px-3 sm:px-6 py-2 sm:py-3 flex-1 min-w-0">
+                <div className="text-[11px] sm:text-xs font-bold text-text-muted truncate">{oppName} {isBot ? "🤖" : "👤"}</div>
+                <div className="text-xl sm:text-3xl font-black text-orange-500 leading-none mt-0.5">{oppScore}</div>
               </div>
 
               {/* Center */}
-              <div className="shrink-0 flex flex-col items-center justify-center px-2 sm:px-4 py-1.5 sm:py-2 gap-0.5">
-                <div className="text-[9px] sm:text-[10px] font-bold text-text-muted">س {currentQ + 1}/{questions.length}</div>
-                <div key={qTimer} className="text-2xl sm:text-3xl font-black leading-none" style={{ color: timerColor }}>{qTimer}</div>
-                <div className="flex gap-0.5 mt-0.5">
-                  {questions.map((_, i) => (
-                    <div key={i} className="h-1 w-1.5 sm:w-3 rounded-full"
-                      style={{ background: i < currentQ ? "var(--primary)" : i === currentQ ? timerColor : "var(--border)" }} />
-                  ))}
-                </div>
+              <div className="shrink-0 flex flex-col items-center justify-center px-4 sm:px-8 py-2 min-w-[80px] sm:min-w-[120px]">
+                <div className="text-[10px] sm:text-xs font-bold text-text-muted mb-1">س {currentQ + 1} / {questions.length}</div>
+                <div key={qTimer} className="text-2xl sm:text-4xl font-black leading-none" style={{ color: timerColor }}>{qTimer}</div>
               </div>
 
               {/* Me + Exit */}
-              <div className="flex items-center gap-1.5 sm:gap-3 px-2 sm:px-4 py-2 sm:py-3 flex-1 min-w-0 justify-end">
-                <div className="text-right min-w-0">
-                  <div className="text-[9px] sm:text-[10px] font-bold text-text-muted">نقاطك</div>
-                  <div className="text-lg sm:text-2xl font-black text-primary leading-none">{myScore}</div>
-                </div>
-                <div className="hidden sm:flex w-9 h-9 shrink-0 rounded-xl items-center justify-center font-black text-xs bg-primary/10 border border-primary/20 text-primary">أنت</div>
+              <div className="flex items-center gap-2 sm:gap-4 px-3 sm:px-6 py-2 sm:py-3 flex-1 min-w-0 justify-between flex-row-reverse">
                 <button onClick={tryExit}
-                  className="w-7 h-7 sm:w-8 sm:h-8 shrink-0 rounded-lg sm:rounded-xl flex items-center justify-center border border-border text-text-muted/40 hover:text-red-500 hover:border-red-500/30 transition-all">
-                  <IconX size={13} />
+                  className="w-7 h-7 sm:w-10 sm:h-10 shrink-0 rounded-lg sm:rounded-xl flex items-center justify-center border border-border text-text-muted/40 hover:text-red-500 hover:border-red-500/30 transition-all bg-background">
+                  <IconX size={14} className="sm:w-5 sm:h-5" />
                 </button>
+                <div className="flex flex-col justify-center items-end min-w-0 text-left">
+                  <div className="text-[11px] sm:text-xs font-bold text-text-muted">نقاطك أنت</div>
+                  <div className="text-xl sm:text-3xl font-black text-primary leading-none mt-0.5">{myScore}</div>
+                </div>
               </div>
             </div>
           </header>
