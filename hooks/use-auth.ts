@@ -17,6 +17,7 @@ export type AuthProfile = {
 };
 
 const PROFILE_CACHE_KEY = "tkhsas-profile-cache";
+const USER_CACHE_KEY = "tkhsas-user-cache";
 
 function getCachedProfile(): AuthProfile | null {
   try {
@@ -32,14 +33,35 @@ function setCachedProfile(p: AuthProfile | null) {
   } catch {}
 }
 
+function getCachedUser(): AuthUser | null {
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function setCachedUser(u: AuthUser | null) {
+  try {
+    if (u) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(u));
+    else localStorage.removeItem(USER_CACHE_KEY);
+  } catch {}
+}
+
 export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  // Read from localStorage cache immediately — eliminates the "طالب جديد" flash
+  const [user, setUser] = useState<AuthUser | null>(() => {
+    if (typeof window === "undefined") return null;
+    return getCachedUser();
+  });
+  // Read from localStorage cache immediately
   const [profile, setProfile] = useState<AuthProfile | null>(() => {
     if (typeof window === "undefined") return null;
     return getCachedProfile();
   });
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    // If we have a cached user, we can skip the initial loading spinner
+    return !getCachedUser();
+  });
   // Tracks the userId we initialized for — prevents re-fetch on token refresh
   const currentUserIdRef = useRef<string | null>(null);
 
@@ -101,7 +123,9 @@ let globalProfileFetchUserId: string | null = null;
 
         if (session?.user) {
           currentUserIdRef.current = session.user.id;
-          setUser({ id: session.user.id, email: session.user.email || "" });
+          const userObj = { id: session.user.id, email: session.user.email || "" };
+          setUser(userObj);
+          setCachedUser(userObj);
 
           // Fetch fresh profile from server
           const profileData = await fetchProfile(session.user.id);
@@ -128,6 +152,7 @@ let globalProfileFetchUserId: string | null = null;
         } else {
           currentUserIdRef.current = null;
           setCachedProfile(null);
+          setCachedUser(null);
           setUser(null);
           setProfile(null);
         }
@@ -135,11 +160,12 @@ let globalProfileFetchUserId: string | null = null;
         console.error("Auth init error:", err);
         if (typeof navigator !== "undefined" && !navigator.onLine) {
            console.warn("Offline: keeping cached session alive");
-           const cached = getCachedProfile();
-           if (cached) {
-              setUser({ id: cached.id, email: "" });
-              setProfile(cached);
-              currentUserIdRef.current = cached.id;
+           const cachedProfile = getCachedProfile();
+           const cachedUser = getCachedUser();
+           if (cachedProfile && cachedUser) {
+              setUser(cachedUser);
+              setProfile(cachedProfile);
+              currentUserIdRef.current = cachedUser.id;
            }
         }
       } finally {
@@ -168,6 +194,7 @@ let globalProfileFetchUserId: string | null = null;
         }
         currentUserIdRef.current = null;
         setCachedProfile(null);
+        setCachedUser(null);
         setUser(null);
         setProfile(null);
         setIsLoading(false);
@@ -176,7 +203,9 @@ let globalProfileFetchUserId: string | null = null;
 
       // Genuinely new user signed in
       currentUserIdRef.current = newUserId;
-      setUser({ id: session.user.id, email: session.user.email || "" });
+      const userObj = { id: session.user.id, email: session.user.email || "" };
+      setUser(userObj);
+      setCachedUser(userObj);
 
       const profileData = await fetchProfile(session.user.id);
       if (mounted) {
@@ -208,6 +237,7 @@ let globalProfileFetchUserId: string | null = null;
     const supabase = createClient();
     await supabase.auth.signOut();
     setCachedProfile(null);
+    setCachedUser(null);
     setUser(null);
     setProfile(null);
     if (typeof window !== "undefined") {
@@ -215,6 +245,7 @@ let globalProfileFetchUserId: string | null = null;
       localStorage.removeItem("flow-user-role");
       localStorage.removeItem("nokhba-platform-storage-v4");
       localStorage.removeItem("tkhsas-profile-cache");
+      localStorage.removeItem("tkhsas-user-cache");
       localStorage.removeItem("active_course_id");
       localStorage.removeItem("tkhsas-active-exam");
       localStorage.removeItem("flow-redirect-after-login");
