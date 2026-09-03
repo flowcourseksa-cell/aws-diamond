@@ -43,6 +43,7 @@ export default function ExamBuilderPage() {
   const [hierarchy, setHierarchy] = useState<DbTrack[]>([]); // To get the micro-skills
 
   const [questions, setQuestions] = useState<QuestionState[]>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -150,6 +151,52 @@ export default function ExamBuilderPage() {
       }
     }
     setQuestions(prev => prev.filter((_, i) => i !== index));
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      next.delete(index);
+      return next;
+    });
+  }
+
+  async function handleBulkRemove() {
+    if (selectedQuestions.size === 0) return;
+    
+    const selectedArray = Array.from(selectedQuestions);
+    const savedQuestionsToDelete = selectedArray
+      .filter(index => questions[index]?.id)
+      .map(index => questions[index].id as string);
+    
+    if (savedQuestionsToDelete.length > 0) {
+      if (!confirm(`هل أنت متأكد من حذف ${savedQuestionsToDelete.length} سؤال من قاعدة البيانات بشكل نهائي؟`)) {
+        return;
+      }
+      setIsSaving(true);
+      for (const id of savedQuestionsToDelete) {
+        await deleteQuestion(id);
+      }
+      setIsSaving(false);
+    }
+    
+    setQuestions(prev => prev.filter((_, i) => !selectedQuestions.has(i)));
+    setSelectedQuestions(new Set());
+  }
+
+  function toggleSelection(index: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedQuestions.size === questions.length) {
+      setSelectedQuestions(new Set());
+    } else {
+      setSelectedQuestions(new Set(questions.map((_, i) => i)));
+    }
   }
 
   function updateQuestion(index: number, updates: Partial<QuestionState>) {
@@ -510,11 +557,11 @@ export default function ExamBuilderPage() {
                 <IconDownload size={18} /> تحميل القالب
               </button>
               
-              {/* ZIP upload for images */}
+              {/* Multiple Images upload */}
               <div className="relative flex-1">
-                <input type="file" accept=".zip" onChange={handleZipSelect} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                <div className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold border transition-colors text-xs ${zipFileName ? "bg-amber-500/10 border-amber-500/40 text-amber-700" : "border-border bg-bg text-text-muted hover:border-amber-400"}`}>
-                  <IconPhoto size={16} /> {zipFileName ? zipFileName.slice(0, 12) + "…" : "ZIP الصور"}
+                <input type="file" multiple accept="image/*" onChange={handleImagesSelect} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                <div className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold border transition-colors text-xs ${selectedImagesCount > 0 ? "bg-amber-500/10 border-amber-500/40 text-amber-700" : "border-border bg-bg text-text-muted hover:border-amber-400"}`}>
+                  <IconPhoto size={16} /> {selectedImagesCount > 0 ? `${selectedImagesCount} صورة محددة` : "اختيار الصور"}
                 </div>
               </div>
 
@@ -537,6 +584,32 @@ export default function ExamBuilderPage() {
         </div>
       )}
 
+      {/* Bulk Action Bar */}
+      {questions.length > 0 && (
+        <div className="flex items-center justify-between bg-card border border-border rounded-xl p-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox" 
+              checked={selectedQuestions.size === questions.length && questions.length > 0}
+              onChange={toggleSelectAll}
+              className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+            />
+            <span className="text-sm font-bold text-text-muted">
+              تحديد الكل ({selectedQuestions.size} محدد)
+            </span>
+          </div>
+          {selectedQuestions.size > 0 && (
+            <button 
+              onClick={handleBulkRemove}
+              disabled={isSaving}
+              className="flex items-center gap-2 text-xs font-bold text-white bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+            >
+              <IconTrash size={14} /> حذف المحدد
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Questions List */}
       <div className="flex flex-col gap-4">
         {questions.map((q, qIndex) => (
@@ -548,6 +621,14 @@ export default function ExamBuilderPage() {
               onClick={() => updateQuestion(qIndex, { isExpanded: !q.isExpanded })}
             >
               <div className="flex items-center gap-3">
+                <div onClick={(e) => e.stopPropagation()}>
+                  <input 
+                    type="checkbox" 
+                    checked={selectedQuestions.has(qIndex)}
+                    onChange={(e) => toggleSelection(qIndex, e as any)}
+                    className="w-4 h-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                  />
+                </div>
                 <IconGripVertical size={16} className="text-border" />
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-black">
                   {qIndex + 1}
