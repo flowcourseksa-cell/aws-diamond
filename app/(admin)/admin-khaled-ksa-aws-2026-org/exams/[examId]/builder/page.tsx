@@ -217,6 +217,8 @@ export default function ExamBuilderPage() {
     if (file) { zipFileRef.current = file; setZipFileName(file.name); }
   };
 
+  const [uploadProgress, setUploadProgress] = useState<{ total: number; current: number } | null>(null);
+
   const parseExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!exam || !importMicroSkillId) return;
     const file = e.target.files?.[0];
@@ -224,6 +226,7 @@ export default function ExamBuilderPage() {
 
     setImportLoading(true);
     setImportResult(null);
+    setUploadProgress(null);
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
@@ -245,9 +248,20 @@ export default function ExamBuilderPage() {
             let foundImagesCount = 0;
             let successUploadCount = 0;
 
+            // First pass to count total images
             zip.forEach((relativePath, zipEntry) => {
               if (!zipEntry.dir && /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(relativePath)) {
                 foundImagesCount++;
+              }
+            });
+
+            if (foundImagesCount > 0) {
+              setUploadProgress({ total: foundImagesCount, current: 0 });
+            }
+
+            // Second pass to upload
+            zip.forEach((relativePath, zipEntry) => {
+              if (!zipEntry.dir && /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(relativePath)) {
                 const fileName = relativePath.split("/").pop() || relativePath;
                 const normalizedFileName = fileName.trim().toLowerCase(); // Case-insensitive matching
 
@@ -258,6 +272,8 @@ export default function ExamBuilderPage() {
                     if (url) {
                       imageMap.set(normalizedFileName, url);
                       successUploadCount++;
+                      // Update progress UI securely
+                      setUploadProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
                     } else {
                       console.error(`Failed to upload image from ZIP: ${fileName}`);
                     }
@@ -268,6 +284,7 @@ export default function ExamBuilderPage() {
             
             if (foundImagesCount > 0) {
               await Promise.all(uploadPromises);
+              setUploadProgress(null); // Clear progress when done
               if (successUploadCount === 0) {
                 alert("⚠️ تنبيه: تم العثور على صور في ملف ZIP لكن فشل رفعها جميعاً. تأكد أنك نفذت كود الـ SQL في Supabase لإنشاء مجلد الصور وإعطاء الصلاحيات.");
               } else if (successUploadCount < foundImagesCount) {
@@ -278,6 +295,7 @@ export default function ExamBuilderPage() {
             }
           } catch (zipErr) {
             console.error("ZIP parse error:", zipErr);
+            setUploadProgress(null);
             alert("خطأ في قراءة ملف ZIP، تأكد أن الملف سليم.");
           }
         }
@@ -450,7 +468,24 @@ export default function ExamBuilderPage() {
             </ol>
           </div>
 
+          {/* Upload Progress Bar */}
+          {uploadProgress && (
+            <div className="mb-5 p-4 rounded-xl border border-primary/20 bg-primary/5">
+              <div className="flex justify-between items-center mb-2 text-xs font-bold text-primary">
+                <span>جاري رفع الصور...</span>
+                <span>{uploadProgress.current} من {uploadProgress.total}</span>
+              </div>
+              <div className="h-2 w-full bg-border rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row gap-4">
+
             <div className="flex-1 space-y-2">
               <label className="text-xs font-black text-text-muted block">المهارة المرتبطة لجميع الأسئلة المستوردة <span className="text-red-500">*</span></label>
               <select 
