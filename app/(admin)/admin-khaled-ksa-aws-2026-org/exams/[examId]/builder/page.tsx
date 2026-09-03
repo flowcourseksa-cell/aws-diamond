@@ -255,13 +255,14 @@ export default function ExamBuilderPage() {
     }
   }
 
-  // Parse Excel + optional ZIP file
-  const zipFileRef = useRef<File | null>(null);
-  const [zipFileName, setZipFileName] = useState("");
+  // Parse Excel + optional selected images
+  const imageFilesRef = useRef<File[]>([]);
+  const [selectedImagesCount, setSelectedImagesCount] = useState(0);
 
-  const handleZipSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) { zipFileRef.current = file; setZipFileName(file.name); }
+  const handleImagesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    imageFilesRef.current = files;
+    setSelectedImagesCount(files.length);
   };
 
   const [uploadProgress, setUploadProgress] = useState<{ total: number; current: number } | null>(null);
@@ -284,66 +285,37 @@ export default function ExamBuilderPage() {
         const ws = wb.Sheets[wsname];
         const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
-        // Extract images from ZIP if provided
+        // Upload images if provided directly
         const imageMap = new Map<string, string>(); // lowercase filename -> public URL
-        if (zipFileRef.current) {
-          try {
-            console.log("Loading ZIP file...");
-            const zip = await JSZip.loadAsync(zipFileRef.current);
-            const uploadPromises: Promise<void>[] = [];
+        const imagesToUpload = imageFilesRef.current;
+        
+        let successUploadCount = 0;
+
+        if (imagesToUpload.length > 0) {
+          setUploadProgress({ total: imagesToUpload.length, current: 0 });
+          
+          const uploadPromises = imagesToUpload.map(async (imgFile) => {
+            const fileName = imgFile.name;
+            // Normalize: lowercase, trim, and REMOVE extension (e.g. "q1.png" -> "q1")
+            const normalizedFileName = fileName.trim().toLowerCase().split('.').slice(0, -1).join('.') || fileName.trim().toLowerCase();
             
-            let foundImagesCount = 0;
-            let successUploadCount = 0;
-
-            // First pass to count total images
-            zip.forEach((relativePath, zipEntry) => {
-              if (!zipEntry.dir && /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(relativePath)) {
-                foundImagesCount++;
-              }
-            });
-
-            if (foundImagesCount > 0) {
-              setUploadProgress({ total: foundImagesCount, current: 0 });
-            }
-
-            // Second pass to upload
-            zip.forEach((relativePath, zipEntry) => {
-              if (!zipEntry.dir && /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(relativePath)) {
-                const fileName = relativePath.split("/").pop() || relativePath;
-                const normalizedFileName = fileName.trim().toLowerCase(); // Case-insensitive matching
-
-                uploadPromises.push(
-                  zipEntry.async("blob").then(async (blob) => {
-                    const imageFile = new File([blob], fileName, { type: blob.type || "image/png" });
-                    const url = await uploadImageToStorage(imageFile, fileName);
-                    if (url) {
-                      imageMap.set(normalizedFileName, url);
-                      successUploadCount++;
-                      // Update progress UI securely
-                      setUploadProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
-                    } else {
-                      console.error(`Failed to upload image from ZIP: ${fileName}`);
-                    }
-                  }).catch(e => console.error("Error reading blob from ZIP:", e))
-                );
-              }
-            });
-            
-            if (foundImagesCount > 0) {
-              await Promise.all(uploadPromises);
-              setUploadProgress(null); // Clear progress when done
-              if (successUploadCount === 0) {
-                alert("⚠️ تنبيه: تم العثور على صور في ملف ZIP لكن فشل رفعها جميعاً. تأكد أنك نفذت كود الـ SQL في Supabase لإنشاء مجلد الصور وإعطاء الصلاحيات.");
-              } else if (successUploadCount < foundImagesCount) {
-                alert(`⚠️ تم رفع ${successUploadCount} صورة فقط من أصل ${foundImagesCount}.`);
-              }
+            const url = await uploadImageToStorage(imgFile, fileName);
+            if (url) {
+              imageMap.set(normalizedFileName, url);
+              // Also map the full name just in case
+              imageMap.set(fileName.trim().toLowerCase(), url);
+              successUploadCount++;
+              setUploadProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
             } else {
-              alert("⚠️ لم يتم العثور على أي صور مدعومة داخل ملف الـ ZIP المرفق.");
+              console.error(`Failed to upload image: ${fileName}`);
             }
-          } catch (zipErr) {
-            console.error("ZIP parse error:", zipErr);
-            setUploadProgress(null);
-            alert("خطأ في قراءة ملف ZIP، تأكد أن الملف سليم.");
+          });
+
+          await Promise.all(uploadPromises);
+          setUploadProgress(null);
+
+          if (successUploadCount === 0) {
+            alert("⚠️ تنبيه: فشل رفع جميع الصور. تأكد أنك نفذت كود الـ SQL في Supabase لإنشاء مجلد الصور وإعطاء الصلاحيات.");
           }
         }
 
