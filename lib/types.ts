@@ -71,6 +71,7 @@ export type ExamQuestion = {
   questionText: string;
   options: string[];
   explanation: string;
+  imageUrl?: string | null;
 };
 
 export type LibraryFileType = "pdf" | "video" | "image" | "summary";

@@ -645,6 +645,16 @@ export default function FinalExamPage() {
           <div className="w-full max-w-3xl flex-1 flex flex-col">
             {/* Question Box */}
             <div className="bg-card rounded-3xl p-6 md:p-8 border border-border shadow-sm mb-6">
+              {/* Question Image (if any) */}
+              {q.image_url && (
+                <div className="mb-5 rounded-2xl overflow-hidden border border-border bg-bg flex items-center justify-center">
+                  <img
+                    src={q.image_url}
+                    alt="صورة السؤال"
+                    className="max-h-72 w-full object-contain"
+                  />
+                </div>
+              )}
               <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black shrink-0">
                   {currentQ + 1}

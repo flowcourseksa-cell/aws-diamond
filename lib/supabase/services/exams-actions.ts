@@ -76,6 +76,7 @@ export async function saveQuestionWithOptions(
         text: question.text,
         explanation: question.explanation,
         difficulty: question.difficulty,
+        image_url: question.image_url ?? null,
       })
       .eq("id", questionId);
     if (qError) { console.error("Error updating question:", qError.message); return false; }
@@ -90,7 +91,8 @@ export async function saveQuestionWithOptions(
         text: question.text,
         explanation: question.explanation,
         difficulty: question.difficulty || 'medium',
-        order_index: question.order_index || 0
+        order_index: question.order_index || 0,
+        image_url: question.image_url ?? null,
       }])
       .select()
       .single();
@@ -129,6 +131,7 @@ export async function bulkSaveExamQuestions(
   questions: {
     text: string;
     difficulty: string;
+    image_url?: string | null;
     options: { text: string; is_correct: boolean }[];
   }[]
 ): Promise<{ success: number; failed: number }> {
@@ -157,7 +160,8 @@ export async function bulkSaveExamQuestions(
           text: q.text,
           explanation: null,
           difficulty: q.difficulty,
-          order_index: nextIndex++
+          order_index: nextIndex++,
+          image_url: q.image_url ?? null,
         }])
         .select()
         .single();

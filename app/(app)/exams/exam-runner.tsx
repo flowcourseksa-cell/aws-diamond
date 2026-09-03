@@ -419,6 +419,16 @@ export function ExamRunner({
 
           {/* Question Card */}
           <div key={currentQ} className="animate-in slide-in-from-right-8 fade-in duration-500">
+            {/* Question Image (if any) */}
+            {(question as any).imageUrl && (
+              <div className="mb-6 rounded-2xl overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center">
+                <img
+                  src={(question as any).imageUrl}
+                  alt="صورة السؤال"
+                  className="max-h-72 w-full object-contain"
+                />
+              </div>
+            )}
             <div className="mb-10 text-[26px] sm:text-[32px] font-black text-text leading-tight sm:leading-snug drop-shadow-sm">
               {question.questionText}
             </div>

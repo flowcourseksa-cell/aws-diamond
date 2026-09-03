@@ -48,6 +48,7 @@ export type FinalExamQuestion = {
   explanation: string | null;
   difficulty: "easy" | "medium" | "hard";
   order_index: number;
+  image_url?: string | null;
   options: FinalExamOption[];
   
   // Simulator specific fields

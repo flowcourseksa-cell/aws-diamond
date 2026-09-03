@@ -297,7 +297,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 explanation: q.explanation,
                 skillId: q.micro_skill_id,
                 skillName: q.micro_skills?.name || "مهارة",
-                optionIds: options.map((opt: any) => opt.id)
+                optionIds: options.map((opt: any) => opt.id),
+                imageUrl: q.image_url || null,
               };
             });
 

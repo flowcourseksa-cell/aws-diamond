@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   IconArrowRight, IconPlus, IconTrash, IconCheck,
   IconGripVertical, IconAlertCircle, IconDeviceFloppy,
-  IconFileSpreadsheet, IconDownload, IconUpload, IconX
+  IconFileSpreadsheet, IconDownload, IconUpload, IconX,
+  IconPhoto, IconLoader2
 } from "@tabler/icons-react";
 import * as XLSX from "xlsx";
+import JSZip from "jszip";
 
 import { fetchExamBuilderData, saveQuestionWithOptions, deleteQuestion, type ExamWithDetails, type DbQuestion, type DbQuestionOption } from "@/lib/supabase/services/exams";
 import { bulkSaveExamQuestions } from "@/lib/supabase/services/exams-actions";
@@ -24,6 +26,7 @@ type QuestionState = {
   explanation: string;
   difficulty: "easy" | "medium" | "hard";
   order_index: number;
+  image_url?: string | null;
   options: OptionState[];
   isExpanded: boolean;
 };
@@ -175,13 +178,40 @@ export default function ExamBuilderPage() {
         "الخيار ب": "جدة",
         "الخيار ج": "مكة",
         "الخيار د": "الدمام",
-        "الصعوبة (easy/medium/hard)": "easy"
+        "الصعوبة (easy/medium/hard)": "easy",
+        "اسم الصورة (اختياري)": "سؤال1.png"
       }
     ];
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "الأسئلة");
     XLSX.writeFile(wb, "قالب_أسئلة_الاختبار.xlsx");
+  };
+
+  // Upload a single image to Supabase Storage and return its public URL
+  async function uploadImageToStorage(file: File, fileName: string): Promise<string | null> {
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const ext = fileName.split(".").pop() || "png";
+      const path = `exam-questions/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("question-images").upload(path, file, { upsert: true });
+      if (error) { console.error("Image upload error:", error.message); return null; }
+      const { data: urlData } = supabase.storage.from("question-images").getPublicUrl(path);
+      return urlData?.publicUrl || null;
+    } catch (e) {
+      console.error("uploadImageToStorage error:", e);
+      return null;
+    }
+  }
+
+  // Parse Excel + optional ZIP file
+  const zipFileRef = useRef<File | null>(null);
+  const [zipFileName, setZipFileName] = useState("");
+
+  const handleZipSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) { zipFileRef.current = file; setZipFileName(file.name); }
   };
 
   const parseExcelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -201,8 +231,32 @@ export default function ExamBuilderPage() {
         const ws = wb.Sheets[wsname];
         const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
+        // Extract images from ZIP if provided
+        const imageMap = new Map<string, string>(); // filename -> public URL
+        if (zipFileRef.current) {
+          try {
+            const zip = await JSZip.loadAsync(zipFileRef.current);
+            const uploadPromises: Promise<void>[] = [];
+            zip.forEach((relativePath, zipEntry) => {
+              if (!zipEntry.dir && /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(relativePath)) {
+                const fileName = relativePath.split("/").pop() || relativePath;
+                uploadPromises.push(
+                  zipEntry.async("blob").then(async (blob) => {
+                    const imageFile = new File([blob], fileName, { type: blob.type || "image/png" });
+                    const url = await uploadImageToStorage(imageFile, fileName);
+                    if (url) imageMap.set(fileName, url);
+                  })
+                );
+              }
+            });
+            await Promise.all(uploadPromises);
+          } catch (zipErr) {
+            console.error("ZIP parse error:", zipErr);
+            alert("خطأ في قراءة ملف ZIP، تأكد أن الملف صحيح.");
+          }
+        }
+
         const toImport = rawData.map(row => {
-          // Shuffle options, keeping track of which one is correct (the first one initially)
           let opts = [
             { text: String(row["الخيار أ (صحيح)"] || ""), is_correct: true },
             { text: String(row["الخيار ب"] || ""), is_correct: false },
@@ -210,11 +264,15 @@ export default function ExamBuilderPage() {
             { text: String(row["الخيار د"] || ""), is_correct: false },
           ];
           opts = opts.filter(o => o.text.trim().length > 0);
-          opts.sort(() => Math.random() - 0.5); // Randomize positions
+          opts.sort(() => Math.random() - 0.5);
+
+          const imageName = String(row["اسم الصورة (اختياري)"] || "").trim();
+          const image_url = imageName ? (imageMap.get(imageName) || null) : null;
 
           return {
             text: String(row["نص السؤال"] || ""),
             difficulty: String(row["الصعوبة (easy/medium/hard)"] || "medium"),
+            image_url,
             options: opts
           };
         }).filter(q => q.text.trim().length > 0 && q.options.length >= 2);
@@ -222,10 +280,7 @@ export default function ExamBuilderPage() {
         if (toImport.length > 0) {
           const res = await bulkSaveExamQuestions(exam.id, importMicroSkillId, toImport);
           setImportResult(res);
-          // Reload the page to fetch the new questions correctly with their IDs
-          if (res.success > 0) {
-            window.location.reload();
-          }
+          if (res.success > 0) window.location.reload();
         } else {
           alert("الملف فارغ أو لا يطابق القالب.");
         }
@@ -238,6 +293,16 @@ export default function ExamBuilderPage() {
     };
     reader.readAsBinaryString(file);
   };
+
+  // Upload image for a single question manually
+  async function handleQuestionImageUpload(index: number, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    updateQuestion(index, { image_url: "__uploading__" });
+    const url = await uploadImageToStorage(file, file.name);
+    updateQuestion(index, { image_url: url || null });
+    if (e.target) e.target.value = "";
+  }
 
   async function handleSaveAll() {
     setIsSaving(true);
@@ -260,6 +325,7 @@ export default function ExamBuilderPage() {
           explanation: q.explanation,
           difficulty: q.difficulty,
           order_index: i,
+          image_url: q.image_url === "__uploading__" ? null : (q.image_url ?? null),
         };
         const oPayload: Partial<DbQuestionOption>[] = q.options.map(o => ({
           text: o.text,
@@ -349,7 +415,8 @@ export default function ExamBuilderPage() {
               <li>قم بتعبئة الأسئلة، وضع <b>الإجابة الصحيحة دائماً في (الخيار أ)</b>.</li>
               <li>النظام سيقوم <b>بخلط ترتيب الإجابات عشوائياً</b> لكل سؤال عند رفعه.</li>
               <li>اختر <b>المهارة (Micro-Skill)</b> التي ترغب بربط جميع الأسئلة المستوردة بها.</li>
-              <li>ارفع الملف وسيتم حفظ الأسئلة فوراً.</li>
+              <li className="text-emerald-700 font-bold">🖼️ للأسئلة التي تحتوي صور: ضع أسماء الصور في عمود "اسم الصورة (اختياري)"، ثم اضغط "رفع ملف ZIP الصور" أولاً.</li>
+              <li>ارفع ملف Excel وسيتم حفظ الأسئلة فوراً.</li>
             </ol>
           </div>
 
@@ -378,6 +445,14 @@ export default function ExamBuilderPage() {
                 <IconDownload size={18} /> تحميل القالب
               </button>
               
+              {/* ZIP upload for images */}
+              <div className="relative flex-1">
+                <input type="file" accept=".zip" onChange={handleZipSelect} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                <div className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold border transition-colors text-xs ${zipFileName ? "bg-amber-500/10 border-amber-500/40 text-amber-700" : "border-border bg-bg text-text-muted hover:border-amber-400"}`}>
+                  <IconPhoto size={16} /> {zipFileName ? zipFileName.slice(0, 12) + "…" : "ZIP الصور"}
+                </div>
+              </div>
+
               <div className="relative flex-1">
                 <input
                   type="file"
@@ -389,7 +464,7 @@ export default function ExamBuilderPage() {
                 <div className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold transition-colors ${
                   !importMicroSkillId ? "bg-bg text-text-muted border border-border opacity-50" : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-500/20"
                 }`}>
-                  {importLoading ? <span className="animate-pulse">جاري الاستيراد...</span> : <><IconUpload size={18} /> رفع الملف</>}
+                  {importLoading ? <span className="animate-pulse">جاري الاستيراد...</span> : <><IconUpload size={18} /> رفع Excel</>}
                 </div>
               </div>
             </div>
@@ -476,6 +551,41 @@ export default function ExamBuilderPage() {
                       placeholder="اكتب نص السؤال هنا..."
                       className="w-full rounded-xl border border-border bg-bg px-4 py-3 text-sm font-bold outline-none focus:border-primary min-h-[80px] resize-y"
                     />
+                  </div>
+
+                  {/* Question Image (optional) */}
+                  <div>
+                    <label className="text-xs font-black text-text-muted mb-1.5 block flex items-center gap-1.5">
+                      <IconPhoto size={14} /> صورة السؤال (اختياري)
+                    </label>
+                    {q.image_url && q.image_url !== "__uploading__" ? (
+                      <div className="relative inline-block">
+                        <img src={q.image_url} alt="صورة السؤال" className="max-h-40 rounded-xl border border-border object-contain" />
+                        <button
+                          type="button"
+                          onClick={() => updateQuestion(qIndex, { image_url: null })}
+                          className="absolute -top-2 -left-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 shadow"
+                        >
+                          <IconX size={12} />
+                        </button>
+                      </div>
+                    ) : q.image_url === "__uploading__" ? (
+                      <div className="flex items-center gap-2 text-sm text-text-muted">
+                        <IconLoader2 size={16} className="animate-spin" /> جاري رفع الصورة...
+                      </div>
+                    ) : (
+                      <label className="flex items-center gap-2 cursor-pointer w-fit">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleQuestionImageUpload(qIndex, e)}
+                        />
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-dashed border-border bg-bg text-text-muted hover:border-primary hover:text-primary transition-colors text-sm font-bold">
+                          <IconUpload size={16} /> رفع صورة للسؤال
+                        </div>
+                      </label>
+                    )}
                   </div>
 
                   {/* Options */}

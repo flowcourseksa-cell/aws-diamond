@@ -27,6 +27,7 @@ export type DbQuestion = {
   explanation: string | null;
   difficulty: "easy" | "medium" | "hard";
   order_index: number;
+  image_url: string | null;
   created_at: string;
 };
 
