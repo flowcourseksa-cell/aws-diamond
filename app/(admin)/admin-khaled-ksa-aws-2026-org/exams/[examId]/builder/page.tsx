@@ -60,8 +60,10 @@ export default function ExamBuilderPage() {
       if (data) {
         setExam(data);
         
-        // Map DB questions to our UI state
-        const loadedQuestions: QuestionState[] = data.questions.map((q, i) => ({
+        // Map DB questions to our UI state and sort them by order_index
+        const loadedQuestions: QuestionState[] = data.questions
+          .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+          .map((q, i) => ({
           id: q.id,
           exam_id: q.exam_id,
           micro_skill_id: q.micro_skill_id,
@@ -69,6 +71,7 @@ export default function ExamBuilderPage() {
           explanation: q.explanation || "",
           difficulty: q.difficulty,
           order_index: q.order_index,
+          image_url: q.image_url || null,
           isExpanded: false, // Collapse by default
           options: q.options.map(o => ({
             id: o.id,
@@ -232,27 +235,50 @@ export default function ExamBuilderPage() {
         const rawData = XLSX.utils.sheet_to_json<any>(ws);
 
         // Extract images from ZIP if provided
-        const imageMap = new Map<string, string>(); // filename -> public URL
+        const imageMap = new Map<string, string>(); // lowercase filename -> public URL
         if (zipFileRef.current) {
           try {
+            console.log("Loading ZIP file...");
             const zip = await JSZip.loadAsync(zipFileRef.current);
             const uploadPromises: Promise<void>[] = [];
+            
+            let foundImagesCount = 0;
+            let successUploadCount = 0;
+
             zip.forEach((relativePath, zipEntry) => {
               if (!zipEntry.dir && /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(relativePath)) {
+                foundImagesCount++;
                 const fileName = relativePath.split("/").pop() || relativePath;
+                const normalizedFileName = fileName.trim().toLowerCase(); // Case-insensitive matching
+
                 uploadPromises.push(
                   zipEntry.async("blob").then(async (blob) => {
                     const imageFile = new File([blob], fileName, { type: blob.type || "image/png" });
                     const url = await uploadImageToStorage(imageFile, fileName);
-                    if (url) imageMap.set(fileName, url);
-                  })
+                    if (url) {
+                      imageMap.set(normalizedFileName, url);
+                      successUploadCount++;
+                    } else {
+                      console.error(`Failed to upload image from ZIP: ${fileName}`);
+                    }
+                  }).catch(e => console.error("Error reading blob from ZIP:", e))
                 );
               }
             });
-            await Promise.all(uploadPromises);
+            
+            if (foundImagesCount > 0) {
+              await Promise.all(uploadPromises);
+              if (successUploadCount === 0) {
+                alert("⚠️ تنبيه: تم العثور على صور في ملف ZIP لكن فشل رفعها جميعاً. تأكد أنك نفذت كود الـ SQL في Supabase لإنشاء مجلد الصور وإعطاء الصلاحيات.");
+              } else if (successUploadCount < foundImagesCount) {
+                alert(`⚠️ تم رفع ${successUploadCount} صورة فقط من أصل ${foundImagesCount}.`);
+              }
+            } else {
+              alert("⚠️ لم يتم العثور على أي صور مدعومة داخل ملف الـ ZIP المرفق.");
+            }
           } catch (zipErr) {
             console.error("ZIP parse error:", zipErr);
-            alert("خطأ في قراءة ملف ZIP، تأكد أن الملف صحيح.");
+            alert("خطأ في قراءة ملف ZIP، تأكد أن الملف سليم.");
           }
         }
 
@@ -266,8 +292,9 @@ export default function ExamBuilderPage() {
           opts = opts.filter(o => o.text.trim().length > 0);
           opts.sort(() => Math.random() - 0.5);
 
-          const imageName = String(row["اسم الصورة (اختياري)"] || "").trim();
-          const image_url = imageName ? (imageMap.get(imageName) || null) : null;
+          const rawImageName = String(row["اسم الصورة (اختياري)"] || "").trim();
+          const normalizedImageName = rawImageName.split("/").pop()?.toLowerCase() || rawImageName.toLowerCase();
+          const image_url = normalizedImageName ? (imageMap.get(normalizedImageName) || null) : null;
 
           return {
             text: String(row["نص السؤال"] || ""),
@@ -280,7 +307,10 @@ export default function ExamBuilderPage() {
         if (toImport.length > 0) {
           const res = await bulkSaveExamQuestions(exam.id, importMicroSkillId, toImport);
           setImportResult(res);
-          if (res.success > 0) window.location.reload();
+          if (res.success > 0) {
+            alert(`✅ تم استيراد ${res.success} سؤال بنجاح! تم ربط ${imageMap.size} صورة.`);
+            window.location.reload();
+          }
         } else {
           alert("الملف فارغ أو لا يطابق القالب.");
         }
