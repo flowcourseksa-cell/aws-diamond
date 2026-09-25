@@ -555,7 +555,7 @@ export default function LoginPage() {
               />
               تذكرني
             </label>
-            {!isRegistering && (
+            {!isRegistering && !registrationClosed && (
               <a href="/forgot-password" className="font-semibold text-primary transition-colors duration-200 hover:text-primary-dark">
                 نسيت كلمة المرور؟
               </a>
@@ -574,6 +574,9 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* في وضع «الإضافة عبر المدير فقط» لا يظهر جوجل ولا التسجيل ولا استعادة كلمة المرور */}
+        {!registrationClosed && (
+          <>
         <div className="my-5 flex items-center gap-3 text-[12.5px] font-semibold text-text-muted">
           <span className="h-px flex-1 bg-border" />
           {isRegistering ? "أو التسجيل بواسطة" : "أو الدخول بواسطة"}
@@ -597,12 +600,14 @@ export default function LoginPage() {
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
             </svg>
           )}
-          {googleLoading ? "جاري التحويل لجوجل..." : registrationClosed ? "الدخول بحساب Google" : "المتابعة بحساب Google"}
+          {googleLoading ? "جاري التحويل لجوجل..." : "المتابعة بحساب Google"}
         </button>
+          </>
+        )}
 
         {registrationClosed ? (
           <p className="mt-7 rounded-[10px] border border-border bg-bg px-4 py-3 text-center text-[12.5px] leading-relaxed text-text-muted">
-            إنشاء الحسابات الجديدة يتم عبر إدارة المنصة. الحسابات الحالية تدخل كالمعتاد (البريد وكلمة المرور أو Google).
+            إنشاء الحسابات وكلمات المرور يتم عبر إدارة المنصة. إن لم يكن لديك حساب أو نسيت كلمة مرورك فتواصل مع الإدارة.
           </p>
         ) : (
           <div className="mt-7 text-center">
