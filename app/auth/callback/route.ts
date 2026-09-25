@@ -17,6 +17,12 @@ export async function GET(request: NextRequest) {
   const next = searchParams.get("next") ?? "/";
 
   if (!code) {
+    // عندما يكون التسجيل الذاتي مغلقاً ترفض قاعدة البيانات إنشاء المستخدم الجديد (supabase/registration_mode.sql)
+    // ويعيد Supabase error_description في الرابط بدل code
+    const description = searchParams.get("error_description") || "";
+    if (/registration_closed|Database error saving new user/i.test(description)) {
+      return redirectTo("/login?error=registration_closed");
+    }
     return redirectTo("/login?error=no_code");
   }
 

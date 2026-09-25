@@ -4,11 +4,6 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
-  // 1. Skip Supabase auth checks completely for background prefetches to save DB hits
-  if (request.headers.get('x-middleware-prefetch') || request.headers.get('purpose') === 'prefetch') {
-    return response;
-  }
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

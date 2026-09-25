@@ -8,7 +8,9 @@ import {
   demoteModerator, 
   fetchModerators 
 } from "@/lib/supabase/services/admin-management";
-import { IconSearch, IconUserPlus, IconTrash, IconKey } from "@tabler/icons-react";
+import { IconSearch, IconUserPlus, IconTrash, IconKey, IconWorld, IconShieldLock, IconCheck } from "@tabler/icons-react";
+import { getRegistrationMode, setRegistrationAdminOnly } from "@/lib/supabase/services/registration-actions";
+import type { RegistrationMode } from "@/lib/registration-mode";
 
 export default function SettingsPage() {
   const [password, setPassword] = useState("");
@@ -20,6 +22,32 @@ export default function SettingsPage() {
   const [searchResult, setSearchResult] = useState<any>(null);
   const [searchMessage, setSearchMessage] = useState("");
   const [searching, setSearching] = useState(false);
+
+  // طريقة إنشاء الحسابات
+  const [regMode, setRegMode] = useState<RegistrationMode | null>(null);
+  const [savingRegMode, setSavingRegMode] = useState(false);
+
+  useEffect(() => {
+    getRegistrationMode()
+      .then(setRegMode)
+      .catch(() => setRegMode({ adminOnly: false, changedAt: null }));
+  }, []);
+
+  const handleRegistrationMode = async (adminOnly: boolean) => {
+    if (!regMode || regMode.adminOnly === adminOnly || savingRegMode) return;
+    if (
+      adminOnly &&
+      !confirm("سيُرفض إنشاء أي حساب جديد عبر التسجيل الذاتي أو Google. الحسابات الحالية تستمر بالعمل، وأي حساب جديد تنشئه أنت من صفحة الطلاب. هل تريد المتابعة؟")
+    ) return;
+    setSavingRegMode(true);
+    const res = await setRegistrationAdminOnly(adminOnly);
+    if (res.success) {
+      setRegMode(await getRegistrationMode());
+    } else {
+      alert(res.error || "فشل حفظ الإعداد");
+    }
+    setSavingRegMode(false);
+  };
 
   const [moderators, setModerators] = useState<any[]>([]);
   const [loadingMods, setLoadingMods] = useState(true);
@@ -108,6 +136,53 @@ export default function SettingsPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-black text-text tracking-tight">الإعدادات والصلاحيات</h1>
         <p className="text-text/60">إدارة حسابك الشخصي وصلاحيات المشرفين</p>
+      </div>
+
+      {/* طريقة إنشاء الحسابات */}
+      <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+            <IconShieldLock size={24} />
+          </div>
+          <h2 className="text-xl font-bold text-text">طريقة إنشاء الحسابات</h2>
+        </div>
+        <p className="text-sm text-text/60 mb-5">
+          تحدد كيف يحصل الطلاب على حساباتهم. الحسابات الموجودة لا تتأثر بالتبديل.
+        </p>
+        {regMode === null ? (
+          <div className="text-sm text-text-muted">جاري التحميل...</div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              disabled={savingRegMode}
+              onClick={() => handleRegistrationMode(false)}
+              className={`text-right rounded-xl border-2 p-4 transition-all disabled:opacity-60 ${!regMode.adminOnly ? "border-primary bg-primary/5" : "border-border bg-bg hover:border-primary/40"}`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="flex items-center gap-2 font-bold text-text"><IconWorld size={18} className="text-primary" /> التسجيل الذاتي مفتوح</span>
+                {!regMode.adminOnly && <IconCheck size={18} className="text-primary" />}
+              </div>
+              <p className="text-xs text-text/60 leading-relaxed">الطالب ينشئ حسابه بنفسه من صفحة الدخول عبر جوجل أو البريد الإلكتروني (الوضع الحالي).</p>
+            </button>
+            <button
+              type="button"
+              disabled={savingRegMode}
+              onClick={() => handleRegistrationMode(true)}
+              className={`text-right rounded-xl border-2 p-4 transition-all disabled:opacity-60 ${regMode.adminOnly ? "border-primary bg-primary/5" : "border-border bg-bg hover:border-primary/40"}`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="flex items-center gap-2 font-bold text-text"><IconShieldLock size={18} className="text-emerald-600" /> الإضافة عبر المدير فقط</span>
+                {regMode.adminOnly && <IconCheck size={18} className="text-primary" />}
+              </div>
+              <p className="text-xs text-text/60 leading-relaxed">يُرفض أي حساب جديد لا ينشئه المدير (حتى من لوحة Supabase). تنشئ الحسابات من صفحة الطلاب (زر «إضافة حساب طالب»). الحسابات الحالية تدخل كالمعتاد بالبريد أو Google.</p>
+            </button>
+          </div>
+        )}
+        {regMode?.changedAt && (
+          <p className="mt-3 text-xs text-text-muted">آخر تغيير: {new Date(regMode.changedAt).toLocaleString("ar-SA")}</p>
+        )}
+        {savingRegMode && <p className="mt-2 text-xs text-primary font-bold">جاري الحفظ...</p>}
       </div>
 
       {/* تغيير كلمة المرور */}

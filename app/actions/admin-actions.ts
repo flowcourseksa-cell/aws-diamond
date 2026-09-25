@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { revalidatePath } from "next/cache";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { sendPlatformNotification } from "@/lib/notifications/server-push";
 
@@ -18,59 +19,63 @@ async function verifyAdminAccess() {
 export async function createStudentByAdmin(data: {
   fullName: string;
   email: string;
-  password?: string;
+  password: string;
   phone?: string;
-}) {
-  await verifyAdminAccess();
-  
+  parentPhone?: string;
+}): Promise<{ success: boolean; error?: string; userId?: string }> {
+  try {
+    await verifyAdminAccess();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
   if (!supabaseUrl || !supabaseServiceKey) {
     return { success: false, error: "Missing Supabase configuration." };
   }
 
-  // Create an admin client bypassing RLS and avoiding local session updates
+  const fullName = (data.fullName || "").trim();
+  const email = (data.email || "").trim().toLowerCase();
+  const password = data.password || "";
+  if (fullName.length < 2) return { success: false, error: "أدخل اسم الطالب" };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { success: false, error: "البريد الإلكتروني غير صالح" };
+  if (password.length < 6) return { success: false, error: "كلمة المرور 6 أحرف على الأقل" };
+
+  // Admin client bypassing RLS and avoiding local session updates
   const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+    auth: { autoRefreshToken: false, persistSession: false },
   });
 
   try {
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: data.email,
-      password: data.password || "123456", // default simple password if none provided
+      email,
+      password,
       email_confirm: true,
-      user_metadata: {
-        full_name: data.fullName,
-      },
+      user_metadata: { full_name: fullName, name: fullName },
+      // يميّز الحسابات التي أنشأها المدير حتى تُقبل حين يكون التسجيل الذاتي مغلقاً (lib/registration-mode.ts)
+      app_metadata: { created_by: "admin" },
     });
 
     if (authError) {
       console.error("Error creating user:", authError.message);
-      return { success: false, error: authError.message };
+      const msg = /already|exists|registered/i.test(authError.message) ? "هذا البريد مسجّل بالفعل" : authError.message;
+      return { success: false, error: msg };
     }
+    if (!authData.user) return { success: false, error: "User creation failed." };
 
-    if (!authData.user) {
-      return { success: false, error: "User creation failed." };
-    }
+    // trigger on_auth_user_created ينشئ الملف الشخصي؛ نكمل بقية الحقول ونضمن وجوده
+    const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
+      id: authData.user.id,
+      full_name: fullName,
+      role: "student",
+      phone: data.phone?.trim() || null,
+      parent_phone: data.parentPhone?.trim() || null,
+    });
+    if (profileError) console.error("Error saving profile:", profileError.message);
 
-    // The trigger automatically inserts into profiles.
-    // If phone number is provided, update the profile.
-    if (data.phone) {
-      const { error: profileError } = await supabaseAdmin
-        .from("profiles")
-        .update({ phone: data.phone })
-        .eq("id", authData.user.id);
-        
-      if (profileError) {
-        console.error("Error updating phone:", profileError.message);
-      }
-    }
-
-    return { success: true };
+    revalidatePath("/admin-khaled-ksa-aws-2026-org/students");
+    return { success: true, userId: authData.user.id };
   } catch (err: any) {
     console.error("Server action error:", err);
     return { success: false, error: err.message || "Unknown error" };

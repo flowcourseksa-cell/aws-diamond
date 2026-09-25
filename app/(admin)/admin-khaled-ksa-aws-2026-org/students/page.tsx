@@ -5,8 +5,9 @@ import {
   IconUsers, IconSearch, IconFilter, IconChevronDown, IconChevronUp,
   IconBrandWhatsapp, IconChartPie, IconAlertTriangle, IconActivity,
   IconCheck, IconX, IconTrendingUp, IconKey, IconTrash,
-  IconEdit, IconLock, IconShieldLock, IconUserOff
+  IconEdit, IconLock, IconShieldLock, IconUserOff, IconUserPlus
 } from "@tabler/icons-react";
+import { createStudentByAdmin } from "@/app/actions/admin-actions";
 
 import { fetchStudents, enrollStudent, unenrollStudent, updateStudent, toggleStudentBan, updateStudentPassword, deleteStudentCompletely, type StudentWithDetails } from "@/lib/supabase/services/students";
 import { fetchCourses } from "@/lib/supabase/services/courses";
@@ -39,6 +40,50 @@ export default function AdminStudentsPage() {
 
   const [passwordStudent, setPasswordStudent] = useState<StudentWithDetails | null>(null);
   const [newPassword, setNewPassword] = useState("");
+
+  // إضافة حساب طالب من قِبل المدير
+  const emptyCreateForm = { fullName: "", email: "", password: "", phone: "", parentPhone: "" };
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState(emptyCreateForm);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+
+  function generatePassword() {
+    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+    let p = "";
+    for (let i = 0; i < 10; i++) p += chars[Math.floor(Math.random() * chars.length)];
+    setCreateForm(f => ({ ...f, password: p }));
+  }
+
+  async function handleCreateStudent() {
+    setCreateError("");
+    const saudiPhoneRegex = /^05[0-9]{8}$/;
+    if (createForm.fullName.trim().length < 2) return setCreateError("أدخل اسم الطالب");
+    if (!createForm.email.trim()) return setCreateError("أدخل البريد الإلكتروني");
+    if (createForm.password.length < 6) return setCreateError("كلمة المرور 6 أحرف على الأقل");
+    if (createForm.phone.trim() && !saudiPhoneRegex.test(createForm.phone.trim())) return setCreateError("رقم الطالب يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+    if (createForm.parentPhone.trim() && !saudiPhoneRegex.test(createForm.parentPhone.trim())) return setCreateError("رقم ولي الأمر يجب أن يبدأ بـ 05 ويتكون من 10 أرقام");
+    setCreating(true);
+    try {
+      const res = await createStudentByAdmin({
+        fullName: createForm.fullName,
+        email: createForm.email,
+        password: createForm.password,
+        phone: createForm.phone,
+        parentPhone: createForm.parentPhone,
+      });
+      if (!res.success) return setCreateError(res.error || "فشل إنشاء الحساب");
+      alert(`تم إنشاء الحساب.\nالبريد: ${createForm.email.trim()}\nكلمة المرور: ${createForm.password}\nأرسلهما للطالب.`);
+      setShowCreate(false);
+      setCreateForm(emptyCreateForm);
+      if (page === 1) loadStudents(1, search, filterCourse);
+      else setPage(1);
+    } catch (err: any) {
+      setCreateError(err?.message || "تعذّر الاتصال بالخادم. حاول مرة أخرى.");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   const loadStudents = async (p = page, s = search, c = filterCourse) => {
     setIsLoading(true);
@@ -196,6 +241,12 @@ export default function AdminStudentsPage() {
             {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
           </select>
         </div>
+        <button
+          onClick={() => { setCreateError(""); setShowCreate(true); }}
+          className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-dark"
+        >
+          <IconUserPlus size={18} /> إضافة حساب طالب
+        </button>
       </div>
 
       <div className="fade-up rounded-2xl border border-border bg-card overflow-hidden">
@@ -420,6 +471,55 @@ export default function AdminStudentsPage() {
             <div className="mt-6 flex gap-3">
               <button onClick={handleSaveEdit} className="flex-1 rounded-xl bg-primary py-2.5 text-white font-bold hover:bg-primary-dark">حفظ التغييرات</button>
               <button onClick={() => setEditStudent(null)} className="flex-1 rounded-xl bg-bg border border-border py-2.5 font-bold hover:bg-border">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Student Account Modal */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 fade-in" onClick={e => { if (e.target === e.currentTarget && !creating) setShowCreate(false); }}>
+          <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl scale-in">
+            <h3 className="text-lg font-black mb-1 flex items-center gap-2"><IconUserPlus size={20} className="text-primary" /> إضافة حساب طالب</h3>
+            <p className="text-xs text-text-muted mb-4">يُنشأ الحساب مفعّلاً مباشرة، ويدخل الطالب بالبريد وكلمة المرور من صفحة الدخول.</p>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-sm font-bold text-text-muted mb-1">الاسم الكامل *</label>
+                <input type="text" value={createForm.fullName} onChange={e => setCreateForm(f => ({ ...f, fullName: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-text-muted mb-1">البريد الإلكتروني *</label>
+                <input type="email" dir="ltr" value={createForm.email} onChange={e => setCreateForm(f => ({ ...f, email: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-text-muted mb-1">كلمة المرور * (6 أحرف على الأقل)</label>
+                <div className="flex gap-2">
+                  <input type="text" dir="ltr" value={createForm.password} onChange={e => setCreateForm(f => ({ ...f, password: e.target.value }))}
+                    className="flex-1 rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary" />
+                  <button type="button" onClick={generatePassword} className="rounded-xl border border-border bg-bg px-3 text-xs font-bold hover:border-primary">توليد</button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-bold text-text-muted mb-1">جوال الطالب</label>
+                  <input type="text" dir="ltr" placeholder="05xxxxxxxx" value={createForm.phone} onChange={e => setCreateForm(f => ({ ...f, phone: e.target.value }))}
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-text-muted mb-1">جوال ولي الأمر</label>
+                  <input type="text" dir="ltr" placeholder="05xxxxxxxx" value={createForm.parentPhone} onChange={e => setCreateForm(f => ({ ...f, parentPhone: e.target.value }))}
+                    className="w-full rounded-xl border border-border bg-bg px-3 py-2 outline-none focus:border-primary" />
+                </div>
+              </div>
+              {createError && <p className="text-sm font-bold text-accent-red">{createError}</p>}
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button onClick={handleCreateStudent} disabled={creating} className="flex-1 rounded-xl bg-primary py-2.5 text-white font-bold hover:bg-primary-dark disabled:opacity-60">
+                {creating ? "جاري الإنشاء..." : "إنشاء الحساب"}
+              </button>
+              <button onClick={() => setShowCreate(false)} disabled={creating} className="flex-1 rounded-xl bg-bg border border-border py-2.5 font-bold hover:bg-border">إلغاء</button>
             </div>
           </div>
         </div>

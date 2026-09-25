@@ -19,6 +19,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
+import { getRegistrationMode } from "@/lib/supabase/services/registration-actions";
 
 function isValidEmailOrPhone(value: string) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -74,6 +75,7 @@ export default function LoginPage() {
 
   // ── Google OAuth ──────────────────────────────────────────────
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [registrationClosed, setRegistrationClosed] = useState(false); // التسجيل الذاتي مغلق من إعدادات المدير
 
   async function handleGoogleLogin() {
     setGoogleLoading(true);
@@ -110,6 +112,20 @@ export default function LoginPage() {
 
   useEffect(() => {
     setMounted(true);
+
+    // طريقة إنشاء الحسابات (مفتوح / عبر المدير فقط) — التنفيذ الفعلي في قاعدة البيانات، وهنا للواجهة فقط
+    getRegistrationMode()
+      .then((mode) => {
+        if (mode.adminOnly) {
+          setRegistrationClosed(true);
+          setIsRegistering(false);
+        }
+      })
+      .catch(() => {});
+    if (new URLSearchParams(window.location.search).get("error") === "registration_closed") {
+      showToast("التسجيل الذاتي مغلق حالياً. تواصل مع إدارة المنصة لإنشاء حسابك.", "error");
+      window.history.replaceState(null, "", window.location.pathname);
+    }
     // تنظيف الرابط من أي token قديم عالق من محاولات سابقة
     if (window.location.hash && window.location.hash.includes("access_token")) {
       window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -171,6 +187,10 @@ export default function LoginPage() {
 
     if (!emailValid || !passValid || !nameValid || !confirmValid || !phoneValid || !parentPhoneValid) return;
 
+    if (isRegistering && registrationClosed) {
+      showToast("التسجيل الذاتي مغلق حالياً. تواصل مع إدارة المنصة لإنشاء حسابك.", "error");
+      return;
+    }
     setLoading(true);
     
     try {
@@ -577,22 +597,29 @@ export default function LoginPage() {
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
             </svg>
           )}
-          {googleLoading ? "جاري التحويل لجوجل..." : "المتابعة بحساب Google"}
+          {googleLoading ? "جاري التحويل لجوجل..." : registrationClosed ? "الدخول بحساب Google" : "المتابعة بحساب Google"}
         </button>
 
-        <div className="mt-7 text-center">
-          <button
-            type="button"
-            onClick={() => setIsRegistering(!isRegistering)}
-            className="text-[13.5px] font-semibold text-text-muted transition-colors duration-200 hover:text-primary"
-          >
-            {isRegistering ? (
-              <>لديك حساب بالفعل؟ <span className="text-primary">تسجيل الدخول</span></>
-            ) : (
-              <>ليس لديك حساب؟ <span className="text-primary">إنشاء حساب جديد</span></>
-            )}
-          </button>
-        </div>
+        {registrationClosed ? (
+          <p className="mt-7 rounded-[10px] border border-border bg-bg px-4 py-3 text-center text-[12.5px] leading-relaxed text-text-muted">
+            إنشاء الحسابات الجديدة يتم عبر إدارة المنصة. الحسابات الحالية تدخل كالمعتاد (البريد وكلمة المرور أو Google).
+          </p>
+        ) : (
+          <div className="mt-7 text-center">
+            <button
+              type="button"
+              onClick={() => setIsRegistering(!isRegistering)}
+              className="text-[13.5px] font-semibold text-text-muted transition-colors duration-200 hover:text-primary"
+            >
+              {isRegistering ? (
+                <>لديك حساب بالفعل؟ <span className="text-primary">تسجيل الدخول</span></>
+              ) : (
+                <>ليس لديك حساب؟ <span className="text-primary">إنشاء حساب جديد</span></>
+              )}
+            </button>
+          </div>
+
+        )}
 
         <p className="mt-7 text-center text-[11.5px] text-text-muted">
           © 2026 منصة الأوس الماسية التعليمية — جميع الحقوق محفوظة
