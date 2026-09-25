@@ -86,6 +86,7 @@ export type Course = {
   studentsCount: number;     // 1200
   isActive: boolean;         // هل الدورة مفعّلة على الواجهة
   isFeatured: boolean;       // هل تظهر في الأعلى
+  orderIndex?: number;       // ترتيب الدورة
   requireWhatsappActivation?: boolean; // هل يتطلب الاشتراك تفعيل من الواتساب
   featuresOverride?: Record<string, boolean>; // الاستثناءات الخاصة بالدورة للميزات الشاملة
   isSimulator?: boolean;     // هل الدورة عبارة عن محاكي مجاني

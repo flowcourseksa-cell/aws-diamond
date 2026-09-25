@@ -615,6 +615,7 @@ export async function saveSimulatorQuestions(examId: string, questions: any[]) {
       difficulty: question.difficulty ?? "medium",
       micro_skill_id: question.micro_skill_id ?? null,
       order_index: question.order_index ?? 0,
+      image_url: question.image_url ?? null,
     })
     .select()
     .single();
@@ -652,7 +653,7 @@ export async function deleteFinalExam(examId: string): Promise<boolean> {
 
 export async function bulkSaveFinalExamQuestions(
   finalExamId: string,
-  questions: { text: string; difficulty: string; options: { text: string; is_correct: boolean }[] }[]
+  questions: { text: string; difficulty: string; image_url?: string | null; options: { text: string; is_correct: boolean }[] }[]
 ): Promise<{ success: number; failed: number }> {
   let success = 0;
   let failed = 0;
@@ -663,6 +664,7 @@ export async function bulkSaveFinalExamQuestions(
       explanation: null,
       difficulty: q.difficulty as "easy" | "medium" | "hard",
       order_index: i,
+      image_url: q.image_url ?? null,
       options: q.options as any[],
     });
     if (ok) success++; else failed++;
