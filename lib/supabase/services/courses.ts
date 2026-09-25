@@ -58,7 +58,9 @@ export async function fetchCourses(type: 'course' | 'simulator' | 'all' = 'cours
       )
     `);
 
-  const { data, error } = await query.order("created_at", { ascending: false });
+  const { data, error } = await query
+    .order("order_index", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("SERVER ACTION Error fetching courses:", error.message);
@@ -130,6 +132,7 @@ export async function fetchCourses(type: 'course' | 'simulator' | 'all' = 'cours
       studentsCount: meta.studentsCount ?? 0,
       isActive: d.is_active,
       isFeatured: d.is_featured,
+      orderIndex: d.order_index ?? 0,
       requireWhatsappActivation: meta.requireWhatsappActivation ?? true, // Default to true if not set
       featuresOverride: d.features_override || {},
       isSimulator: meta.isSimulator || false,
@@ -176,6 +179,7 @@ export async function createCourse(course: Partial<Course>): Promise<Course | nu
         discounted_price: course.discountedPrice,
         is_active: course.isActive,
         is_featured: course.isFeatured,
+        order_index: course.orderIndex || 0,
         exam_date: course.examDate || null,
       },
     ])
@@ -226,6 +230,7 @@ export async function updateCourse(id: string, course: Partial<Course>): Promise
   if (course.discountedPrice !== undefined) payload.discounted_price = course.discountedPrice;
   if (course.isActive !== undefined) payload.is_active = course.isActive;
   if (course.isFeatured !== undefined) payload.is_featured = course.isFeatured;
+  if (course.orderIndex !== undefined) payload.order_index = course.orderIndex;
   if (course.examDate !== undefined) payload.exam_date = course.examDate || null;
 
   // Always update description to include merged metadata

@@ -151,6 +151,17 @@ export default function AdminCoursesPage() {
     }
   }
 
+  async function updateOrder(id: string, newOrder: number) {
+    const success = await updateCourse(id, { orderIndex: newOrder });
+    if (success) {
+      setCourses(prev => {
+        const updated = prev.map(c => c.id === id ? { ...c, orderIndex: newOrder } : c);
+        // Sort in UI immediately so the user sees the reordering
+        return updated.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+      });
+    }
+  }
+
   function updateFeature(i: number, val: string) {
     const arr = [...form.features];
     arr[i] = val;
@@ -251,7 +262,17 @@ export default function AdminCoursesPage() {
                 >
                   <IconStar size={14} /> {course.isFeatured ? "مميزة" : "عادية"}
                 </button>
-                <div className="flex-1" />
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex items-center gap-1.5 bg-bg border border-border rounded-lg px-2 py-1">
+                    <span className="text-[10px] font-bold text-text-muted">الترتيب:</span>
+                    <input
+                      type="number"
+                      value={course.orderIndex || 0}
+                      onChange={(e) => updateOrder(course.id, parseInt(e.target.value) || 0)}
+                      className="w-12 bg-transparent text-xs font-bold text-center outline-none text-text"
+                    />
+                  </div>
+                </div>
                 <button onClick={() => openEdit(course)} className="rounded-lg p-2 text-text-muted hover:bg-primary/10 hover:text-primary transition-colors">
                   <IconEdit size={15} />
                 </button>

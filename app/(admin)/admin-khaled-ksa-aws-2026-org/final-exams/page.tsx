@@ -23,7 +23,7 @@ import {
   IconChevronDown, IconChevronUp, IconUpload, IconDownload,
   IconClock, IconTarget, IconRefresh, IconX,
   IconFileSpreadsheet, IconAlertTriangle, IconToggleLeft,
-  IconToggleRight, IconBulb, IconArrowsTransferDown,
+  IconToggleRight, IconBulb, IconArrowsTransferDown, IconPhoto
 } from "@tabler/icons-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -77,10 +77,11 @@ function shuffleArray<T>(arr: T[]): T[] {
 type ParsedQuestion = {
   text: string;
   difficulty: string;
+  image_url?: string | null;
   options: { text: string; is_correct: boolean }[];
 };
 
-function parseExcelFile(file: File): Promise<ParsedQuestion[]> {
+function parseExcelFile(file: File, imageMap: Map<string, string> = new Map()): Promise<ParsedQuestion[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -99,6 +100,14 @@ function parseExcelFile(file: File): Promise<ParsedQuestion[]> {
           const opt4          = String(row[4] || "").trim();
           const rawDiff       = String(row[5] || "medium").trim().toLowerCase();
           const difficulty    = ["easy", "medium", "hard"].includes(rawDiff) ? rawDiff : "medium";
+          
+          const rawImageName  = String(row[6] || "").trim();
+          let normalizedImageName = rawImageName.split("/").pop()?.toLowerCase() || rawImageName.toLowerCase();
+          if (normalizedImageName.includes('.')) {
+             normalizedImageName = normalizedImageName.split('.').slice(0, -1).join('.');
+          }
+          const image_url = rawImageName ? (imageMap.get(normalizedImageName) || imageMap.get(rawImageName.toLowerCase()) || null) : null;
+
           if (!text || !correctAnswer) continue;
           const rawOptions = [
             { text: correctAnswer, is_correct: true },
@@ -106,7 +115,7 @@ function parseExcelFile(file: File): Promise<ParsedQuestion[]> {
             ...(opt3 ? [{ text: opt3, is_correct: false }] : []),
             ...(opt4 ? [{ text: opt4, is_correct: false }] : []),
           ];
-          questions.push({ text, difficulty, options: shuffleArray(rawOptions) });
+          questions.push({ text, difficulty, image_url, options: shuffleArray(rawOptions) });
         }
         resolve(questions);
       } catch (err) { reject(err); }
@@ -118,13 +127,13 @@ function parseExcelFile(file: File): Promise<ParsedQuestion[]> {
 
 function downloadTemplate() {
   const ws_data = [
-    ["السؤال", "الإجابة الصحيحة", "الخيار 2", "الخيار 3", "الخيار 4", "الصعوبة (easy/medium/hard)"],
-    ["ما هو الغاز المسؤول عن عملية التنفس في الإنسان؟", "الأكسجين", "ثاني أكسيد الكربون", "النيتروجين", "الهيدروجين", "easy"],
-    ["ما هي عاصمة المملكة العربية السعودية؟", "الرياض", "جدة", "مكة المكرمة", "الدمام", "easy"],
+    ["السؤال", "الإجابة الصحيحة", "الخيار 2", "الخيار 3", "الخيار 4", "الصعوبة (easy/medium/hard)", "اسم الصورة (اختياري)"],
+    ["ما هو الغاز المسؤول عن عملية التنفس في الإنسان؟", "الأكسجين", "ثاني أكسيد الكربون", "النيتروجين", "الهيدروجين", "easy", ""],
+    ["ما هي عاصمة المملكة العربية السعودية؟", "الرياض", "جدة", "مكة المكرمة", "الدمام", "easy", "سؤال1.png"],
   ];
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(ws_data);
-  ws["!cols"] = [{ wch: 50 }, { wch: 30 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 25 }];
+  ws["!cols"] = [{ wch: 50 }, { wch: 30 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 25 }, { wch: 30 }];
   XLSX.utils.book_append_sheet(wb, ws, "الأسئلة");
   XLSX.writeFile(wb, "قالب_أسئلة_الاختبار.xlsx");
 }
@@ -296,6 +305,7 @@ export default function AdminFinalExamsPage() {
   const [qForm, setQForm] = useState({
     text: "",
     difficulty: "medium" as "easy" | "medium" | "hard",
+    imageFile: null as File | null,
     options: [
       { text: "", is_correct: true },
       { text: "", is_correct: false },
@@ -309,6 +319,35 @@ export default function AdminFinalExamsPage() {
   const [importPreview, setImportPreview] = useState<ParsedQuestion[]>([]);
   const [importLoading, setImportLoading] = useState(false);
   const [importResult, setImportResult] = useState<{ success: number; failed: number } | null>(null);
+  
+  // Image upload and Bulk delete states
+  const imageFilesRef = useRef<File[]>([]);
+  const [selectedImagesCount, setSelectedImagesCount] = useState(0);
+  const [uploadProgress, setUploadProgress] = useState<{ total: number; current: number } | null>(null);
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<number>>(new Set());
+
+  // Upload a single image to Supabase Storage and return its public URL
+  async function uploadImageToStorage(file: File, fileName: string): Promise<string | null> {
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const ext = fileName.split(".").pop() || "png";
+      const path = `exam-questions/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("question-images").upload(path, file, { upsert: true });
+      if (error) { console.error("Image upload error:", error.message); return null; }
+      const { data: urlData } = supabase.storage.from("question-images").getPublicUrl(path);
+      return urlData?.publicUrl || null;
+    } catch (e) {
+      console.error("uploadImageToStorage error:", e);
+      return null;
+    }
+  }
+
+  const handleImagesSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    imageFilesRef.current = files;
+    setSelectedImagesCount(files.length);
+  };
 
   useEffect(() => {
     (async () => {
@@ -388,18 +427,25 @@ export default function AdminFinalExamsPage() {
     if (!qForm.text.trim()) return alert("أدخل نص السؤال");
     if (qForm.options.some(o => !o.text.trim())) return alert("أدخل جميع الخيارات");
     setSaving(true);
+    
+    let uploadedImageUrl = null;
+    if (qForm.imageFile) {
+      uploadedImageUrl = await uploadImageToStorage(qForm.imageFile, qForm.imageFile.name);
+    }
+
     const shuffledOptions = [...qForm.options].sort(() => Math.random() - 0.5);
     const ok = await saveFinalExamQuestion(selectedExam.id, {
       text: qForm.text,
       explanation: null,
       difficulty: qForm.difficulty,
       order_index: examQuestions.length,
+      image_url: uploadedImageUrl,
       options: shuffledOptions,
     });
     if (ok) {
       await refreshQuestions(selectedExam);
       setShowAddQ(false);
-      setQForm({ text: "", difficulty: "medium", options: [{ text: "", is_correct: true }, { text: "", is_correct: false }, { text: "", is_correct: false }, { text: "", is_correct: false }] });
+      setQForm({ text: "", difficulty: "medium", imageFile: null, options: [{ text: "", is_correct: true }, { text: "", is_correct: false }, { text: "", is_correct: false }, { text: "", is_correct: false }] });
     }
     setSaving(false);
   };
@@ -408,7 +454,49 @@ export default function AdminFinalExamsPage() {
     if (!confirm("حذف هذا السؤال؟")) return;
     await deleteFinalExamQuestion(qId);
     setExamQuestions(prev => prev.filter(q => q.id !== qId));
+    setSelectedQuestions(new Set());
   };
+
+  async function handleBulkRemove() {
+    if (selectedQuestions.size === 0) return;
+    
+    const selectedArray = Array.from(selectedQuestions);
+    const savedQuestionsToDelete = selectedArray
+      .filter(index => examQuestions[index]?.id)
+      .map(index => examQuestions[index].id as string);
+    
+    if (savedQuestionsToDelete.length > 0) {
+      if (!confirm(`هل أنت متأكد من حذف ${savedQuestionsToDelete.length} سؤال من الاختبار النهائي؟`)) {
+        return;
+      }
+      setSaving(true);
+      for (const id of savedQuestionsToDelete) {
+        await deleteFinalExamQuestion(id);
+      }
+      setSaving(false);
+    }
+    
+    setExamQuestions(prev => prev.filter((_, i) => !selectedQuestions.has(i)));
+    setSelectedQuestions(new Set());
+  }
+
+  function toggleSelection(index: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    setSelectedQuestions(prev => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedQuestions.size === examQuestions.length) {
+      setSelectedQuestions(new Set());
+    } else {
+      setSelectedQuestions(new Set(examQuestions.map((_, i) => i)));
+    }
+  }
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -430,13 +518,46 @@ export default function AdminFinalExamsPage() {
   const handleImport = async () => {
     if (!selectedExam || !importFile) return;
     setImportLoading(true);
+    setUploadProgress(null);
     try {
-      const parsed = await parseExcelFile(importFile);
+      const imageMap = new Map<string, string>();
+      const imagesToUpload = imageFilesRef.current;
+      let successUploadCount = 0;
+
+      if (imagesToUpload.length > 0) {
+        setUploadProgress({ total: imagesToUpload.length, current: 0 });
+        
+        const uploadPromises = imagesToUpload.map(async (imgFile) => {
+          const fileName = imgFile.name;
+          const normalizedFileName = fileName.trim().toLowerCase().split('.').slice(0, -1).join('.') || fileName.trim().toLowerCase();
+          
+          const url = await uploadImageToStorage(imgFile, fileName);
+          if (url) {
+            imageMap.set(normalizedFileName, url);
+            imageMap.set(fileName.trim().toLowerCase(), url);
+            successUploadCount++;
+            setUploadProgress(prev => prev ? { ...prev, current: prev.current + 1 } : null);
+          } else {
+            console.error(`Failed to upload image: ${fileName}`);
+          }
+        });
+
+        await Promise.all(uploadPromises);
+        setUploadProgress(null);
+
+        if (successUploadCount === 0) {
+          alert("⚠️ تنبيه: فشل رفع جميع الصور. تأكد أنك نفذت كود الـ SQL في Supabase لإنشاء مجلد الصور وإعطاء الصلاحيات.");
+        }
+      }
+
+      const parsed = await parseExcelFile(importFile, imageMap);
       const result = await bulkSaveFinalExamQuestions(selectedExam.id, parsed);
       setImportResult(result);
       await refreshQuestions(selectedExam);
       setImportFile(null);
       setImportPreview([]);
+      imageFilesRef.current = [];
+      setSelectedImagesCount(0);
     } catch {
       alert("فشل استيراد الأسئلة");
     }
@@ -702,20 +823,45 @@ export default function AdminFinalExamsPage() {
                   <>
                     <div className="text-xs text-text-muted mb-3 bg-bg border border-border rounded-xl p-2.5">
                       <span className="font-black text-text">التنسيق: </span>
-                      A: السؤال | B: الإجابة الصحيحة | C-E: الخيارات | F: الصعوبة
+                      A: السؤال | B: الإجابة الصحيحة | C-E: الخيارات | F: الصعوبة | G: اسم الصورة (اختياري)
+                      <div className="mt-1 text-emerald-700 font-bold">🖼️ للأسئلة التي تحتوي صور: ضع أسماء الصور في عمود G ثم حددها جميعاً من الزر أدناه</div>
                       <div className="mt-1 text-amber-600 font-bold">⚠️ سيتم خلط الإجابات تلقائياً</div>
                     </div>
-                    <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} className="hidden" />
-                    {!importFile ? (
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-8 rounded-xl border-2 border-dashed border-border text-center font-bold hover:border-primary/50 hover:text-primary hover:bg-primary/5 transition-all flex flex-col items-center gap-2 text-text-muted text-xs"
-                      >
-                        <IconUpload size={24} />
-                        اضغط لاختيار ملف Excel أو CSV
-                      </button>
-                    ) : (
-                      <div className="flex flex-col gap-2">
+                    
+                    {/* Upload Progress Bar */}
+                    {uploadProgress && (
+                      <div className="mb-4 p-3 rounded-xl border border-primary/20 bg-primary/5">
+                        <div className="flex justify-between items-center mb-2 text-xs font-bold text-primary">
+                          <span>جاري رفع الصور...</span>
+                          <span>{uploadProgress.current} من {uploadProgress.total}</span>
+                        </div>
+                        <div className="h-2 w-full bg-border rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary transition-all duration-300"
+                            style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <input type="file" multiple accept="image/*" onChange={handleImagesSelect} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        <div className={`flex h-11 items-center justify-center gap-2 rounded-xl font-bold border transition-colors text-xs ${selectedImagesCount > 0 ? "bg-amber-500/10 border-amber-500/40 text-amber-700" : "border-border bg-bg text-text-muted hover:border-amber-400"}`}>
+                          <IconPhoto size={16} /> {selectedImagesCount > 0 ? `${selectedImagesCount} صورة محددة` : "اختيار الصور"}
+                        </div>
+                      </div>
+                      
+                      <div className="relative flex-1">
+                        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFileChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                        <div className="flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-bg text-text-muted font-bold text-xs hover:border-primary/50 transition-colors">
+                          <IconUpload size={16} /> اختيار ملف Excel
+                        </div>
+                      </div>
+                    </div>
+
+                    {importFile && (
+                      <div className="flex flex-col gap-2 mt-3">
                         <div className="flex items-center gap-2 p-2.5 bg-bg border border-border rounded-xl">
                           <IconFileSpreadsheet size={16} className="text-emerald-500 shrink-0" />
                           <div className="flex-1 min-w-0">
@@ -737,9 +883,8 @@ export default function AdminFinalExamsPage() {
                         )}
                         <div className="flex gap-2">
                           <button onClick={handleImport} disabled={importLoading} className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-primary text-white font-bold rounded-xl text-xs disabled:opacity-50">
-                            {importLoading ? "جاري الاستيراد..." : <><IconUpload size={13} /> استيراد الأسئلة</>}
+                            {importLoading ? "جاري الاستيراد..." : <><IconUpload size={13} /> استيراد الأسئلة والصور</>}
                           </button>
-                          <button onClick={() => fileInputRef.current?.click()} className="px-3 py-2 bg-card border border-border text-text-muted font-bold rounded-xl text-xs hover:bg-bg">تغيير</button>
                         </div>
                       </div>
                     )}
@@ -792,6 +937,20 @@ export default function AdminFinalExamsPage() {
                           {DIFFICULTY_MAP[d].label}
                         </button>
                       ))}
+                    </div>
+                    
+                    {/* Manual Image Upload for single question */}
+                    <div className="relative ml-2">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={e => setQForm(f => ({ ...f, imageFile: e.target.files?.[0] || null }))}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                      />
+                      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black transition-all border ${qForm.imageFile ? "border-amber-300 bg-amber-500/10 text-amber-600" : "bg-bg text-text-muted border-border hover:border-amber-300"}`}>
+                        <IconPhoto size={14} />
+                        {qForm.imageFile ? "تم الرفاق صورة" : "صورة (اختياري)"}
+                      </div>
                     </div>
                     <div className="mr-auto flex gap-2">
                       <button onClick={() => setShowAddQ(false)} className="px-3 py-1.5 text-xs font-bold text-text-muted hover:text-text">إلغاء</button>
@@ -930,12 +1089,62 @@ export default function AdminFinalExamsPage() {
 
             {/* Questions list */}
             <div className="flex flex-col gap-2">
+              {/* Bulk Actions */}
+              {examQuestions.length > 0 && (
+                <div className="flex items-center justify-between p-3 bg-card border border-border rounded-xl mb-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${
+                      selectedQuestions.size > 0 && selectedQuestions.size === examQuestions.length
+                        ? "bg-primary border-primary"
+                        : selectedQuestions.size > 0
+                          ? "bg-primary/20 border-primary text-primary"
+                          : "border-border hover:border-primary"
+                    }`} onClick={toggleSelectAll}>
+                      {selectedQuestions.size > 0 && selectedQuestions.size === examQuestions.length && <IconCheck size={14} className="text-white" />}
+                      {selectedQuestions.size > 0 && selectedQuestions.size !== examQuestions.length && <div className="w-2.5 h-0.5 bg-primary rounded-full" />}
+                    </div>
+                    <span className="text-xs font-bold text-text-muted">
+                      {selectedQuestions.size > 0 ? `تم تحديد (${selectedQuestions.size})` : "تحديد الكل"}
+                    </span>
+                  </label>
+
+                  {selectedQuestions.size > 0 && (
+                    <button
+                      onClick={handleBulkRemove}
+                      disabled={saving}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-600 border border-rose-200 rounded-lg text-xs font-bold hover:bg-rose-500/20 transition-colors disabled:opacity-50"
+                    >
+                      <IconTrash size={14} />
+                      {saving ? "جاري الحذف..." : "حذف المحدد"}
+                    </button>
+                  )}
+                </div>
+              )}
+
               {examQuestions.map((q, qi) => {
                 const diff = DIFFICULTY_MAP[q.difficulty as keyof typeof DIFFICULTY_MAP] ?? DIFFICULTY_MAP.medium;
+                const anyQ = q as any; // Cast to any to access optional image_url since types might not strictly match
                 return (
                   <div key={q.id} className="bg-card border border-border rounded-xl overflow-hidden">
                     <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => setExpandedQ(expandedQ === q.id ? null : q.id)}>
+                      <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
+                          selectedQuestions.has(qi)
+                            ? "bg-primary border-primary text-white"
+                            : "border-border hover:border-primary bg-card"
+                        }`} onClick={(e) => toggleSelection(qi, e)}>
+                          {selectedQuestions.has(qi) && <IconCheck size={14} />}
+                        </div>
+                      </div>
                       <div className="w-7 h-7 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-xs shrink-0">{qi + 1}</div>
+                      
+                      {anyQ.image_url && (
+                        <div className="w-10 h-10 rounded-lg border border-border overflow-hidden shrink-0 bg-bg">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={anyQ.image_url} alt="Question" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-text text-sm leading-tight line-clamp-1">{q.text}</div>
                         <div className="flex items-center gap-1.5 mt-0.5">
