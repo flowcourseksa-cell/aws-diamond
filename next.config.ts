@@ -7,7 +7,7 @@ const withSerwist = withSerwistInit({
   disable: process.env.NODE_ENV === "development",
   // لا تخزّن مسبقاً كل محتويات public/ (نحو 20MB صوتيات وصور) عند أول زيارة؛
   // يكفي هيكل الـ PWA، وبقية الأصول تُخزَّن عند الاستخدام عبر قواعد التخزين وقت التشغيل.
-  globPublicPatterns: ["manifest.json", "icon-*.png"],
+  globPublicPatterns: ["manifest.json", "icon-*.png", "hero-book*.png", "hero-child.png"],
 });
 
 // على استضافة مشتركة اضبط NEXT_BUILD_CPUS=1 أثناء البناء لتقليل الذاكرة (الافتراضي: عدد أنوية المضيف - 1).

@@ -1,17 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { getPublicOrigin } from "@/lib/public-origin";
+
+/**
+ * تحويل نسبي (Location: /path): يحلّه المتصفح على المضيف الحالي نفسه الذي ضُبطت عليه كوكيز الجلسة،
+ * فيعمل بلا فرق على Vercel أو next start أو Passenger، ولا يعتمد على request.url
+ * (الذي يصبح http://localhost:PORT على استضافة ذاتية) ولا على أي متغير بيئة.
+ */
+function redirectTo(path: string) {
+  return new NextResponse(null, { status: 307, headers: { Location: path } });
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  // الأصل العام للموقع (وليس origin الداخلي للسيرفر): انظر lib/public-origin.ts
-  const origin = getPublicOrigin(request.headers, request.url);
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/";
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/login?error=no_code`);
+    return redirectTo("/login?error=no_code");
   }
 
   const cookieStore = await cookies();
@@ -41,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   if (error || !data.session) {
     console.error("OAuth callback error:", error);
-    return NextResponse.redirect(`${origin}/login?error=oauth_failed`);
+    return redirectTo("/login?error=oauth_failed");
   }
 
   const user = data.session.user;
@@ -55,15 +61,15 @@ export async function GET(request: NextRequest) {
 
   // السماح بالمرور لصفحة تغيير كلمة المرور حتى لو لم يكتمل الملف
   if (next.startsWith("/reset-password")) {
-    return NextResponse.redirect(`${origin}${next}`);
+    return redirectTo(next);
   }
 
   if (!profile || !profile.parent_phone) {
-    return NextResponse.redirect(`${origin}/onboarding`);
+    return redirectTo("/onboarding");
   }
 
   const isAdmin = profile.role === "admin";
   const destination = isAdmin ? "/admin-khaled-ksa-aws-2026-org" : "/";
 
-  return NextResponse.redirect(`${origin}${destination}`);
+  return redirectTo(destination);
 }

@@ -2,9 +2,6 @@
   "name": "al-aws-almasiya",
   "version": "0.1.0",
   "private": true,
-  "engines": {
-    "node": ">=20.9.0"
-  },
   "browser": {
     "canvas": false
   },
