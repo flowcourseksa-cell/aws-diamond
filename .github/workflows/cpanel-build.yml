@@ -1,0 +1,64 @@
+# بناء إنتاجي على Linux لرفعه إلى استضافة cPanel عندما لا تستطيع الاستضافة المشتركة تنفيذ `npm run build`
+# (حدود الذاكرة). يُشغَّل يدوياً من تبويب Actions → "cPanel build artifact" → Run workflow.
+#
+# المطلوب قبل التشغيل: Settings → Secrets and variables → Actions → أضف الأسرار التالية بقيم الإنتاج
+# (نفس أسماء .env.example): NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, NEXT_PUBLIC_SITE_URL,
+# NEXT_PUBLIC_VAPID_PUBLIC_KEY, SUPABASE_SERVICE_ROLE_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL, CRON_SECRET,
+# ULTRAMSG_INSTANCE_ID, ULTRAMSG_TOKEN. كلها مطلوبة وقت البناء (انظر .env.example).
+#
+# الناتج: أرشيف يحوي .next (بدون الكاش) و public/sw.js من نفس البناء. على السيرفر: فكّه في جذر التطبيق
+# فوق نسخة المصدر، ثم `npm ci --include=dev` (لثنائيات Linux) ثم Restart. انظر DEPLOY_CPANEL.md.
+name: cPanel build artifact
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_SITE_URL: ${{ secrets.NEXT_PUBLIC_SITE_URL }}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+      VAPID_EMAIL: ${{ secrets.VAPID_EMAIL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      ULTRAMSG_INSTANCE_ID: ${{ secrets.ULTRAMSG_INSTANCE_ID }}
+      ULTRAMSG_TOKEN: ${{ secrets.ULTRAMSG_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (devDependencies are required by next build)
+        run: npm ci --include=dev
+
+      - name: Build
+        run: npm run build 2>&1 | tee build.log
+
+      - name: Verify build output
+        run: |
+          test -f public/sw.js
+          grep -c -F -e "$(cat .next/BUILD_ID)" public/sw.js
+          grep -rl "serviceWorker.register" .next/static/chunks | head -1
+          grep -c "Bundling the service worker" build.log
+          test "$(grep -c 'localhost:3000' .next/server/app/api/auth/register/route.js)" = "0"
+
+      - name: Package (.next without cache + public/sw.js)
+        run: |
+          rm -rf .next/cache .next/dev
+          tar -czf cpanel-build-${GITHUB_SHA::7}.tar.gz .next public/sw.js
+          ls -la cpanel-build-*.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpanel-build-${{ github.sha }}
+          path: cpanel-build-*.tar.gz
+          retention-days: 14
