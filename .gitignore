@@ -47,3 +47,6 @@ public/swe-worker-*.js
 
 # keep the documented template (no real values)
 !.env.example
+
+# Claude Code personal project settings
+.claude/settings.local.json
