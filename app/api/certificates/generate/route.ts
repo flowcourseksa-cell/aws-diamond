@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchCertificateById } from "@/lib/supabase/services/certificates";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 // This route generates a professional PDF certificate using Puppeteer
 // GET /api/certificates/generate?id=<cert-id>
@@ -16,7 +17,8 @@ export async function GET(req: NextRequest) {
     day: "numeric",
   });
 
-  const verifyUrl = `${req.nextUrl.origin}/verify/${cert.id}`;
+  // الأصل العام للموقع (وليس origin الداخلي للسيرفر): انظر lib/public-origin.ts
+  const verifyUrl = `${getPublicOrigin(req.headers, req.url)}/verify/${cert.id}`;
 
   const html = buildCertificateHTML({
     studentName: cert.student_name,
