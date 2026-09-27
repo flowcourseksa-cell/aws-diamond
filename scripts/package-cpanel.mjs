@@ -44,8 +44,11 @@ for (const envFile of [".env", ".env.local", ".env.production", ".env.production
 // 5) sharp يُتتبَّع مع Next لمحسّن الصور، لكن images.unoptimized يعطّله؛ ثنائياته خاصة بنظام جهاز البناء
 //    (مثل @img/sharp-win32-x64) ولا تعمل على Linux، فنحذفها (نحو 20MB).
 for (const dir of ["sharp", "@img"]) rmSync(join(out, "node_modules", dir), { recursive: true, force: true });
-// 6) بيان الإجراءات (server actions) يحوي مسارات مطلقة من جهاز البناء في الحقل filename (يُستخدم في سجلات التطوير فقط)؛
-//    نجعلها نسبية حتى لا تحمل الحزمة مسارات الجهاز.
+// 6) server-reference-manifest.json (البيان الذي يحمّله Next وقت التشغيل) يحوي في الحقل filename مسارات مطلقة
+//    من جهاز البناء (تُستخدم في سجلات التطوير فقط)؛ نجعلها نسبية. تبقى نسخ أخرى من مسار جهاز البناء في
+//    next-standalone.js (outputFileTracingRoot/turbopack.root) وrequired-server-files.json وحزم الصفحات
+//    وبيانات client-reference: كلها معرّفات خاملة لا تُستخدم كمسارات ملفات في الإنتاج ويجب ألا تُعدَّل
+//    (تُقارن نصياً فيما بينها). لتفادي وجود اسم المستخدم فيها ابنِ من مجلد قصير محايد (مثل C:app) أو على Linux.
 const manifestPath = join(out, ".next", "server", "server-reference-manifest.json");
 if (existsSync(manifestPath)) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
