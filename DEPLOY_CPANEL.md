@@ -13,7 +13,8 @@
 
 ```bash
 # 1) .env.production في جذر المشروع بقيم الإنتاج (Supabase + VAPID + CRON_SECRET). اترك NEXT_PUBLIC_SITE_URL فارغاً:
-#    الدومين يُضبط وقت التشغيل عبر SITE_URL ولا يُدمج في الحزمة.
+#    الدومين يُضبط وقت التشغيل عبر SITE_URL ولا يُدمج في الحزمة. انقل .env.local مؤقتاً خارج المجلد:
+#    next build يقرؤه حتى مع NODE_ENV=production وهو يتقدم على .env.production (فيُدمج عنوان Vercel).
 NEXT_OUTPUT_STANDALONE=1 NODE_ENV=production npm run build   # ينتج .next/standalone
 node scripts/package-cpanel.mjs                                # يجمّع dist-cpanel/ (الخادم + node_modules اللازمة + public + .next/static)
 # 2) ضع .env.production (بقيم الإنتاج وSITE_URL=https://الدومين) داخل dist-cpanel/ ثم اضغط محتوى المجلد (لا المجلد نفسه) في zip.
@@ -26,10 +27,11 @@ node scripts/package-cpanel.mjs                                # يجمّع dist
 ### التثبيت على cPanel
 
 1. **Setup Node.js App → Create Application**: Node **22** (أو 20.19+)، Application mode **Production**، Application root مجلد مستقل خارج `public_html` (مثل `aws-diamond`)، Application URL الدومين، startup file `server.js`.
-2. **File Manager** → افتح مجلد التطبيق → Upload → الـ zip → Extract في المجلد نفسه → احذف الـ zip. يجب أن يكون `server.js` و`next-standalone.js` و`.next` و`node_modules` و`public` في جذر المجلد مباشرة.
+2. **File Manager** → أنشئ مجلد التطبيق → Upload → الـ zip → Extract في المجلد نفسه → احذف الـ zip. يجب أن يكون `server.js` و`next-standalone.js` و`.next` و`node_modules` و`public` في جذر المجلد مباشرة.
+   افعل هذا **قبل** إنشاء التطبيق في الخطوة 1 إن أمكن: إنشاء التطبيق على مجلد فارغ يكتب `server.js` تجريبياً يجب استبداله.
 3. حرّر `.env.production` (فعّل Show Hidden Files) وضع الدومين في `SITE_URL`، وصلاحيات الملف 600. لا حاجة لإدخال المتغيرات في واجهة cPanel؛ إن أدخلتها فلها الأولوية على الملف.
 4. **Restart** من صفحة التطبيق. السجلات في `stderr.log` داخل جذر التطبيق.
-5. أكمل خطوات القسم 5 (بعد الإطلاق) أدناه.
+5. أكمل خطوات القسم 5 (بعد الإطلاق) أدناه. الدومين يجب أن يشير إلى السيرفر (DNS) مع شهادة AutoSSL قبل الاختبار.
 
 عند التحديث: ارفع الحزمة الجديدة في مجلد جديد (مثل `aws-diamond-v2`) مع `.env.production`، ثم غيّر Application root إليه وأعد التشغيل؛ الرجوع = إعادة المسار القديم.
 
@@ -82,14 +84,14 @@ grep -c "Bundling the service worker" build.log   # يجب أن يعطي 1 (Serw
 
 ```bash
 test -f public/sw.js && grep -c -F -e "$(cat .next/BUILD_ID)" public/sw.js   # يجب أن يعطي ≥ 1 (sw.js من نفس البناء)
-grep -c "localhost:3000" .next/server/app/api/auth/register/route.js     # يجب أن يعطي 0
+grep -c "localhost:3000" .next/server/app/api/auth/check-email/route.js  # يجب أن يعطي 0
 grep -rl "serviceWorker.register" .next/static/chunks | head -1              # يجب أن يطبع ملفاً (كود تسجيل الـ SW موجود)
 ```
 
-ثم **Restart** من واجهة cPanel (أو `touch tmp/restart.txt`). السجلات في `stderr.log` داخل جذر التطبيق.
+ثم **Restart** من واجهة cPanel (أو `mkdir -p tmp && touch tmp/restart.txt`). السجلات في `stderr.log` داخل جذر التطبيق.
 
-> عند التحديثات اللاحقة: ابنِ في مجلد إصدار جديد ثم وجّه Application root إليه وأعد التشغيل،
-> لأن `next build` يمسح `.next` ويعطّل الموقع طوال مدة البناء لو بُني في المجلد الحي.
+> عند التحديثات اللاحقة: انسخ الكود و`.env.production` إلى مجلد إصدار جديد، نفّذ فيه `npm ci --include=dev` والبناء،
+> ثم وجّه Application root إليه وأعد التشغيل، لأن `next build` يمسح `.next` ويعطّل الموقع طوال مدة البناء لو بُني في المجلد الحي.
 >
 > ملاحظة: كاش أسئلة الاختبار النهائي يُبطَل داخل عملية Node التي استقبلت تعديل الأدمن فقط. التطبيق يعمل بعملية واحدة
 > افتراضياً في Passenger؛ إن شغّل المزوّد أكثر من عملية فقد يظهر تعديل الأسئلة متأخراً، وإعادة التشغيل من cPanel هي الحل اليدوي.
