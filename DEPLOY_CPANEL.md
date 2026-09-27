@@ -3,6 +3,40 @@
 هذا الدليل يخص الاستضافة الذاتية على cPanel. قاعدة البيانات والمصادقة والتخزين تبقى على Supabase بلا أي تغيير.
 الكود يعمل أيضاً على Vercel كما هو؛ `server.js` يُستخدم على cPanel فقط.
 
+هناك طريقتان:
+- **الطريقة أ (الموصى بها): حزمة مبنية مسبقاً** تُبنى على جهاز المطوّر وتُرفع جاهزة؛ لا `npm` ولا `next build` على السيرفر.
+- **الطريقة ب: البناء على السيرفر** عبر SSH (تحتاج Node 22 وذاكرة نحو 2GB أثناء البناء).
+
+## الطريقة أ — الحزمة المبنية مسبقاً
+
+### إنتاج الحزمة (على جهاز المطوّر)
+
+```bash
+# 1) .env.production في جذر المشروع بقيم الإنتاج (Supabase + VAPID + CRON_SECRET). اترك NEXT_PUBLIC_SITE_URL فارغاً:
+#    الدومين يُضبط وقت التشغيل عبر SITE_URL ولا يُدمج في الحزمة.
+NEXT_OUTPUT_STANDALONE=1 NODE_ENV=production npm run build   # ينتج .next/standalone
+node scripts/package-cpanel.mjs                                # يجمّع dist-cpanel/ (الخادم + node_modules اللازمة + public + .next/static)
+# 2) ضع .env.production (بقيم الإنتاج وSITE_URL=https://الدومين) داخل dist-cpanel/ ثم اضغط محتوى المجلد (لا المجلد نفسه) في zip.
+```
+
+ما بداخل الحزمة: `server.js` (غلاف Passenger يحمّل `.env.production` ثم يشغّل خادم Next)، `next-standalone.js` (خادم Next المولَّد)،
+`.next/` (ناتج البناء)، `node_modules/` (حزم التشغيل فقط، نحو ربع الحجم الكامل)، `public/` (مع `sw.js` المبني)، `package.json`، `BUILD_INFO.txt`.
+لا تحتاج `next.config.ts` ولا الشيفرة المصدرية على السيرفر.
+
+### التثبيت على cPanel
+
+1. **Setup Node.js App → Create Application**: Node **22** (أو 20.19+)، Application mode **Production**، Application root مجلد مستقل خارج `public_html` (مثل `aws-diamond`)، Application URL الدومين، startup file `server.js`.
+2. **File Manager** → افتح مجلد التطبيق → Upload → الـ zip → Extract في المجلد نفسه → احذف الـ zip. يجب أن يكون `server.js` و`next-standalone.js` و`.next` و`node_modules` و`public` في جذر المجلد مباشرة.
+3. حرّر `.env.production` (فعّل Show Hidden Files) وضع الدومين في `SITE_URL`، وصلاحيات الملف 600. لا حاجة لإدخال المتغيرات في واجهة cPanel؛ إن أدخلتها فلها الأولوية على الملف.
+4. **Restart** من صفحة التطبيق. السجلات في `stderr.log` داخل جذر التطبيق.
+5. أكمل خطوات القسم 5 (بعد الإطلاق) أدناه.
+
+عند التحديث: ارفع الحزمة الجديدة في مجلد جديد (مثل `aws-diamond-v2`) مع `.env.production`، ثم غيّر Application root إليه وأعد التشغيل؛ الرجوع = إعادة المسار القديم.
+
+ملاحظة الانتقال بين الأنظمة: الحزمة تُبنى على Windows وتعمل على Linux لأن ناتج Next نقي JavaScript (لا وحدات أصلية: `images.unoptimized` يلغي sharp، ولا يُستخدم SWC وقت التشغيل).
+
+## الطريقة ب — البناء على السيرفر
+
 ## 1. متطلبات الاستضافة (تأكد منها قبل البدء)
 
 | المتطلب | الحد الأدنى |
@@ -62,7 +96,7 @@ grep -rl "serviceWorker.register" .next/static/chunks | head -1              # �
 
 ## 5. بعد الإطلاق
 
-- فعّل **Force HTTPS Redirect** وتحويل www ↔ apex إلى الأصل المستخدم في `NEXT_PUBLIC_SITE_URL`.
+- فعّل **Force HTTPS Redirect** وتحويل www ↔ apex إلى الأصل المستخدم في `SITE_URL` (أو `NEXT_PUBLIC_SITE_URL` عند البناء على السيرفر).
 - إن تغيّر الدومين: Supabase → Authentication → URL Configuration → Site URL + Redirect URLs.
 - اختبارات سريعة: تسجيل دخول بجوجل يعود إلى الدومين (لا إلى localhost)، نسيت كلمة المرور، فتح
   `/certificates`، إرسال إشعار من الإدارة، `curl -sI https://DOMAIN/sw.js` → 200.

@@ -14,6 +14,12 @@ const withSerwist = withSerwistInit({
 const buildCpus = Number(process.env.NEXT_BUILD_CPUS);
 
 const nextConfig: NextConfig = {
+  // NEXT_OUTPUT_STANDALONE=1 أثناء البناء ينتج .next/standalone (حزمة تشغيل مستقلة للاستضافة الذاتية على cPanel،
+  // انظر DEPLOY_CPANEL.md). لا يُفعَّل على Vercel ولا في البناء العادي على السيرفر.
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "1" ? { output: "standalone" as const } : {}),
+  // جذر تتبع الملفات = مجلد المشروع دائماً؛ بدونه قد يستنتج Next جذراً أعلى إذا وُجد package-lock.json آخر
+  // في مجلد أب (يحدث على أجهزة التطوير) فتخرج حزمة standalone بمسارات متداخلة.
+  outputFileTracingRoot: process.cwd(),
   images: {
     remotePatterns: [
       {

@@ -50,3 +50,6 @@ public/swe-worker-*.js
 
 # Claude Code personal project settings
 .claude/settings.local.json
+
+# cPanel pre-built package (scripts/package-cpanel.mjs)
+/dist-cpanel/
