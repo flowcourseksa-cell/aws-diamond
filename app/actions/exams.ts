@@ -1,12 +1,25 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
+import { requireUserId } from "@/lib/supabase/verify-admin";
 
+/**
+ * إجراء خاص بالطالب (session-bound): تُسجَّل المحاولة دائماً على حساب صاحب الجلسة،
+ * ويُتجاهل معرّف المستخدم القادم من العميل (التوقيع ثابت حتى لا يتغير المستدعون).
+ */
 export async function submitSecureExamAttempt(
-  userId: string,
+  _userId: string,
   examId: string,
   rawAnswers: { question_id: string; selected_option_id: string | null; micro_skill_id: string }[]
 ) {
+  let userId: string;
+  try {
+    userId = await requireUserId();
+  } catch (error) {
+    console.error("Server Action submitSecureExamAttempt rejected: no authenticated user", error);
+    return { success: false };
+  }
+
   // Use Admin Client to bypass RLS for fetching correct answers and inserting securely
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,7 +29,7 @@ export async function submitSecureExamAttempt(
   try {
     const questionIds = rawAnswers.map(a => a.question_id);
     
-    if (questionIds.length === 0) return false;
+    if (questionIds.length === 0) return { success: false };
 
     const { data: dbOptions, error: dbError } = await supabaseAdmin
       .from("question_options")

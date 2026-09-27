@@ -47,7 +47,7 @@ export default async function CertificatePage(props: { params: Promise<{ id: str
         </div>
 
         {/* Interactive Certificate Component */}
-        <CertificateClient cert={cert} />
+        <CertificateClient cert={{ id: cert.id, student_name: cert.student_name, course_title: cert.course_title, score_pct: cert.score_pct, issued_at: cert.issued_at }} />
 
         {/* Call to Action for visitors */}
         <div className="mt-16 mb-8 text-center fade-in w-full">

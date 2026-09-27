@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 import { fetchWhatsappSettings } from "@/lib/supabase/services/settings";
 import { fetchStudents } from "@/lib/supabase/services/students";
@@ -14,8 +15,7 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && process.env.NODE_ENV !== "development") {
+    if (!isCronAuthorized(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

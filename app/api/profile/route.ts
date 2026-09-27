@@ -5,7 +5,8 @@ import { cookies } from "next/headers";
 
 export async function POST(req: Request) {
   try {
-    const { userId, fullName, phone, parentPhone, role } = await req.json();
+    // الدور لا يُقبل من هذا المسار إطلاقاً (تغييره عبر promoteToModerator/demoteModerator المحميين)
+    const { userId, fullName, phone, parentPhone } = await req.json();
 
     if (!userId || !fullName) {
       return NextResponse.json({ error: "بيانات غير مكتملة" }, { status: 400 });
@@ -58,16 +59,12 @@ export async function POST(req: Request) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Only admins can change roles
-    const safeRole = isAdmin && role ? role : "student";
-
     // Bypassing RLS with service_role key to upsert profile
     const { error } = await supabaseAdmin.from("profiles").upsert({
       id: userId,
       full_name: fullName,
       phone: phone,
       parent_phone: parentPhone,
-      role: safeRole,
     });
 
     if (error) {

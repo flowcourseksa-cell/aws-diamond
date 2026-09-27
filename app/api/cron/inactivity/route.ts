@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 
 // We need a service role key to bypass RLS for cron jobs
@@ -13,8 +14,7 @@ export const maxDuration = 300;
 
 export async function GET(request: Request) {
   // 1. Verify cron secret to protect this endpoint
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(request)) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
@@ -50,7 +50,8 @@ export async function GET(request: Request) {
         newLevel = 3;
         const { data: enrollments } = await supabase.from("enrollments").select("id").eq("student_id", student.id);
         if (enrollments) {
-          const { unenrollStudent } = await import("@/lib/supabase/services/students-actions");
+          // النسخة الداخلية: إجراء الإدارة يتطلب جلسة مدير، والمهمة المجدولة مفوّضة بـ CRON_SECRET أعلاه
+          const { unenrollStudentInternal: unenrollStudent } = await import("@/lib/supabase/services/students-internal");
           for (const enr of enrollments) {
             await unenrollStudent(enr.id);
           }

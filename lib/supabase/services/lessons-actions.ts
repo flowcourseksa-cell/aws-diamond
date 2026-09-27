@@ -1,8 +1,9 @@
 "use server";
 
-import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
+import { verifyAdminAccess, requireUserId, currentUserId } from "@/lib/supabase/verify-admin";
 
 import { createAdminClient } from "@/lib/supabase/client";
+import { createClient as createServerClient } from "@/lib/supabase/server";
 import { sendPlatformNotification } from "@/lib/notifications/server-push";
 import type { DbLesson } from "./lessons";
 
@@ -93,6 +94,8 @@ export async function uploadLessonCover(formData: FormData): Promise<string | nu
 }
 
 export async function fetchLessonComments(lessonId: string) {
+  // التعليقات تحوي أسماء الطلاب ومعرّفاتهم؛ للمسجّلين فقط (العقد: [] عند الفشل)
+  if (!(await currentUserId())) return [];
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("lesson_comments")
@@ -117,13 +120,33 @@ export async function fetchLessonComments(lessonId: string) {
   }));
 }
 
+/**
+ * إجراء خاص بالطالب (session-bound): التعليق يُسجَّل دائماً باسم صاحب الجلسة، ويُتجاهل معرّف الطالب
+ * القادم من العميل. كذلك العلم is_admin_reply يُحسب على الخادم من دور صاحب الجلسة في profiles
+ * ولا يُؤخذ من العميل (التوقيع ثابت حتى لا يتغير المستدعون).
+ */
 export async function addLessonComment(
   lessonId: string,
-  studentId: string,
+  _studentId: string,
   body: string,
   parentId?: string,
-  isAdminReply = false
+  _isAdminReply = false
 ) {
+  let studentId: string;
+  try {
+    studentId = await requireUserId();
+  } catch (err: any) {
+    return { error: err?.message || "غير مصرح لك" };
+  }
+
+  const sessionClient = await createServerClient();
+  const { data: sessionProfile } = await sessionClient
+    .from("profiles")
+    .select("role")
+    .eq("id", studentId)
+    .single();
+  const isAdminReply = sessionProfile?.role === "admin";
+
   const supabase = createAdminClient();
 
   if (!isAdminReply) {

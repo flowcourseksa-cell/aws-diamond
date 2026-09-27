@@ -1,20 +1,40 @@
 "use server";
 
 import { createClient } from "@supabase/supabase-js";
-import { createCertificate } from "@/lib/supabase/services/certificates";
+import { insertCertificate } from "@/lib/supabase/services/certificates-internal";
+import { requireUserId } from "@/lib/supabase/verify-admin";
 
+/**
+ * إجراء خاص بالطالب (session-bound): الشهادة تُصدر دائماً لصاحب الجلسة،
+ * ويُتجاهل معرّف الطالب القادم من العميل (التوقيع ثابت حتى لا يتغير المستدعون).
+ * يرمي "غير مصرح لك" إن لم توجد جلسة — المستدعي يلتقط الاستثناء أصلاً.
+ */
 export async function gradeSimulatorAttempt(
   courseId: string,
   examId: string,
   answers: Record<string, string | null>, // question_id -> option_id
-  studentId: string,
-  userName: string,
-  examTitle: string
+  _studentId: string,
+  _userName: string,
+  _examTitle: string
 ) {
+  const studentId = await requireUserId();
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
+
+  // 0. الاختبار يجب أن يتبع الدورة المطلوبة، والاسم والعنوان يُقرآن من قاعدة البيانات لا من العميل
+  const [{ data: exam }, { data: profile }] = await Promise.all([
+    supabaseAdmin.from("final_exams").select("id, course_id, title").eq("id", examId).single(),
+    supabaseAdmin.from("profiles").select("full_name").eq("id", studentId).single(),
+  ]);
+  if (!exam || exam.course_id !== courseId) {
+    throw new Error("Invalid exam");
+  }
+  const { data: course } = await supabaseAdmin.from("courses").select("title").eq("id", courseId).single();
+  const studentName = (profile?.full_name || "").trim() || "طالب متميز";
+  const certificateTitle = (exam.title || course?.title || "").trim() || "محاكي اختبار ستيب";
 
   // 1. Fetch all questions and options for this exam
   const { data: questionsData, error } = await supabaseAdmin
@@ -58,13 +78,13 @@ export async function gradeSimulatorAttempt(
 
   // 3. Create Certificate if passed or even if failed (simulator creates certificate anyway)
   // Actually simulator creates it always.
-  const newCert = await createCertificate({
+  const newCert = await insertCertificate({
     student_id: studentId,
     course_id: courseId,
     final_exam_id: examId,
     score_pct: percentage,
-    student_name: userName || 'طالب متميز',
-    course_title: examTitle
+    student_name: studentName,
+    course_title: certificateTitle,
   });
 
   return {

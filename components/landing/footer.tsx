@@ -46,7 +46,7 @@ export default function Footer() {
           <ul className="space-y-4 text-text-muted">
             <li className="flex items-center gap-2">
               <IconBrandWhatsapp size={18} className="text-primary" />
-              <span dir="ltr">+966 50 000 0000</span>
+              <span dir="ltr">+966 50 780 6516</span>
             </li>
             <li>الرياض، المملكة العربية السعودية</li>
             <li>info@nokhba.com</li>

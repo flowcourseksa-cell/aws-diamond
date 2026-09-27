@@ -1,9 +1,11 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/client";
+import { verifyAdminAccess, requireUserId } from "@/lib/supabase/verify-admin";
 import type { DbLibraryFile } from "./library";
 
 export async function createFile(file: Partial<DbLibraryFile>): Promise<DbLibraryFile | null> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("library_files")
@@ -31,6 +33,7 @@ export async function createFile(file: Partial<DbLibraryFile>): Promise<DbLibrar
 }
 
 export async function updateFile(id: string, file: Partial<DbLibraryFile>): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase
     .from("library_files")
@@ -56,6 +59,7 @@ export async function updateFile(id: string, file: Partial<DbLibraryFile>): Prom
 }
 
 export async function deleteFile(id: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = createAdminClient();
   const { error } = await supabase.from("library_files").delete().eq("id", id);
   if (error) {
@@ -66,6 +70,9 @@ export async function deleteFile(id: string): Promise<boolean> {
 }
 
 export async function incrementFileDownload(id: string): Promise<boolean> {
+  // Student-facing counter bump: only a logged-in user may trigger it (the /library page is login-gated by
+  // proxy.ts and AppShell, so this changes nothing for real users but blocks anonymous service-role writes).
+  await requireUserId();
   const supabase = createAdminClient();
   const { data } = await supabase.from("library_files").select("downloads_count").eq("id", id).single();
   if (data) {

@@ -3,8 +3,17 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { sendPlatformNotification } from "@/lib/notifications/server-push";
 import { revalidatePath } from 'next/cache';
+import { verifyAdminAccess, verifySuperAdminAccess, requireUserId } from "@/lib/supabase/verify-admin";
 
 export async function fetchPendingActivations() {
+  // إجراء إداري: يعيد [] لغير المديرين (عقد الدالة يعيد [] عند الفشل)
+  try {
+    await verifySuperAdminAccess();
+  } catch (err: any) {
+    console.error("fetchPendingActivations:", err?.message || "غير مصرح لك");
+    return [];
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);
@@ -40,6 +49,13 @@ export async function fetchPendingActivations() {
 }
 
 export async function fetchPendingCount() {
+  // إجراء إداري: يعيد 0 لغير المديرين (عقد الدالة يعيد 0 عند الفشل)
+  try {
+    await verifyAdminAccess();
+  } catch {
+    return 0;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);
@@ -52,22 +68,79 @@ export async function fetchPendingCount() {
   return count || 0;
 }
 
+/**
+ * إجراء خاص بالطالب (session-bound): يعمل دائماً على حساب صاحب الجلسة.
+ * المعرّف والعلم activateImmediately والسعر وحالة الدفع وعنوان الدورة القادمة من العميل تُتجاهل،
+ * وتُحسب على الخادم من الجلسة ومن صف الدورة في قاعدة البيانات (التوقيع ثابت حتى لا يتغير المستدعون).
+ */
 export async function requestCourseActivation(
-  studentId: string, 
-  courseId: string, 
-  studentName: string, 
-  courseTitle: string,
-  isPaid: boolean = false,
-  finalPrice?: number,
+  _studentId: string,
+  courseId: string,
+  studentName: string,
+  _courseTitle: string,
+  _isPaid: boolean = false,
+  _finalPrice?: number,
   discountCode?: string,
-  activateImmediately: boolean = false
+  _activateImmediately: boolean = false
 ) {
+  let studentId: string;
+  try {
+    studentId = await requireUserId();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);
 
+  // 0. Server-side truth about the course (price / activation policy / title) — never trust the client for these
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select('id, title, price, discounted_price, description')
+    .eq('id', courseId)
+    .single();
+  if (courseError || !course) {
+    return { success: false, error: "الدورة غير موجودة" };
+  }
+
+  let meta: any = {};
+  try {
+    if (course.description && course.description.startsWith("{")) meta = JSON.parse(course.description);
+  } catch {
+    // Not JSON, ignore
+  }
+  const requireWhatsappActivation: boolean = meta.requireWhatsappActivation ?? true;
+  // Same rule as the course page: free == discounted price is exactly 0
+  const isFree = course.discounted_price === 0;
+  const isPaid = !isFree;
+  const activateImmediately = isFree && requireWhatsappActivation === false;
+  const courseTitle: string = course.title || 'الدورة';
+
+  // Recompute the expected price on the server (mirrors the course page / validateDiscountCode)
+  const currentPrice: number = Number(course.discounted_price ?? course.price ?? 0);
+  let finalPrice: number = currentPrice;
+  let appliedCode: string | undefined = undefined;
+  if (isPaid && discountCode) {
+    const code = discountCode.trim().toUpperCase();
+    const { data: dc } = await supabase
+      .from('discount_codes')
+      .select('code, discount_percent, uses, max_uses, expiry_date')
+      .eq('code', code)
+      .maybeSingle();
+    if (dc) {
+      const expired = dc.expiry_date ? new Date(dc.expiry_date) < new Date(new Date().toDateString()) : false;
+      const usedUp = (dc.max_uses ?? 0) > 0 && (dc.uses ?? 0) >= (dc.max_uses ?? 0);
+      if (!expired && !usedUp) {
+        appliedCode = dc.code;
+        finalPrice = currentPrice - (currentPrice * (dc.discount_percent ?? 0) / 100);
+      }
+    }
+  }
+
   // 1. Ensure profile exists (to prevent foreign key constraint violations)
-  const { data: existingProfile } = await supabase.from('profiles').select('id').eq('id', studentId).single();
+  const { data: existingProfile } = await supabase.from('profiles').select('id, full_name').eq('id', studentId).single();
+  const displayName: string = existingProfile?.full_name || studentName || 'طالب جديد';
   if (!existingProfile) {
     const { error: profileError } = await supabase.from('profiles').insert({
       id: studentId,
@@ -83,10 +156,10 @@ export async function requestCourseActivation(
   const { error: insertError } = await supabase.from('enrollments').insert({
     student_id: studentId,
     course_id: courseId,
-    is_active: activateImmediately, // ✅ Activates immediately if requested
+    is_active: activateImmediately, // ✅ Activates immediately only when the course policy allows it (server-derived)
     payment_status: isPaid ? 'pending' : 'free',
     final_price: finalPrice,
-    discount_code: discountCode
+    discount_code: appliedCode
   });
 
   if (insertError) {
@@ -96,7 +169,7 @@ export async function requestCourseActivation(
 
   if (activateImmediately) {
     // No need to notify admins if activated immediately (or we can optionally notify them, but let's skip)
-    return { success: true };
+    return { success: true, activated: true };
   }
 
   // Notify admins
@@ -105,7 +178,7 @@ export async function requestCourseActivation(
     const adminNotifications = admins.map(admin => ({
       user_id: admin.id,
       title: "طلب تفعيل جديد",
-      message: `الطالب ${studentName || 'طالب جديد'} يطلب تفعيل دورة ${courseTitle}. يرجى مراجعة صفحة إشعارات التفعيل.`,
+      message: `الطالب ${displayName} يطلب تفعيل دورة ${courseTitle}. يرجى مراجعة صفحة إشعارات التفعيل.`,
       type: "info"
     }));
     await supabase.from('notifications').insert(adminNotifications);
@@ -115,10 +188,16 @@ export async function requestCourseActivation(
   revalidatePath('/');
   revalidatePath('/dashboard');
 
-  return { success: true };
+  return { success: true, activated: false };
 }
 
 export async function approveActivation(enrollmentId: string, studentId: string, courseTitle: string) {
+  try {
+    await verifySuperAdminAccess();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);
@@ -140,6 +219,12 @@ export async function approveActivation(enrollmentId: string, studentId: string,
 }
 
 export async function rejectActivation(enrollmentId: string, studentId: string, courseTitle: string) {
+  try {
+    await verifySuperAdminAccess();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);

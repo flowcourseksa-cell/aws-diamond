@@ -29,13 +29,26 @@ export function usePushNotifications() {
     }
   }, [user]);
 
+  async function registerOnServer(sub: PushSubscription): Promise<boolean> {
+    const res = await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub.toJSON() }), // الهوية تُؤخذ من الجلسة على الخادم
+    });
+    return res.ok;
+  }
+
   async function checkSubscription() {
     if (!("serviceWorker" in navigator) || !user) return;
     try {
       const reg = await navigator.serviceWorker.ready;
       const sub = await reg.pushManager.getSubscription();
-      setIsSubscribed(!!sub);
-    } catch {}
+      if (!sub) return setIsSubscribed(false);
+      // أعد ربط اشتراك المتصفح بالمستخدم الحالي (جهاز مشترك: الاشتراك القديم قد يكون باسم طالب آخر)
+      setIsSubscribed(await registerOnServer(sub));
+    } catch {
+      setIsSubscribed(false);
+    }
   }
 
   async function subscribe() {
@@ -52,11 +65,13 @@ export function usePushNotifications() {
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
 
-      await fetch("/api/push/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subscription: sub.toJSON(), studentId: user.id }),
-      });
+      const saved = await registerOnServer(sub);
+      if (!saved) {
+        // لم يُحفظ على الخادم (جلسة منتهية أو خطأ): لا نُبقي اشتراك متصفح لن يصله شيء
+        await sub.unsubscribe().catch(() => {});
+        setIsSubscribed(false);
+        return;
+      }
 
       setIsSubscribed(true);
     } catch (err) {

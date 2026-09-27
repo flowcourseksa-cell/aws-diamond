@@ -6,6 +6,10 @@ import { getPublicOrigin } from "@/lib/public-origin";
 // GET /api/certificates/generate?id=<cert-id>
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get("id");
+  // المعرّف يجب أن يكون UUID قبل أي استعلام أو إدراج في HTML/روابط
+  if (!id || !UUID_RE.test(id)) {
+    return NextResponse.json({ error: "Invalid certificate ID" }, { status: 400 });
+  }
   if (!id) return NextResponse.json({ error: "Missing certificate ID" }, { status: 400 });
 
   const cert = await fetchCertificateById(id);
@@ -21,9 +25,9 @@ export async function GET(req: NextRequest) {
   const verifyUrl = `${getPublicOrigin(req.headers, req.url)}/verify/${cert.id}`;
 
   const html = buildCertificateHTML({
-    studentName: cert.student_name,
-    courseTitle: cert.course_title,
-    scorePct: cert.score_pct,
+    studentName: escapeHtml(cert.student_name),
+    courseTitle: escapeHtml(cert.course_title),
+    scorePct: Number(cert.score_pct) || 0,
     issuedDate,
     certId: cert.id,
     verifyUrl,
@@ -39,6 +43,13 @@ export async function GET(req: NextRequest) {
 }
 
 // ─── Certificate HTML Template ────────────────────────────────────────────────
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// كل نص قادم من قاعدة البيانات يُدرج في HTML بعد الهروب (اسم الطالب وعنوان الدورة يكتبهما المستخدمون)
+function escapeHtml(value: unknown): string {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[c] as string));
+}
 
 function buildCertificateHTML(opts: {
   studentName: string;

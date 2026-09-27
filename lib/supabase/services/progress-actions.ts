@@ -1,9 +1,14 @@
 "use server";
 import { createAdminClient } from "@/lib/supabase/client";
 import { unstable_noStore as noStore } from "next/cache";
+import { currentUserId } from "@/lib/supabase/verify-admin";
 
-export async function fetchUserProgressServer(userId: string) {
+export async function fetchUserProgressServer(_userId: string) {
   noStore();
+  // SECURITY: يُقرأ تقدّم صاحب الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل (بلا جلسة = لا تقدّم)
+  const userId = await currentUserId();
+  if (!userId) return { skills: [], lessons: [] };
+
   const supabase = createAdminClient();
   
   // Fetch skill progress

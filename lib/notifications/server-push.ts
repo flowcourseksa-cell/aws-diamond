@@ -78,25 +78,29 @@ export async function sendPlatformNotification(
     let sent = 0;
     const deadEndpoints: string[] = [];
 
-    await Promise.allSettled(
-      subs.map(async (sub) => {
-        try {
-          await webpush.sendNotification(
-            {
-              endpoint: sub.endpoint,
-              keys: { p256dh: sub.p256dh, auth: sub.auth },
-            },
-            pushPayload,
-            { TTL: 86400 } // 24 hours
-          );
-          sent++;
-        } catch (err: any) {
-          if (err.statusCode === 410 || err.statusCode === 404) {
-            deadEndpoints.push(sub.endpoint);
+    // دفعات محدودة + مهلة لكل طلب: نقطة اشتراك معطّلة أو بطيئة لا تعلّق الإرسال للجميع
+    const BATCH = 50;
+    for (let i = 0; i < subs.length; i += BATCH) {
+      await Promise.allSettled(
+        subs.slice(i, i + BATCH).map(async (sub) => {
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint: sub.endpoint,
+                keys: { p256dh: sub.p256dh, auth: sub.auth },
+              },
+              pushPayload,
+              { TTL: 86400, timeout: 10_000 } // 24 hours; 10s per endpoint
+            );
+            sent++;
+          } catch (err: any) {
+            if (err.statusCode === 410 || err.statusCode === 404) {
+              deadEndpoints.push(sub.endpoint);
+            }
           }
-        }
-      })
-    );
+        })
+      );
+    }
 
     // Clean up expired push subscriptions
     if (deadEndpoints.length > 0) {

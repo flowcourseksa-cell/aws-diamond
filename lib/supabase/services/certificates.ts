@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { verifyAdminAccess, currentUserId } from "@/lib/supabase/verify-admin";
 
 function getReadClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -40,12 +41,15 @@ function getHighestCertificates(certs: Certificate[]): Certificate[] {
   return Array.from(map.values());
 }
 
-export async function fetchStudentCertificates(studentId: string): Promise<Certificate[]> {
+/** Student: own certificates only. The student id is taken from the session, never from the client. */
+export async function fetchStudentCertificates(_studentId: string): Promise<Certificate[]> {
+  const userId = await currentUserId();
+  if (!userId) return [];
   const supabase = getReadClient();
   const { data, error } = await supabase
     .from("certificates")
     .select("*")
-    .eq("student_id", studentId)
+    .eq("student_id", userId)
     .order("issued_at", { ascending: false });
 
   if (error) return [];
@@ -74,6 +78,7 @@ export async function fetchCertificateById(id: string): Promise<Certificate | nu
 
 /** Admin: fetch all issued certificates */
 export async function fetchAllCertificates(): Promise<Certificate[]> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from("certificates")
@@ -86,16 +91,18 @@ export async function fetchAllCertificates(): Promise<Certificate[]> {
   return getHighestCertificates(data as Certificate[]);
 }
 
-/** Check if a student already has a certificate for a course */
+/** Check if the session user already has a certificate for a course (client-supplied student id is ignored) */
 export async function fetchCertificateForCourse(
-  studentId: string,
+  _studentId: string,
   courseId: string
 ): Promise<Certificate | null> {
+  const userId = await currentUserId();
+  if (!userId) return null;
   const supabase = getReadClient();
   const { data, error } = await supabase
     .from("certificates")
     .select("*")
-    .eq("student_id", studentId)
+    .eq("student_id", userId)
     .eq("course_id", courseId)
     .order("issued_at", { ascending: false })
     .limit(1)
@@ -105,16 +112,18 @@ export async function fetchCertificateForCourse(
   return data as Certificate;
 }
 
-/** Fetch the highest score certificate for a student in a course */
+/** Fetch the session user's highest score certificate in a course (client-supplied student id is ignored) */
 export async function fetchHighestScoreForCourse(
-  studentId: string,
+  _studentId: string,
   courseId: string
 ): Promise<Certificate | null> {
+  const userId = await currentUserId();
+  if (!userId) return null;
   const supabase = getReadClient();
   const { data, error } = await supabase
     .from("certificates")
     .select("*")
-    .eq("student_id", studentId)
+    .eq("student_id", userId)
     .eq("course_id", courseId)
     .order("score_pct", { ascending: false })
     .limit(1)
@@ -124,27 +133,12 @@ export async function fetchHighestScoreForCourse(
   return data as Certificate;
 }
 
-/** Create a new certificate */
-export async function createCertificate(data: Omit<Certificate, 'id' | 'issued_at'>): Promise<Certificate | null> {
-  const supabase = getAdminClient();
-  const { data: newCert, error } = await supabase
-    .from("certificates")
-    .insert([{
-      ...data,
-      issued_at: new Date().toISOString()
-    }])
-    .select()
-    .single();
-
-  if (error) {
-    console.error("Error creating certificate:", error);
-    return null;
-  }
-  return newCert as Certificate;
-}
+/** Create a new certificate — always issued to the session user (client-supplied student_id is ignored) */
+// إصدار الشهادات لم يعد إجراء خادم عاماً: يتم فقط من داخل gradeSimulatorAttempt عبر lib/supabase/services/certificates-internal.ts
 
 /** Admin: delete a single certificate by ID */
 export async function deleteCertificate(id: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { error } = await supabase
     .from("certificates")
@@ -156,6 +150,7 @@ export async function deleteCertificate(id: string): Promise<boolean> {
 
 /** Admin: delete multiple certificates by IDs */
 export async function deleteMultipleCertificates(ids: string[]): Promise<boolean> {
+  await verifyAdminAccess();
   if (ids.length === 0) return true;
   const supabase = getAdminClient();
   const { error } = await supabase

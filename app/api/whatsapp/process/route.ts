@@ -4,13 +4,13 @@
 // ============================================================
 import { NextRequest, NextResponse } from "next/server";
 import { processWhatsAppQueue } from "@/lib/whatsapp";
+import { isCronAuthorized } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   // حماية: تأكد أن الطلب قادم من Supabase Cron أو Admin
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!isCronAuthorized(req)) {
     return NextResponse.json({ error: "غير مصرح" }, { status: 401 });
   }
 

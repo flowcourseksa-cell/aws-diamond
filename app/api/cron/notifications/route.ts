@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isCronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
 import { parseNotificationTemplate } from "@/lib/notifications/parser";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -14,8 +15,7 @@ const DAYS_EN = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday
 export async function GET(request: Request) {
   try {
     // 1. Check authorization (Cron Secret) - Optional but recommended for production
-    const authHeader = request.headers.get("authorization");
-    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!isCronAuthorized(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

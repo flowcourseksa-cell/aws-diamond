@@ -22,8 +22,14 @@ export function SyncManager() {
       let lessonSuccessCount = 0;
       let userIdToSync = null;
 
+      // الإجراءات على الخادم تنسب المحاولة لصاحب الجلسة الحالية؛ لا نعيد إرسال ما سُجّل لحساب آخر على نفس الجهاز
+      const { data: { user: sessionUser } } = await createClient().auth.getUser();
+      const currentUserId = sessionUser?.id;
+      if (!currentUserId) return;
+
       // Loop over exams
       for (const pending of pendingExams) {
+        if (pending.userId !== currentUserId) continue;
         try {
           const response = await submitSecureExamAttempt(pending.userId, pending.examId, pending.rawAnswers);
           if (response && response.success) {
@@ -42,6 +48,7 @@ export function SyncManager() {
       if (pendingLessons.length > 0) {
         const { markLessonCompleted } = await import("@/lib/supabase/services/progress");
         for (const pending of pendingLessons) {
+          if (pending.userId !== currentUserId) continue;
           try {
             const success = await markLessonCompleted(pending.userId, pending.lessonId);
             if (success) {

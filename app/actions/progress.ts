@@ -3,22 +3,15 @@
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient as createServerClient } from "@/lib/supabase/server";
+import { verifyAdminAccess, requireUserId, currentUserId } from "@/lib/supabase/verify-admin";
 
-async function verifyUserAccess(targetStudentId: string) {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("غير مصرح لك");
-  if (user.id !== targetStudentId) {
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-    if (profile?.role !== "admin") {
-      throw new Error("غير مصرح لك بتعديل بيانات هذا الطالب");
-    }
-  }
-}
+/**
+ * إجراءات الطالب في هذا الملف مقيدة بالجلسة (session-bound): يُستخدم معرّف صاحب الجلسة دائماً
+ * ويُتجاهل معرّف الطالب القادم من العميل (التوقيع ثابت حتى لا يتغير المستدعون).
+ */
 
-export async function grantRemedialAttempt(studentId: string, examId: string, skillId?: string) {
-  await verifyUserAccess(studentId);
-
+/** المنطق الفعلي لمنح محاولة علاجية لطالب محدد — داخلي (غير مُصدَّر) ويُستدعى بعد التحقق من الهوية. */
+async function grantRemedialAttemptFor(studentId: string, examId: string) {
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -75,7 +68,24 @@ export async function grantRemedialAttempt(studentId: string, examId: string, sk
   }
 }
 
+export async function grantRemedialAttempt(_studentId: string, examId: string, skillId?: string) {
+  let studentId: string;
+  try {
+    studentId = await requireUserId();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
+  return grantRemedialAttemptFor(studentId, examId);
+}
+
+/** لا مستدعين حالياً؛ محمي كإجراء إداري (يعمل على طالب محدد بمعرّفه). */
 export async function autoRemediateExams(studentId: string, lessonId: string) {
+  try {
+    await verifyAdminAccess();
+  } catch {
+    return { success: false };
+  }
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -101,8 +111,8 @@ export async function autoRemediateExams(studentId: string, lessonId: string) {
         .lt("mastery_score", 50);
 
       // We simply grant an attempt to any locked exam in the scope. 
-      // The grantRemedialAttempt function automatically checks if officialCount >= 5 before granting.
-      await grantRemedialAttempt(studentId, exam.id);
+      // The grantRemedialAttemptFor function automatically checks if officialCount >= 5 before granting.
+      await grantRemedialAttemptFor(studentId, exam.id);
     }
 
     return { success: true };
@@ -112,7 +122,14 @@ export async function autoRemediateExams(studentId: string, lessonId: string) {
   }
 }
 
+/** لا مستدعين حالياً؛ محمي كإجراء إداري (يقرأ محاولات طالب محدد بمعرّفه). */
 export async function getRemediableExamForLesson(studentId: string, lessonId: string): Promise<string | null> {
+  try {
+    await verifyAdminAccess();
+  } catch {
+    return null;
+  }
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -163,8 +180,13 @@ export async function getRemediableExamForLesson(studentId: string, lessonId: st
   }
 }
 
-export async function archiveStudentCourse(studentId: string, courseId: string) {
-  await verifyUserAccess(studentId);
+export async function archiveStudentCourse(_studentId: string, courseId: string) {
+  let studentId: string;
+  try {
+    studentId = await requireUserId();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
 
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -262,8 +284,13 @@ export async function archiveStudentCourse(studentId: string, courseId: string) 
   }
 }
 
-export async function saveLessonProgressTime(studentId: string, lessonId: string, progressSeconds: number) {
-  await verifyUserAccess(studentId);
+export async function saveLessonProgressTime(_studentId: string, lessonId: string, progressSeconds: number) {
+  let studentId: string;
+  try {
+    studentId = await requireUserId();
+  } catch (err: any) {
+    return { success: false, error: err?.message || "غير مصرح لك" };
+  }
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -285,7 +312,9 @@ export async function saveLessonProgressTime(studentId: string, lessonId: string
   }
 }
 
-export async function getLessonProgressTime(studentId: string, lessonId: string): Promise<number> {
+export async function getLessonProgressTime(_studentId: string, lessonId: string): Promise<number> {
+  const studentId = await currentUserId();
+  if (!studentId) return 0;
   const supabase = await createServerClient();
   try {
     const { data, error } = await supabase

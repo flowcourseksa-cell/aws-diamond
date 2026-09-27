@@ -7,7 +7,10 @@ import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 import Link from "next/link";
 
-export default function CertificateClient({ cert }: { cert: Certificate }) {
+// يصل المتصفح إلى الحقول المعروضة فقط (لا student_id ولا معرّفات الاختبار)
+export type PublicCertificate = Pick<Certificate, "id" | "student_name" | "course_title" | "score_pct" | "issued_at">;
+
+export default function CertificateClient({ cert }: { cert: PublicCertificate }) {
   const certificateRef = useRef<HTMLDivElement>(null);
 
   const handleDownload = async () => {

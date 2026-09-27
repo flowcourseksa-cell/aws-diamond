@@ -3,6 +3,7 @@ import { Cairo, Tajawal } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import PushRebind from "@/components/ui/push-rebind";
 import { OfflineWarning } from "@/components/ui/offline-warning";
 
 const cairo = Cairo({ 
@@ -37,7 +38,10 @@ export default function RootLayout({
       <body className="antialiased font-sans bg-bg text-text">
         <OfflineWarning />
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <ToastProvider>
+            <PushRebind />
+            {children}
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -2,6 +2,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { verifySuperAdminAccess } from "@/lib/supabase/verify-admin";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -11,6 +12,12 @@ function getAdminClient() {
 }
 
 export async function searchStudentToPromote(email: string) {
+  try {
+    await verifySuperAdminAccess();
+  } catch (err: any) {
+    return { success: false, message: err?.message || "غير مصرح لك" };
+  }
+
   const supabase = getAdminClient();
   
   // Search in auth.users
@@ -53,6 +60,12 @@ export async function searchStudentToPromote(email: string) {
 }
 
 export async function promoteToModerator(userId: string) {
+  try {
+    await verifySuperAdminAccess();
+  } catch (err: any) {
+    return { success: false, message: err?.message || "غير مصرح لك" };
+  }
+
   const supabase = getAdminClient();
   const { error } = await supabase
     .from("profiles")
@@ -68,6 +81,12 @@ export async function promoteToModerator(userId: string) {
 }
 
 export async function demoteModerator(userId: string) {
+  try {
+    await verifySuperAdminAccess();
+  } catch (err: any) {
+    return { success: false, message: err?.message || "غير مصرح لك" };
+  }
+
   const supabase = getAdminClient();
   const { error } = await supabase
     .from("profiles")
@@ -83,6 +102,13 @@ export async function demoteModerator(userId: string) {
 }
 
 export async function fetchModerators() {
+  // إجراء إداري: يعيد [] لغير المديرين (عقد الدالة يعيد [] عند الفشل)
+  try {
+    await verifySuperAdminAccess();
+  } catch {
+    return [];
+  }
+
   const supabase = getAdminClient();
   
   // Get all content admins
@@ -109,7 +135,8 @@ export async function fetchModerators() {
 }
 
 export async function changeAdminPassword(newPassword: string) {
-  // Wait, updating password needs to happen on the client if it's for the currently logged in user, 
+  await verifySuperAdminAccess();
+  // Wait, updating password needs to happen on the client if it's for the currently logged in user,
   // OR we can use the Service Role to change password if we know the user ID.
   // Actually, Supabase client side `supabase.auth.updateUser` is much safer because it uses their session.
   // Let's do it client-side in the component.

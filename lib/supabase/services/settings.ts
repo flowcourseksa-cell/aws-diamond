@@ -2,6 +2,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
 
 function getAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -21,6 +22,7 @@ export type PlatformSettings = {
   global_library: boolean;
 };
 
+// قراءة عامة (إعدادات المنصة غير الشخصية) — تُستخدم في app-shell لكل المستخدمين، لا تحتاج حراسة
 export async function fetchPlatformSettings(): Promise<PlatformSettings> {
   const supabase = getReadClient();
   const { data, error } = await supabase.from("platform_settings").select("*");
@@ -57,6 +59,21 @@ export async function fetchWhatsappSettings() {
 }
 
 export async function updatePlatformSetting(key: keyof PlatformSettings, value: boolean) {
+  // إجراء إداري: يعيد false لغير المديرين (عقد الدالة يعيد false عند الفشل)
+  try {
+    await verifyAdminAccess();
+  } catch (err: any) {
+    console.error("updatePlatformSetting:", err?.message || "غير مصرح لك");
+    return false;
+  }
+
+  // المفتاح يصل نصاً من العميل: نقبل مفاتيح الميزات المعروفة فقط وقيمة منطقية فقط
+  const ALLOWED_KEYS: (keyof PlatformSettings)[] = ["global_interactive_book", "global_study_plan", "global_library"];
+  if (!ALLOWED_KEYS.includes(key) || typeof value !== "boolean") {
+    console.error("updatePlatformSetting: invalid key or value", key);
+    return false;
+  }
+
   const supabase = getAdminClient();
   const { error } = await supabase
     .from("platform_settings")
@@ -73,6 +90,14 @@ export async function updatePlatformSetting(key: keyof PlatformSettings, value: 
 }
 
 export async function updateCourseFeatureOverrides(courseId: string, overrides: Record<string, boolean | null>) {
+  // إجراء إداري: يعيد false لغير المديرين (عقد الدالة يعيد false عند الفشل)
+  try {
+    await verifyAdminAccess();
+  } catch (err: any) {
+    console.error("updateCourseFeatureOverrides:", err?.message || "غير مصرح لك");
+    return false;
+  }
+
   const supabase = getAdminClient();
   
   // Clean null values from overrides (null means inherit global)

@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Course } from "@/lib/store";
 import { revalidatePath } from "next/cache";
+import { verifyAdminAccess } from "@/lib/supabase/verify-admin";
 
 // Server-only Supabase clients. The service role key MUST stay on the server
 // (no NEXT_PUBLIC_ prefix) so it is never shipped to the browser.
@@ -19,6 +20,7 @@ function getAdminClient() {
 }
 
 export async function uploadCourseCover(formData: FormData) {
+  await verifyAdminAccess();
   const file = formData.get("file") as File;
   if (!file) return null;
 
@@ -151,6 +153,7 @@ export async function fetchCourses(type: 'course' | 'simulator' | 'all' = 'cours
 }
 
 export async function createCourse(course: Partial<Course>): Promise<Course | null> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
 
   const metadata = {
@@ -201,6 +204,7 @@ export async function createCourse(course: Partial<Course>): Promise<Course | nu
 }
 
 export async function updateCourse(id: string, course: Partial<Course>): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
 
   // Fetch the existing course to merge metadata
@@ -251,6 +255,7 @@ export async function updateCourse(id: string, course: Partial<Course>): Promise
 }
 
 export async function deleteCourse(id: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { error } = await supabase
     .from("courses")
@@ -267,6 +272,7 @@ export async function deleteCourse(id: string): Promise<boolean> {
 }
 
 export async function uploadCourseCoverImage(formData: FormData): Promise<string | null> {
+  await verifyAdminAccess();
   console.warn("uploadCourseCoverImage not implemented");
   return null;
 }

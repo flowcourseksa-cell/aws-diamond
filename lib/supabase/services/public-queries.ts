@@ -30,9 +30,10 @@ export async function fetchHierarchyByCourseAdmin(courseId: string): Promise<DbT
 export async function fetchLessonsByTracksAdmin(trackIds: string[]): Promise<DbLesson[]> {
   if (trackIds.length === 0) return [];
   const supabase = createAdminClient();
+  // صفحة الدورة العامة تحتاج المدة فقط؛ لا نعيد video_url وبقية أعمدة الدروس المدفوعة للزوار
   const { data, error } = await supabase
     .from("lessons")
-    .select("*")
+    .select("id, track_id, duration_seconds, access_type")
     .in("track_id", trackIds)
     .order("created_at", { ascending: true });
 
@@ -40,5 +41,5 @@ export async function fetchLessonsByTracksAdmin(trackIds: string[]): Promise<DbL
     console.error("Error fetching lessons:", error);
     return [];
   }
-  return data as DbLesson[];
+  return data as unknown as DbLesson[];
 }

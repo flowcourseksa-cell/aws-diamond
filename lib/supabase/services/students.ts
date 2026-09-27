@@ -1,8 +1,11 @@
 "use server";
+import { isCronAuthorizedHeader } from "@/lib/cron-auth";
 
 import { createClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { type Course } from "@/lib/store";
+import { verifyAdminAccess, requireUserId } from "@/lib/supabase/verify-admin";
 
 function getReadClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -16,7 +19,10 @@ function getAdminClient() {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export async function fetchProfileServer(userId: string) {
+export async function fetchProfileServer(_userId: string) {
+  // SECURITY: يُعاد ملف صاحب الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل.
+  // يُرمى الخطأ خارج try حتى يعامله المستدعي (hooks/use-auth) كفشل مؤقت لا كـ"لا يوجد ملف".
+  const userId = await requireUserId();
   try {
     const supabase = getReadClient();
     const { data, error } = await supabase
@@ -59,6 +65,21 @@ export type StudentWithDetails = DbProfile & {
   enrollments: DbEnrollment[];
 };
 
+/**
+ * fetchStudents يُستدعى من صفحة الطلاب الإدارية (كـ Server Action) ومن كرون التقارير
+ * app/api/cron/reports/route.ts داخل الخادم نفسه حيث لا توجد جلسة مستخدم.
+ * نسمح بحالتين فقط: مدير صاحب جلسة، أو طلب يحمل Authorization: Bearer CRON_SECRET
+ * (نفس الرأس الذي يتحقق منه الكرون نفسه). أي استدعاء آخر يُرفض.
+ */
+async function verifyAdminOrCronAccess() {
+  try {
+    if (isCronAuthorizedHeader((await headers()).get("authorization"))) return;
+  } catch {
+    // خارج سياق طلب HTTP — نكمل إلى التحقق من صلاحية المدير
+  }
+  await verifyAdminAccess();
+}
+
 // Fetch profiles with role='student', with pagination and search
 export async function fetchStudents(
   page: number = 1,
@@ -66,6 +87,7 @@ export async function fetchStudents(
   searchQuery: string = "",
   courseIdFilter: string = "all"
 ): Promise<{ data: StudentWithDetails[], count: number }> {
+  await verifyAdminOrCronAccess();
   const supabase = getReadClient();
   
   // Base select. If courseIdFilter is not "all", we must use !inner join to filter the parent (profiles)
@@ -116,6 +138,7 @@ export async function fetchStudents(
 
 // Grant access to a student for a specific course
 export async function enrollStudent(studentId: string, courseId: string, expiresAt: string | null = null): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   
   const { error } = await supabase
@@ -136,6 +159,7 @@ export async function enrollStudent(studentId: string, courseId: string, expires
 
 // Revoke access
 export async function unenrollStudent(enrollmentId: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   
   const { error } = await supabase
@@ -151,6 +175,7 @@ export async function unenrollStudent(enrollmentId: string): Promise<boolean> {
 }
 
 export async function updateStudent(studentId: string, updates: Partial<DbProfile>): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { error } = await supabase
     .from("profiles")
@@ -165,10 +190,12 @@ export async function updateStudent(studentId: string, updates: Partial<DbProfil
 }
 
 export async function toggleStudentBan(studentId: string, isBanned: boolean): Promise<boolean> {
+  await verifyAdminAccess();
   return updateStudent(studentId, { is_banned: isBanned });
 }
 
 export async function updateStudentPassword(studentId: string, newPassword: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { error } = await supabase.auth.admin.updateUserById(studentId, {
     password: newPassword
@@ -182,6 +209,7 @@ export async function updateStudentPassword(studentId: string, newPassword: stri
 }
 
 export async function deleteStudentCompletely(studentId: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   
   // Attempt to delete auth user (this usually cascades)

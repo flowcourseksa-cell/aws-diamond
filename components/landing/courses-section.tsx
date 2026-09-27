@@ -299,7 +299,7 @@ function CourseCard({ course, index, enrollmentStatus, courseStatus }: { course:
               إغلاق
             </button>
             <Link 
-              href="https://wa.me/966500000000"
+              href="https://wa.me/966507806516"
               target="_blank"
               onClick={(e) => e.stopPropagation()}
               className="flex-1 py-3 rounded-xl bg-orange-500 text-white font-bold hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"

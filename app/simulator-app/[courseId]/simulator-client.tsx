@@ -5,7 +5,6 @@ import { IconClock, IconChevronRight, IconChevronLeft, IconFlag, IconCheck, Icon
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { createCertificate } from "@/lib/supabase/services/certificates";
 import { toPng } from "html-to-image";
 import { gradeSimulatorAttempt } from "@/app/actions/simulator";
 

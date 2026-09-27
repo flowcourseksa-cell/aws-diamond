@@ -5,6 +5,7 @@ import { sendWhatsApp } from "@/lib/whatsapp";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { sendPlatformNotification } from "@/lib/notifications/server-push";
 import { unstable_cache, revalidateTag } from "next/cache";
+import { verifyAdminAccess, requireUserId, currentUserId } from "@/lib/supabase/verify-admin";
 
 // Type-safe wrapper around revalidateTag for this Next.js version
 // The type definition in this version incorrectly requires 2 args, but 1 is correct per docs
@@ -147,9 +148,13 @@ export async function fetchFinalExamByCourse(courseId: string): Promise<FinalExa
 
 /** Check how many attempts the student has used */
 export async function fetchStudentFinalExamAttempts(
-  studentId: string,
+  _studentId: string,
   finalExamId: string
 ): Promise<FinalExamAttempt[]> {
+  // SECURITY: يُقرأ معرّف الطالب من الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل
+  const studentId = await currentUserId();
+  if (!studentId) return [];
+
   const supabase = getReadClient();
   const { data, error } = await supabase
     .from("final_exam_attempts")
@@ -164,11 +169,9 @@ export async function fetchStudentFinalExamAttempts(
 
 /** Check if the student has unlocked the final exam */
 export async function checkFinalExamUnlock(
-  studentId: string,
+  _studentId: string,
   courseId: string
 ): Promise<UnlockStatus> {
-  const supabase = getReadClient();
-
   // Default empty state
   const defaultStatus: UnlockStatus = {
     unlocked: false,
@@ -182,6 +185,12 @@ export async function checkFinalExamUnlock(
     examsTotal: 0,
     requiredExamsPassed: false,
   };
+
+  // SECURITY: يُقرأ معرّف الطالب من الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل (بلا جلسة = مقفل)
+  const studentId = await currentUserId();
+  if (!studentId) return defaultStatus;
+
+  const supabase = getReadClient();
 
   // Step 1: Get final exam unlock config
   const { data: exam } = await supabase
@@ -285,37 +294,37 @@ export async function checkFinalExamUnlock(
 
 /** Submit a final exam attempt and return score */
 export async function submitFinalExamAttempt(
-  studentId: string,
+  _studentId: string,
   finalExamId: string,
   questions: FinalExamQuestion[],
   answers: (number | null)[],
   timeSpentSec: number
 ): Promise<{ scorePct: number; passed: boolean; correct: number; total: number }> {
+  // SECURITY: المحاولة تُسجَّل باسم صاحب الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل
+  const studentId = await requireUserId();
   const supabase = getAdminClient();
 
-  // SECURE GRADING: Extract the IDs of the options the user selected
-  const selectedOptionIds: string[] = [];
+  // SECURE GRADING: العميل يرسل فقط "أي خيار اختار لكل سؤال"؛ مجموعة الأسئلة والإجابات الصحيحة تُقرأ من
+  // قاعدة البيانات للاختبار نفسه، فلا يمكن تقليص عدد الأسئلة أو تمرير خيارات من اختبار آخر.
+  const selectedByQuestion = new Map<string, string>();
   questions.forEach((q, i) => {
     const selectedIdx = answers[i];
-    if (selectedIdx !== null && q.options[selectedIdx]) {
-      selectedOptionIds.push(q.options[selectedIdx].id);
+    if (q?.id && selectedIdx !== null && selectedIdx !== undefined && q.options?.[selectedIdx]) {
+      selectedByQuestion.set(q.id, q.options[selectedIdx].id);
     }
   });
 
-  let correct = 0;
-  
-  if (selectedOptionIds.length > 0) {
-    // Query the database securely to check which of those specific option IDs are correct
-    const { data: correctOptions } = await supabase
-      .from("final_exam_question_options")
-      .select("id")
-      .in("id", selectedOptionIds)
-      .eq("is_correct", true);
-      
-    correct = correctOptions ? correctOptions.length : 0;
-  }
+  const { data: examQuestions } = await supabase
+    .from("final_exam_questions")
+    .select("id, options:final_exam_question_options(id, is_correct)")
+    .eq("final_exam_id", finalExamId);
 
-  const total = questions.length;
+  let correct = 0;
+  const total = examQuestions?.length ?? 0;
+  for (const q of examQuestions ?? []) {
+    const correctOption = (q.options as { id: string; is_correct: boolean }[] | null)?.find((o) => o.is_correct);
+    if (correctOption && selectedByQuestion.get(q.id) === correctOption.id) correct++;
+  }
   const scorePct = total > 0 ? Math.round((correct / total) * 100) : 0;
 
   // Fetch passing score
@@ -505,6 +514,7 @@ async function issueCertificate(
 // ─── Admin API ────────────────────────────────────────────────────────────────
 
 export async function fetchAllFinalExams(): Promise<(FinalExam & { course_title: string })[]> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { data, error } = await supabase
     .from("final_exams")
@@ -516,6 +526,7 @@ export async function fetchAllFinalExams(): Promise<(FinalExam & { course_title:
 }
 
 export async function upsertFinalExam(exam: Partial<FinalExam>): Promise<FinalExam | null> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
 
   // ── If creating new exam (no id), check the course doesn't already have one ──
@@ -558,6 +569,7 @@ export async function upsertFinalExam(exam: Partial<FinalExam>): Promise<FinalEx
 }
 
 export async function saveSimulatorQuestions(examId: string, questions: any[]) {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   
   // 1. Delete all existing questions for this exam
@@ -599,7 +611,18 @@ export async function saveSimulatorQuestions(examId: string, questions: any[]) {
   }
 
   return true;
-}export async function saveFinalExamQuestion(
+}
+
+export async function saveFinalExamQuestion(
+  finalExamId: string,
+  question: Partial<FinalExamQuestion> & { options: Partial<FinalExamOption>[] }
+): Promise<boolean> {
+  await verifyAdminAccess();
+  return saveFinalExamQuestionInternal(finalExamId, question);
+}
+
+/** Internal (not exported => not a Server Action): caller must have verified admin access already. */
+async function saveFinalExamQuestionInternal(
   finalExamId: string,
   question: Partial<FinalExamQuestion> & { options: Partial<FinalExamOption>[] }
 ): Promise<boolean> {
@@ -638,6 +661,7 @@ export async function saveSimulatorQuestions(examId: string, questions: any[]) {
 }
 
 export async function deleteFinalExamQuestion(questionId: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { error } = await supabase.from("final_exam_questions").delete().eq("id", questionId);
   if (!error) invalidateExamCache();
@@ -645,6 +669,7 @@ export async function deleteFinalExamQuestion(questionId: string): Promise<boole
 }
 
 export async function deleteFinalExam(examId: string): Promise<boolean> {
+  await verifyAdminAccess();
   const supabase = getAdminClient();
   const { error } = await supabase.from("final_exams").delete().eq("id", examId);
   if (!error) invalidateExamCache();
@@ -655,11 +680,13 @@ export async function bulkSaveFinalExamQuestions(
   finalExamId: string,
   questions: { text: string; difficulty: string; image_url?: string | null; options: { text: string; is_correct: boolean }[] }[]
 ): Promise<{ success: number; failed: number }> {
+  await verifyAdminAccess();
   let success = 0;
   let failed = 0;
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
-    const ok = await saveFinalExamQuestion(finalExamId, {
+    // Access already verified above — use the internal writer to avoid re-checking per question
+    const ok = await saveFinalExamQuestionInternal(finalExamId, {
       text: q.text,
       explanation: null,
       difficulty: q.difficulty as "easy" | "medium" | "hard",
@@ -689,6 +716,8 @@ export type CourseTrackExam = {
 };
 
 export async function fetchCourseExamsWithQuestions(courseId: string): Promise<CourseTrackExam[]> {
+  // Admin-only: returns is_correct flags for track-exam questions
+  await verifyAdminAccess();
   const supabase = getAdminClient();
 
   // Get all tracks for this course
@@ -743,6 +772,7 @@ export async function fetchCourseExamsWithQuestions(courseId: string): Promise<C
 }
 
 export async function uploadSimulatorAudio(formData: FormData): Promise<string | null> {
+  await verifyAdminAccess();
   const file = formData.get("file") as File;
   if (!file) return null;
 
@@ -766,7 +796,9 @@ export async function uploadSimulatorAudio(formData: FormData): Promise<string |
  * Fetches course statuses (certified, failed) for a student across all courses.
  * Used primarily for displaying badges on course cards in the dashboard.
  */
-export async function fetchStudentCourseStatuses(studentId: string) {
+export async function fetchStudentCourseStatuses(_studentId: string) {
+  // SECURITY: يُقرأ معرّف الطالب من الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل
+  const studentId = await requireUserId();
   const supabase = getReadClient();
 
   // 1. Get all certificates for this student

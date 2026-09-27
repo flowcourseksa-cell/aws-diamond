@@ -1,8 +1,13 @@
 "use server";
 
 import { createClient } from '@supabase/supabase-js';
+import { currentUserId } from "@/lib/supabase/verify-admin";
 
-export async function fetchUserEnrollments(userId: string) {
+export async function fetchUserEnrollments(_userId: string) {
+  // SECURITY: تُقرأ تسجيلات صاحب الجلسة فقط؛ المعرّف القادم من العميل يُتجاهل (بلا جلسة = لا تسجيلات)
+  const userId = await currentUserId();
+  if (!userId) return [];
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
   const supabase = createClient(url, key);
